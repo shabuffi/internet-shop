@@ -6,7 +6,7 @@ from app.core.config import settings
 from app.db.session import Base
 
 # Все модели нужно импортировать здесь, чтобы Alembic их видел
-# from app.db.models import product, order  # добавляем по мере создания
+from app.db.models import product  # noqa: F401
 
 config = context.config
 

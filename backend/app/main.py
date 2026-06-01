@@ -26,6 +26,5 @@ def health_check():
     return {"status": "ok"}
 
 
-# Роутеры подключаем здесь по мере добавления (Sprint 1+)
-# from app.api.v1 import router as api_router
-# app.include_router(api_router, prefix="/api/v1")
+from app.api.v1.endpoints.exchange import router as exchange_router
+app.include_router(exchange_router, prefix="/api/v1")
