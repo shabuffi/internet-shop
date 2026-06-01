@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getProduct } from "@/lib/api";
+import AddToCartButton from "@/components/AddToCartButton";
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -38,9 +39,7 @@ export default async function ProductPage({ params }: Props) {
         {inStock ? `В наличии: ${product.stock} шт` : "Нет в наличии"}
       </p>
 
-      <button className="btn" disabled={!inStock}>
-        {inStock ? "Добавить в корзину" : "Нет в наличии"}
-      </button>
+      <AddToCartButton product={product} />
     </div>
   );
 }
