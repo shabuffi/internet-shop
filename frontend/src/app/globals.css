@@ -1,0 +1,83 @@
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: #f9f9f9;
+  color: #1a1a1a;
+  line-height: 1.6;
+}
+
+a { color: inherit; text-decoration: none; }
+
+.container { max-width: 1200px; margin: 0 auto; padding: 0 1.5rem; }
+
+/* Header */
+.header {
+  background: #fff;
+  border-bottom: 1px solid #e5e5e5;
+  padding: 1rem 0;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+.header-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.logo { font-size: 1.25rem; font-weight: 700; letter-spacing: -0.5px; }
+
+/* Product grid */
+.catalog-page { padding: 2rem 0; }
+.catalog-title { font-size: 1.75rem; font-weight: 700; margin-bottom: 1.5rem; }
+
+.product-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 1.25rem;
+}
+
+.product-card {
+  background: #fff;
+  border: 1px solid #e5e5e5;
+  border-radius: 12px;
+  padding: 1.25rem;
+  transition: box-shadow 0.15s, transform 0.15s;
+  cursor: pointer;
+}
+.product-card:hover {
+  box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+  transform: translateY(-2px);
+}
+.product-name { font-weight: 600; font-size: 0.95rem; margin-bottom: 0.25rem; }
+.product-article { color: #888; font-size: 0.8rem; margin-bottom: 0.75rem; }
+.product-price { font-size: 1.25rem; font-weight: 700; color: #111; }
+.product-stock { font-size: 0.8rem; margin-top: 0.25rem; }
+.in-stock { color: #16a34a; }
+.out-of-stock { color: #dc2626; }
+
+/* Product detail */
+.product-detail { padding: 2rem 0; max-width: 640px; }
+.back-link { color: #555; font-size: 0.9rem; margin-bottom: 1.5rem; display: inline-block; }
+.back-link:hover { color: #111; }
+.detail-name { font-size: 2rem; font-weight: 700; margin-bottom: 0.5rem; }
+.detail-article { color: #888; margin-bottom: 1rem; }
+.detail-price { font-size: 2rem; font-weight: 700; margin-bottom: 1rem; }
+.detail-description { color: #444; line-height: 1.7; margin-bottom: 1.5rem; }
+.detail-stock { font-size: 0.9rem; margin-bottom: 2rem; }
+.btn {
+  display: inline-block;
+  background: #111;
+  color: #fff;
+  padding: 0.75rem 2rem;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 1rem;
+  cursor: pointer;
+  border: none;
+}
+.btn:hover { background: #333; }
+.btn:disabled { background: #ccc; cursor: not-allowed; }
+
+/* Empty state */
+.empty { text-align: center; padding: 4rem 0; color: #888; }
