@@ -10,10 +10,30 @@ from app.core.config import settings
 BASE = "https://api.moysklad.ru/api/remap/1.2"
 
 
+def _get_credentials() -> tuple[str, str]:
+    """
+    Credentials берём из БД (ShopSettings) если они там есть,
+    иначе fallback на .env. Это позволяет настраивать МойСклад через admin панель.
+    """
+    try:
+        from app.db.session import SessionLocal
+        from app.db.models.admin import ShopSettings
+        db = SessionLocal()
+        try:
+            login_row = db.get(ShopSettings, "moysklad_login")
+            pass_row  = db.get(ShopSettings, "moysklad_password")
+            login = login_row.value if login_row and login_row.value else settings.MOYSKLAD_LOGIN
+            password = pass_row.value if pass_row and pass_row.value else settings.MOYSKLAD_PASSWORD
+            return login, password
+        finally:
+            db.close()
+    except Exception:
+        return settings.MOYSKLAD_LOGIN, settings.MOYSKLAD_PASSWORD
+
+
 def _headers() -> dict:
-    creds = base64.b64encode(
-        f"{settings.MOYSKLAD_LOGIN}:{settings.MOYSKLAD_PASSWORD}".encode()
-    ).decode()
+    login, password = _get_credentials()
+    creds = base64.b64encode(f"{login}:{password}".encode()).decode()
     return {"Authorization": f"Basic {creds}", "Content-Type": "application/json"}
 
 
