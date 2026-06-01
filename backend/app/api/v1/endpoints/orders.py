@@ -57,4 +57,10 @@ def create_order(payload: OrderIn, db: Session = Depends(get_db)):
     db.add(order)
     db.commit()
     db.refresh(order)
+
+    # Запускаем фоновую задачу отправки в МойСклад
+    # delay() — поставить в очередь Celery (не ждём результата)
+    from app.tasks.sync import push_order_to_moysklad
+    push_order_to_moysklad.delay(order.id)
+
     return order
