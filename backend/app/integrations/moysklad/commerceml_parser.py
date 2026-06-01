@@ -70,21 +70,31 @@ class ParsedCatalog:
     products: list[ParsedProduct] = field(default_factory=list)
 
 
-# Пространство имён CommerceML — МойСклад использует его в XML
+# Пространство имён CommerceML (опционально — МойСклад может не включать его)
 _NS = "urn:1C.ru:commerceml_2"
 
 
-def _tag(name: str) -> str:
-    """Возвращает тег с пространством имён: {urn:...}Наименование"""
-    return f"{{{_NS}}}{name}"
+def _tag(name: str, ns: str = "") -> str:
+    """Возвращает тег с namespace или без него."""
+    return f"{{{ns}}}{name}" if ns else name
 
 
-def _text(element, tag: str, default: str | None = None) -> str | None:
-    """Достаёт текст из дочернего элемента по имени тега."""
-    child = element.find(_tag(tag))
+def _text(element, tag: str, default: str | None = None, ns: str = "") -> str | None:
+    """Достаёт текст из дочернего элемента. Пробует с namespace и без."""
+    child = element.find(_tag(tag, ns))
+    if child is None and ns:
+        child = element.find(tag)  # fallback без namespace
     if child is not None and child.text:
         return child.text.strip()
     return default
+
+
+def _detect_ns(root) -> str:
+    """Определяет namespace из корневого элемента (или возвращает пустую строку)."""
+    tag = root.tag
+    if tag.startswith("{"):
+        return tag[1:tag.index("}")]
+    return ""
 
 
 def parse_import_xml(xml_bytes: bytes) -> ParsedCatalog:
@@ -93,22 +103,23 @@ def parse_import_xml(xml_bytes: bytes) -> ParsedCatalog:
     Возвращает ParsedCatalog с заполненными списками.
     """
     root = etree.fromstring(xml_bytes)
+    ns = _detect_ns(root)
     catalog = ParsedCatalog()
 
     # ─── Категории ────────────────────────────────────────────────────────────
-    classifier = root.find(_tag("Классификатор"))
+    classifier = root.find(_tag("Классификатор", ns))
     if classifier is not None:
-        groups_el = classifier.find(_tag("Группы"))
+        groups_el = classifier.find(_tag("Группы", ns))
         if groups_el is not None:
-            catalog.categories = _parse_groups(groups_el, parent_id=None)
+            catalog.categories = _parse_groups(groups_el, parent_id=None, ns=ns)
 
     # ─── Товары ───────────────────────────────────────────────────────────────
-    catalog_el = root.find(_tag("Каталог"))
+    catalog_el = root.find(_tag("Каталог", ns))
     if catalog_el is not None:
-        products_el = catalog_el.find(_tag("Товары"))
+        products_el = catalog_el.find(_tag("Товары", ns))
         if products_el is not None:
-            for товар in products_el.findall(_tag("Товар")):
-                product = _parse_product(товар)
+            for товар in products_el.findall(_tag("Товар", ns)):
+                product = _parse_product(товар, ns=ns)
                 if product:
                     catalog.products.append(product)
 
@@ -121,84 +132,79 @@ def parse_offers_xml(xml_bytes: bytes, catalog: ParsedCatalog) -> None:
     Обновляет price и stock прямо в объектах ParsedProduct из catalog.
     """
     root = etree.fromstring(xml_bytes)
+    ns = _detect_ns(root)
 
-    # Строим индекс товаров по moysklad_id для быстрого поиска
     product_index = {p.moysklad_id: p for p in catalog.products}
 
-    packet = root.find(_tag("ПакетПредложений"))
+    packet = root.find(_tag("ПакетПредложений", ns))
     if packet is None:
         return
 
-    offers_el = packet.find(_tag("Предложения"))
+    offers_el = packet.find(_tag("Предложения", ns))
     if offers_el is None:
         return
 
-    for предложение in offers_el.findall(_tag("Предложение")):
-        offer_id = _text(предложение, "Ид")
+    for предложение in offers_el.findall(_tag("Предложение", ns)):
+        offer_id = _text(предложение, "Ид", ns=ns)
         if not offer_id:
             continue
 
-        # Убираем суффикс варианта если есть: "uuid#variant" → "uuid"
         base_id = offer_id.split("#")[0]
         product = product_index.get(base_id)
         if not product:
             continue
 
-        # Цена
-        prices_el = предложение.find(_tag("Цены"))
+        prices_el = предложение.find(_tag("Цены", ns))
         if prices_el is not None:
-            price_el = prices_el.find(_tag("Цена"))
+            price_el = prices_el.find(_tag("Цена", ns))
             if price_el is not None:
-                price_str = _text(price_el, "ЦенаЗаЕдиницу", "0")
+                price_str = _text(price_el, "ЦенаЗаЕдиницу", "0", ns=ns)
                 try:
                     product.price = Decimal(price_str.replace(",", "."))
                 except Exception:
                     pass
 
-        # Остатки
-        qty_str = _text(предложение, "Количество", "0")
+        qty_str = _text(предложение, "Количество", "0", ns=ns)
         try:
             product.stock = int(float(qty_str))
         except Exception:
             pass
 
 
-def _parse_groups(groups_el, parent_id: str | None) -> list[ParsedCategory]:
+def _parse_groups(groups_el, parent_id: str | None, ns: str = "") -> list[ParsedCategory]:
     """Рекурсивно парсит дерево категорий."""
     result = []
-    for group in groups_el.findall(_tag("Группа")):
-        group_id = _text(group, "Ид")
-        name = _text(group, "Наименование")
+    for group in groups_el.findall(_tag("Группа", ns)):
+        group_id = _text(group, "Ид", ns=ns)
+        name = _text(group, "Наименование", ns=ns)
         if not group_id or not name:
             continue
         result.append(ParsedCategory(moysklad_id=group_id, name=name, parent_id=parent_id))
-        # Вложенные подгруппы
-        nested = group.find(_tag("Группы"))
+        nested = group.find(_tag("Группы", ns))
         if nested is not None:
-            result.extend(_parse_groups(nested, parent_id=group_id))
+            result.extend(_parse_groups(nested, parent_id=group_id, ns=ns))
     return result
 
 
-def _parse_product(товар) -> ParsedProduct | None:
+def _parse_product(товар, ns: str = "") -> ParsedProduct | None:
     """Парсит один элемент <Товар>."""
-    product_id = _text(товар, "Ид")
-    name = _text(товар, "Наименование")
+    product_id = _text(товар, "Ид", ns=ns)
+    name = _text(товар, "Наименование", ns=ns)
     if not product_id or not name:
         return None
 
-    # Категория — первый элемент <Ид> внутри <Группы>
     category_id = None
-    groups_el = товар.find(_tag("Группы"))
+    groups_el = товар.find(_tag("Группы", ns))
     if groups_el is not None:
-        first_id = groups_el.find(_tag("Ид"))
+        first_id = groups_el.find(_tag("Ид", ns))
         if first_id is not None and first_id.text:
             category_id = first_id.text.strip()
 
     return ParsedProduct(
         moysklad_id=product_id,
         name=name,
-        description=_text(товар, "Описание"),
-        article=_text(товар, "Артикул"),
-        code=_text(товар, "БазоваяЕдиница"),
+        description=_text(товар, "Описание", ns=ns),
+        article=_text(товар, "Артикул", ns=ns),
+        code=_text(товар, "БазоваяЕдиница", ns=ns),
         category_id=category_id,
     )
