@@ -1,5 +1,6 @@
 # Secrets — never commit these
 .env
+.env.prod
 .env.local
 .env.*.local
 
@@ -21,8 +22,10 @@ node_modules/
 out/
 dist/
 
-# Docker
+# Docker / Celery
 *.log
+celerybeat-schedule
+celerybeat.pid
 
 # OS
 .DS_Store
