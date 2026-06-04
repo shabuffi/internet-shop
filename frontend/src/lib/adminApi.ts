@@ -1,33 +1,21 @@
 const API = "/api/v1/admin";
 
-export function getToken(): string | null {
-  if (typeof window === "undefined") return null;
-  return localStorage.getItem("admin_token");
-}
-
-export function setToken(token: string) {
-  localStorage.setItem("admin_token", token);
-}
-
-export function clearToken() {
-  localStorage.removeItem("admin_token");
-}
+// Авторизация админки — через httpOnly-куку (её ставит /admin/login на бэкенде).
+// Токен НЕ хранится в localStorage (защита от XSS): JS его не видит, кука едет сама.
 
 export async function adminFetch<T>(path: string, init?: RequestInit): Promise<T> {
-  const token = getToken();
   const res = await fetch(`${API}${path}`, {
     ...init,
     headers: {
       "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...(init?.headers ?? {}),
     },
+    credentials: "same-origin", // отправлять httpOnly-куку
     cache: "no-store",
   });
 
   if (res.status === 401) {
-    clearToken();
-    window.location.href = "/admin/login";
+    if (typeof window !== "undefined") window.location.href = "/admin/login";
     throw new Error("Unauthorized");
   }
 
@@ -37,4 +25,8 @@ export async function adminFetch<T>(path: string, init?: RequestInit): Promise<T
   }
 
   return res.json();
+}
+
+export async function adminLogout(): Promise<void> {
+  await fetch(`${API}/logout`, { method: "POST", credentials: "same-origin" }).catch(() => {});
 }

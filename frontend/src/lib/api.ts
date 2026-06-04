@@ -1,4 +1,4 @@
-import type { Product, ProductListResponse } from "@/types/product";
+import type { Product, ProductListResponse, Category } from "@/types/product";
 
 // Внутри Docker-сети frontend обращается к backend по имени сервиса.
 // Снаружи (браузер) — через localhost:8000.
@@ -32,4 +32,8 @@ export async function getProducts(params?: {
 
 export async function getProduct(id: string): Promise<Product> {
   return apiFetch<Product>(`/products/${id}`);
+}
+
+export async function getCategories(): Promise<Category[]> {
+  return apiFetch<Category[]>("/products/categories");
 }

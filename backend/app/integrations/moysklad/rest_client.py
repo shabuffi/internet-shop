@@ -11,9 +11,13 @@ BASE = "https://api.moysklad.ru/api/remap/1.2"
 
 
 def _get_credentials() -> tuple[str, str]:
-    """
-    Credentials берём из БД (ShopSettings) если они там есть,
-    иначе fallback на .env. Это позволяет настраивать МойСклад через admin панель.
+    """Возвращает логин/пароль REST API МойСклад.
+
+    Берёт значения из БД (ShopSettings), а если их там нет — из ``.env``. Это позволяет
+    настраивать доступ к МойСклад через админку, не трогая конфиг.
+
+    Returns:
+        Кортеж ``(login, password)`` — настоящие креды аккаунта МойСклад.
     """
     try:
         from app.db.session import SessionLocal
@@ -32,13 +36,50 @@ def _get_credentials() -> tuple[str, str]:
 
 
 def _headers() -> dict:
+    """Собирает HTTP-заголовки с Basic Auth для запросов к МойСклад.
+
+    Returns:
+        Заголовки с ``Authorization: Basic ...`` и ``Content-Type: application/json``.
+    """
     login, password = _get_credentials()
     creds = base64.b64encode(f"{login}:{password}".encode()).decode()
     return {"Authorization": f"Basic {creds}", "Content-Type": "application/json"}
 
 
+def get_product_image_url(moysklad_id: str) -> str | None:
+    """Возвращает URL миниатюры первого изображения товара.
+
+    Args:
+        moysklad_id: UUID товара в МойСклад.
+
+    Returns:
+        href миниатюры первого изображения или ``None`` (нет картинок либо ошибка запроса).
+    """
+    try:
+        r = httpx.get(
+            f"{BASE}/entity/product/{moysklad_id}/images",
+            headers=_headers(),
+            timeout=10,
+        )
+        r.raise_for_status()
+        rows = r.json().get("rows", [])
+        if rows:
+            return rows[0].get("miniature", {}).get("href")
+        return None
+    except Exception:
+        return None
+
+
 def get_organization_href() -> str:
-    """Возвращает href первой организации аккаунта."""
+    """Возвращает href первой организации аккаунта МойСклад.
+
+    Returns:
+        href организации (нужен для создания заказов).
+
+    Raises:
+        RuntimeError: Если в аккаунте нет организаций.
+        httpx.HTTPStatusError: При ошибке запроса/авторизации.
+    """
     r = httpx.get(f"{BASE}/entity/organization", headers=_headers(), timeout=10)
     r.raise_for_status()
     rows = r.json().get("rows", [])
@@ -48,7 +89,14 @@ def get_organization_href() -> str:
 
 
 def find_product_href_by_article(article: str) -> str | None:
-    """Ищет товар в МойСклад по артикулу, возвращает href или None."""
+    """Ищет товар в МойСклад по артикулу.
+
+    Args:
+        article: Артикул товара.
+
+    Returns:
+        href найденного товара или ``None``, если товар не найден.
+    """
     r = httpx.get(
         f"{BASE}/entity/product",
         params={"filter": f"article={article}"},
@@ -61,9 +109,14 @@ def find_product_href_by_article(article: str) -> str | None:
 
 
 def get_or_create_counterparty(name: str, phone: str) -> str:
-    """
-    Ищет контрагента по телефону, если не найден — создаёт нового.
-    Возвращает href контрагента.
+    """Находит контрагента по телефону или создаёт нового.
+
+    Args:
+        name: Имя покупателя.
+        phone: Телефон покупателя (ключ поиска).
+
+    Returns:
+        href найденного или созданного контрагента.
     """
     # Ищем по номеру телефона
     r = httpx.get(
@@ -95,11 +148,24 @@ def create_customer_order(
     positions: list[dict],
     description: str = "",
 ) -> dict:
-    """
-    Создаёт покупательский заказ в МойСклад.
+    """Создаёт покупательский заказ в МойСклад.
 
-    positions = [{"href": "...product href...", "quantity": 2, "price": 1250.0}]
-    price передаётся в копейках (МойСклад хранит в копейках).
+    Контрагент находится/создаётся по телефону. Цена в позициях указывается в рублях и
+    внутри конвертируется в копейки (МойСклад хранит цены в копейках).
+
+    Args:
+        organization_href: href организации (из :func:`get_organization_href`).
+        customer_name: Имя покупателя.
+        customer_phone: Телефон покупателя.
+        positions: Список позиций вида
+            ``[{"href": "<product href>", "quantity": 2, "price": 1250.0}]`` (цена в рублях).
+        description: Комментарий к заказу; если пуст — собирается автоматически.
+
+    Returns:
+        JSON созданного заказа от МойСклад (содержит, в т.ч., ``id``).
+
+    Raises:
+        httpx.HTTPStatusError: При ошибке создания заказа.
     """
     agent_href = get_or_create_counterparty(customer_name, customer_phone)
 

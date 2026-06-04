@@ -1,19 +1,58 @@
 from app.tasks.celery_app import celery_app
 
 
-@celery_app.task(name="app.tasks.sync.sync_catalog")
-def sync_catalog():
-    """Периодическая синхронизация каталога из МойСклад. Реализация — в Sprint 5."""
-    print("TODO: sync catalog from МойСклад via REST API", flush=True)
-    return {"status": "ok"}
+@celery_app.task(name="app.tasks.sync.fetch_product_images")
+def fetch_product_images():
+    """Celery-задача: дозагружает URL картинок из МойСклад для товаров без них.
+
+    Обрабатывает партию из максимум 50 активных товаров, у которых ещё нет
+    ``image_url`` (чтобы не перегружать API МойСклад). Запускается из админки кнопкой
+    «Загрузить картинки».
+
+    Returns:
+        Словарь ``{"updated": N}`` — сколько товаров получили картинку.
+    """
+    from sqlalchemy import select
+    from app.db.session import SessionLocal
+    from app.db.models.product import Product
+    from app.integrations.moysklad.rest_client import get_product_image_url
+
+    db = SessionLocal()
+    try:
+        products = db.scalars(
+            select(Product)
+            .where(Product.image_url.is_(None), Product.is_active == True)
+            .limit(50)
+        ).all()
+
+        updated = 0
+        for product in products:
+            url = get_product_image_url(product.moysklad_id)
+            if url:
+                product.image_url = url
+                updated += 1
+
+        if updated:
+            db.commit()
+        print(f"fetch_product_images: обновлено {updated} товаров", flush=True)
+        return {"updated": updated}
+    finally:
+        db.close()
 
 
 @celery_app.task(name="app.tasks.sync.push_order_to_moysklad", bind=True, max_retries=3)
 def push_order_to_moysklad(self, order_id: str):
-    """
-    Отправляет заказ в МойСклад.
-    bind=True даёт доступ к self для retry.
-    max_retries=3 — повторит 3 раза если МойСклад недоступен.
+    """Celery-задача: отправляет заказ в МойСклад (REST API).
+
+    Идемпотентна: если у заказа уже есть ``moysklad_id`` — выходит без действий. Товары
+    в МойСклад ищутся по артикулу. При недоступности МойСклад повторяет до 3 раз с
+    паузой 60 секунд (``bind=True`` нужен для доступа к ``self.retry``).
+
+    Args:
+        order_id: ID заказа в нашей БД.
+
+    Raises:
+        Retry: Перезапуск задачи при ошибке (пока не исчерпаны попытки).
     """
     from app.db.session import SessionLocal
     from app.db.models.order import Order  # noqa

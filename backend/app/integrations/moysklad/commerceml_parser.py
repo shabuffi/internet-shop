@@ -98,9 +98,16 @@ def _detect_ns(root) -> str:
 
 
 def parse_import_xml(xml_bytes: bytes) -> ParsedCatalog:
-    """
-    Парсит import.xml — категории и товары.
-    Возвращает ParsedCatalog с заполненными списками.
+    """Парсит ``import.xml`` — категории и товары.
+
+    Namespace определяется автоматически (МойСклад обычно шлёт XML без ``xmlns``).
+    Цены и остатки на этом шаге ещё нулевые — они приходят отдельно в ``offers.xml``.
+
+    Args:
+        xml_bytes: Сырые байты ``import.xml``.
+
+    Returns:
+        :class:`ParsedCatalog` с заполненными списками категорий и товаров.
     """
     root = etree.fromstring(xml_bytes)
     ns = _detect_ns(root)
@@ -127,9 +134,18 @@ def parse_import_xml(xml_bytes: bytes) -> ParsedCatalog:
 
 
 def parse_offers_xml(xml_bytes: bytes, catalog: ParsedCatalog) -> None:
-    """
-    Парсит offers.xml — цены и остатки.
-    Обновляет price и stock прямо в объектах ParsedProduct из catalog.
+    """Парсит ``offers.xml`` — цены и остатки — и дописывает их в каталог.
+
+    Обновляет ``price`` и ``stock`` прямо в объектах :class:`ParsedProduct` внутри
+    ``catalog`` (находит их по ``moysklad_id``). Цена берётся как есть, в рублях —
+    без деления на 100. Предложения для товаров не из каталога игнорируются.
+
+    Args:
+        xml_bytes: Сырые байты ``offers.xml``.
+        catalog: Каталог из :func:`parse_import_xml`, который дополняется на месте.
+
+    Returns:
+        None. Результат — мутация переданного ``catalog``.
     """
     root = etree.fromstring(xml_bytes)
     ns = _detect_ns(root)

@@ -1,16 +1,35 @@
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy.orm import Session
 from app.db.models.product import Product, Category, SyncLog
 from app.integrations.moysklad.commerceml_parser import ParsedCatalog
 
 
+def _utcnow() -> datetime:
+    """Наивный UTC-таймстамп (замена устаревшего datetime.utcnow())."""
+    return datetime.now(timezone.utc).replace(tzinfo=None)
+
+
 def upsert_catalog(db: Session, catalog: ParsedCatalog, source: str = "commerceml") -> SyncLog:
+    """Сохраняет распарсенный каталог в БД (upsert по ``moysklad_id``).
+
+    Сначала создаёт/обновляет категории и проставляет их связи родитель-потомок, затем
+    товары: новые вставляются, существующие обновляются. Вся операция — одна транзакция:
+    при ошибке делается откат, а в журнал пишется статус ``error``.
+
+    Args:
+        db: Сессия БД.
+        catalog: Распарсенный каталог (категории и товары) из CommerceML.
+        source: Источник синхронизации для журнала (``commerceml`` / ``rest_api``).
+
+    Returns:
+        Запись :class:`SyncLog` с итогами: статус и счётчики созданных/обновлённых товаров.
+
+    Raises:
+        Exception: Любая ошибка записи пробрасывается наверх (после отката и записи
+            статуса ``error`` в журнал).
     """
-    Сохраняет распарсенный каталог в БД.
-    Upsert = INSERT если нет, UPDATE если уже есть (по moysklad_id).
-    """
-    log = SyncLog(source=source, status="running", started_at=datetime.utcnow())
+    log = SyncLog(source=source, status="running", started_at=_utcnow())
     db.add(log)
     db.flush()
 
@@ -18,7 +37,8 @@ def upsert_catalog(db: Session, catalog: ParsedCatalog, source: str = "commercem
 
     try:
         # ─── Категории ────────────────────────────────────────────────────────
-        category_id_map: dict[str, str] = {}  # moysklad_id → наш internal id
+        category_id_map: dict[str, str] = {}       # moysklad_id → наш internal id
+        category_objs: dict[str, Category] = {}    # moysklad_id → объект Category
 
         for parsed_cat in catalog.categories:
             cat = db.query(Category).filter_by(moysklad_id=parsed_cat.moysklad_id).first()
@@ -33,14 +53,15 @@ def upsert_catalog(db: Session, catalog: ParsedCatalog, source: str = "commercem
                 cat.name = parsed_cat.name
 
             # Родительскую категорию установим после того как все уже добавлены
+            category_objs[parsed_cat.moysklad_id] = cat
             category_id_map[parsed_cat.moysklad_id] = cat.id
 
-        # Теперь проставляем parent_id
+        # Проставляем parent_id по объектам в памяти — без повторного запроса в БД.
+        # (При autoflush=False свежедобавленные категории ещё не во flush'ены, и
+        # повторный db.query() их не нашёл бы — parent_id не проставлялся бы.)
         for parsed_cat in catalog.categories:
             if parsed_cat.parent_id and parsed_cat.parent_id in category_id_map:
-                cat = db.query(Category).filter_by(moysklad_id=parsed_cat.moysklad_id).first()
-                if cat:
-                    cat.parent_id = category_id_map[parsed_cat.parent_id]
+                category_objs[parsed_cat.moysklad_id].parent_id = category_id_map[parsed_cat.parent_id]
 
         db.flush()
 
@@ -64,7 +85,7 @@ def upsert_catalog(db: Session, catalog: ParsedCatalog, source: str = "commercem
                     price=parsed_product.price,
                     stock=parsed_product.stock,
                     category_id=cat_id,
-                    synced_at=datetime.utcnow(),
+                    synced_at=_utcnow(),
                 )
                 db.add(product)
                 created += 1
@@ -76,7 +97,7 @@ def upsert_catalog(db: Session, catalog: ParsedCatalog, source: str = "commercem
                 product.price = parsed_product.price
                 product.stock = parsed_product.stock
                 product.category_id = cat_id
-                product.synced_at = datetime.utcnow()
+                product.synced_at = _utcnow()
                 updated += 1
 
         db.commit()
@@ -84,14 +105,14 @@ def upsert_catalog(db: Session, catalog: ParsedCatalog, source: str = "commercem
         log.status = "success"
         log.products_created = created
         log.products_updated = updated
-        log.finished_at = datetime.utcnow()
+        log.finished_at = _utcnow()
         db.commit()
 
     except Exception as exc:
         db.rollback()
         log.status = "error"
         log.error_message = str(exc)
-        log.finished_at = datetime.utcnow()
+        log.finished_at = _utcnow()
         db.commit()
         raise
 

@@ -5,10 +5,12 @@ import AdminShell from "@/components/AdminShell";
 import { adminFetch } from "@/lib/adminApi";
 
 export default function SettingsPage() {
-  const [form, setForm] = useState({ moysklad_login: "", moysklad_password: "", sync_interval: "300", shop_name: "" });
+  const [form, setForm] = useState({ moysklad_login: "", moysklad_password: "", exchange_login: "", exchange_password: "", shop_name: "" });
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [testResult, setTestResult] = useState<{ ok: boolean; message: string } | null>(null);
+  const [testing, setTesting] = useState(false);
 
   useEffect(() => {
     adminFetch<typeof form>("/settings").then(data => setForm(data)).catch(() => {});
@@ -24,6 +26,16 @@ export default function SettingsPage() {
     } catch (err) {
       setError(err instanceof Error ? err.message : "Ошибка");
     } finally { setLoading(false); }
+  }
+
+  async function handleTestConnection() {
+    setTesting(true); setTestResult(null);
+    try {
+      const result = await adminFetch<{ ok: boolean; message: string }>("/test-connection", { method: "POST" });
+      setTestResult(result);
+    } catch (err) {
+      setTestResult({ ok: false, message: err instanceof Error ? err.message : "Ошибка" });
+    } finally { setTesting(false); }
   }
 
   const inputStyle = { display: "flex", flexDirection: "column" as const, gap: 6, marginBottom: 16 };
@@ -54,22 +66,59 @@ export default function SettingsPage() {
               type="password" />
           </div>
 
+          <div style={{ marginBottom: 20 }}>
+            <button
+              type="button"
+              className="btn btn-ghost"
+              onClick={handleTestConnection}
+              disabled={testing}
+              style={{ fontSize: 14 }}
+            >
+              {testing ? "Проверяем..." : "Проверить подключение"}
+            </button>
+            {testResult && (
+              <p style={{ fontSize: 13, marginTop: 8, color: testResult.ok ? "var(--success)" : "var(--critical)" }}>
+                {testResult.ok ? "✓" : "✕"} {testResult.message}
+              </p>
+            )}
+          </div>
+
           <div style={{ height: 1, background: "var(--hairline-soft)", margin: "20px 0" }} />
 
-          <p style={{ fontWeight: 600, fontSize: 16, marginBottom: 20 }}>Настройки синхронизации</p>
+          <p style={{ fontWeight: 600, fontSize: 16, marginBottom: 6 }}>Данные для обмена (CommerceML)</p>
+          <p style={{ fontSize: 13, color: "var(--ink-secondary)", marginBottom: 20 }}>
+            Придумайте любую пару логин/пароль и впишите её сюда <b>и</b> в МойСклад
+            (Онлайн-торговля → Адрес магазина). Сайт будет пускать обмен, только если они совпадают.
+            Пока поля пустые — обмен открыт для всех.
+          </p>
 
           <div style={inputStyle}>
-            <label className="form-label">Интервал синхронизации (секунды)</label>
-            <input className="form-input" value={form.sync_interval}
-              onChange={e => setForm(p => ({...p, sync_interval: e.target.value}))}
-              type="number" min="60" />
+            <label className="form-label">Логин обмена</label>
+            <input className="form-input" value={form.exchange_login}
+              onChange={e => setForm(p => ({...p, exchange_login: e.target.value}))}
+              placeholder="например, shabshop_exchange" autoComplete="off" />
           </div>
+
+          <div style={inputStyle}>
+            <label className="form-label">Пароль обмена</label>
+            <input className="form-input" value={form.exchange_password}
+              onChange={e => setForm(p => ({...p, exchange_password: e.target.value}))}
+              placeholder="Введите новый пароль или оставьте ***"
+              type="password" autoComplete="off" />
+          </div>
+
+          <div style={{ height: 1, background: "var(--hairline-soft)", margin: "20px 0" }} />
+
+          <p style={{ fontWeight: 600, fontSize: 16, marginBottom: 20 }}>Магазин</p>
 
           <div style={inputStyle}>
             <label className="form-label">Название магазина</label>
             <input className="form-input" value={form.shop_name}
               onChange={e => setForm(p => ({...p, shop_name: e.target.value}))}
               placeholder="Магазин" />
+            <p style={{ fontSize: 12, color: "var(--ink-secondary)" }}>
+              Отображается в шапке сайта
+            </p>
           </div>
 
           {error && <p className="form-error">{error}</p>}

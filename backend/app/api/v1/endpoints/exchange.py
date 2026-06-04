@@ -6,59 +6,213 @@ CommerceML exchange endpoint для приёма данных от МойСкл�
   GET  /api/v1/1c/exchange?mode=init        → "zip=no\nfile_limit=..."
   POST /api/v1/1c/exchange?mode=file&type=catalog&filename=import.xml  → тело = XML
   GET  /api/v1/1c/exchange?mode=import&filename=import.xml  → запускает импорт
+
+Состояние обмена (токен сессии + сырые XML) хранится в Redis с TTL, а не в памяти
+процесса. Это переживает перезапуск backend и работает при нескольких воркерах.
 """
 
+import base64
 import logging
+import secrets
+
+import bcrypt
 from fastapi import APIRouter, Request, Depends, Query
 from fastapi.responses import PlainTextResponse
 from sqlalchemy.orm import Session
 
+from app.core.redis_client import redis_client
 from app.db.session import get_db
-from app.integrations.moysklad.commerceml_parser import parse_import_xml, parse_offers_xml, ParsedCatalog
+from app.db.models.admin import ShopSettings
+from app.integrations.moysklad.commerceml_parser import parse_import_xml, parse_offers_xml
 from app.services.import_service import upsert_catalog
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/1c/exchange", tags=["1C Exchange"])
 
-# Временное хранилище XML файлов в памяти (на время сессии обмена)
-# В продакшне заменить на Redis или S3
-_file_storage: dict[str, bytes] = {}
-_pending_catalog: ParsedCatalog | None = None
+# Ключи и TTL состояния обмена в Redis
+_SESSION_KEY = "exchange:session_token"
+_FILE_KEY = "exchange:file:{name}"          # сырой XML текущей сессии
+_TTL = 3600                                  # 1 час — сессия обмена не длится дольше
+
+
+def _file_key(name: str) -> str:
+    """Формирует Redis-ключ для сырого XML-файла обмена.
+
+    Args:
+        name: Имя файла обмена (``import.xml`` или ``offers.xml``).
+
+    Returns:
+        Ключ вида ``exchange:file:import.xml``.
+    """
+    return _FILE_KEY.format(name=name)
+
+
+# ── Аутентификация обмена ─────────────────────────────────────────────────────
+# МойСклад присылает логин/пароль (Basic Auth) на checkauth и cookie на
+# последующих запросах. Сверяем их с парой, сохранённой в админке.
+# «Мягкий режим»: пока пара не задана в админке — пускаем всех (старое поведение),
+# чтобы не сломать уже настроенный обмен. Как только клиент задал пару — проверка
+# включается автоматически.
+
+def _get_exchange_credentials(db: Session) -> tuple[str, str]:
+    """Достаёт логин и хеш пароля обмена из настроек магазина (ShopSettings).
+
+    Args:
+        db: Сессия БД.
+
+    Returns:
+        Кортеж ``(login, password_hash)``. Если креды не заданы — обе строки пустые,
+        что включает «мягкий режим» в :func:`_is_authorized`.
+    """
+    login_row = db.get(ShopSettings, "exchange_login")
+    pass_row = db.get(ShopSettings, "exchange_password")
+    login = login_row.value if login_row and login_row.value else ""
+    password = pass_row.value if pass_row and pass_row.value else ""
+    return login, password
+
+
+def _basic_auth_ok(request: Request, exp_login: str, exp_pass_hash: str) -> bool:
+    """Проверяет HTTP Basic Auth из запроса против сохранённых кред обмена.
+
+    Логин сравнивается constant-time-методом, пароль — через bcrypt против хеша.
+
+    Args:
+        request: Входящий запрос (берётся заголовок ``Authorization``).
+        exp_login: Ожидаемый логин обмена.
+        exp_pass_hash: bcrypt-хеш ожидаемого пароля обмена из ShopSettings.
+
+    Returns:
+        ``True``, если присланные логин и пароль совпали с ожидаемыми. ``False`` при
+        пустых ожидаемых кредах, отсутствии/порче заголовка или несовпадении.
+    """
+    if not exp_login or not exp_pass_hash:
+        return False  # пустые ожидаемые креды никогда не считаем валидными
+    header = request.headers.get("Authorization", "")
+    if not header.startswith("Basic "):
+        return False
+    try:
+        login, _, password = base64.b64decode(header[6:]).decode("utf-8").partition(":")
+    except Exception:
+        return False
+    if not secrets.compare_digest(login, exp_login):
+        return False
+    try:
+        return bcrypt.checkpw(password.encode(), exp_pass_hash.encode())
+    except Exception:
+        return False  # некорректный хеш в БД
+
+
+def _is_authorized(request: Request, db: Session) -> bool:
+    """Решает, пускать ли запрос обмена (для всех шагов, кроме checkauth).
+
+    Пропускает, если выполнено любое из условий:
+
+    * креды обмена не заданы в админке — «мягкий режим», чтобы не сломать уже
+      настроенный обмен;
+    * пришёл валидный Basic Auth;
+    * пришла cookie ``session`` с токеном, выданным на checkauth (хранится в Redis).
+
+    Args:
+        request: Входящий запрос обмена (заголовки и cookies).
+        db: Сессия БД.
+
+    Returns:
+        ``True``, если запрос авторизован, иначе ``False``.
+    """
+    exp_login, exp_pass = _get_exchange_credentials(db)
+    if not exp_login or not exp_pass:
+        return True  # мягкий режим: креды не заданы — пускаем (как раньше)
+    if _basic_auth_ok(request, exp_login, exp_pass):
+        return True
+    cookie = request.cookies.get("session")
+    if not cookie:
+        return False
+    stored = redis_client.get(_SESSION_KEY)
+    return bool(stored and secrets.compare_digest(cookie, stored.decode("utf-8")))
 
 
 @router.get("", response_class=PlainTextResponse)
 @router.get("/", response_class=PlainTextResponse)
 async def exchange_get(
+    request: Request,
     mode: str = Query(...),
     type: str = Query(default=""),
     filename: str = Query(default=""),
     db: Session = Depends(get_db),
 ):
-    global _pending_catalog
+    """Обрабатывает GET-шаги протокола обмена 1С/CommerceML.
 
+    Маршрутизирует по параметру ``mode``:
+
+    * ``checkauth`` — проверяет логин/пароль обмена и выдаёт токен сессии (3 строки 1С);
+    * ``init`` — отдаёт параметры обмена (zip, лимит размера файла);
+    * ``import`` — собирает import.xml/offers.xml из Redis, парсит и пишет в БД.
+
+    Args:
+        request: Входящий запрос (заголовки, cookies).
+        mode: Шаг протокола (``checkauth`` / ``init`` / ``import``).
+        type: Тип данных от МойСклад (не используется, оставлен для совместимости).
+        filename: Имя файла для шага ``import`` (``import.xml`` / ``offers.xml``).
+        db: Сессия БД.
+
+    Returns:
+        Plain-text ответ протокола 1С: строка ``success...`` либо ``failure\\n<причина>``.
+    """
     # ── Шаг 1: checkauth ──────────────────────────────────────────────────────
     # Стандарт 1С требует ровно три строки: "success", имя куки, значение куки
     if mode == "checkauth":
+        exp_login, exp_pass = _get_exchange_credentials(db)
+        if exp_login and exp_pass:
+            if not _basic_auth_ok(request, exp_login, exp_pass):
+                logger.warning("checkauth: неверный логин/пароль обмена")
+                return "failure\nНеверный логин или пароль обмена"
+            token = secrets.token_hex(16)
+            redis_client.set(_SESSION_KEY, token, ex=_TTL)
+            return f"success\nsession\n{token}"
+        # Мягкий режим: пара не задана в админке — старое поведение
         return "success\nsession\ncommerceml-session"
+
+    # Все остальные шаги требуют валидной авторизации
+    if not _is_authorized(request, db):
+        logger.warning("exchange %s: отказано в доступе", mode)
+        return "failure\nНе авторизовано"
 
     # ── Шаг 2: init ───────────────────────────────────────────────────────────
     # МойСклад спрашивает параметры: поддерживаем ли zip, максимальный размер файла
     if mode == "init":
         return "zip=no\nfile_limit=10485760"  # 10 MB
 
-    # ── Шаг 4: import — запускаем upsert в БД ────────────────────────────────
+    # ── Шаг 4: import — собираем XML из Redis, парсим и запускаем upsert ──────
     if mode == "import":
-        if filename == "import.xml":
-            if _pending_catalog is None or not _pending_catalog.products:
-                return "failure\nНет данных для импорта"
-            log = upsert_catalog(db, _pending_catalog, source="commerceml")
-            _pending_catalog = None
-            _file_storage.clear()
-            print(f"Imported: {log.products_created} created, {log.products_updated} updated", flush=True)
-            return f"success\nИмпортировано: {log.products_created} новых, {log.products_updated} обновлено"
+        if filename != "import.xml":
+            # offers.xml импортируется вместе с import.xml — просто подтверждаем
+            return "success"
 
-        # offers.xml — цены уже применены в POST-шаге, просто подтверждаем
-        return "success"
+        import_xml = redis_client.get(_file_key("import.xml"))
+        if not import_xml:
+            return "failure\nНет данных для импорта"
+
+        try:
+            catalog = parse_import_xml(import_xml)
+        except Exception as exc:
+            logger.error("PARSE ERROR import.xml: %s", exc)
+            return f"failure\nОшибка разбора каталога: {exc}"
+
+        if not catalog.products:
+            return "failure\nНет данных для импорта"
+
+        # Цены и остатки лежат в offers.xml — применяем, если он пришёл
+        offers_xml = redis_client.get(_file_key("offers.xml"))
+        if offers_xml:
+            try:
+                parse_offers_xml(offers_xml, catalog)
+            except Exception as exc:
+                logger.error("PARSE ERROR offers.xml: %s", exc)
+
+        log = upsert_catalog(db, catalog, source="commerceml")
+        redis_client.delete(_file_key("import.xml"), _file_key("offers.xml"))
+        logger.info("Imported: %d created, %d updated", log.products_created, log.products_updated)
+        return f"success\nИмпортировано: {log.products_created} новых, {log.products_updated} обновлено"
 
     return "failure\nНеизвестный mode"
 
@@ -70,32 +224,35 @@ async def exchange_post(
     mode: str = Query(...),
     type: str = Query(default=""),
     filename: str = Query(default=""),
+    db: Session = Depends(get_db),
 ):
-    global _pending_catalog
+    """Обрабатывает POST-шаг ``file`` обмена — приём сырого XML.
 
-    # ── Шаг 3: file — МойСклад отправляет XML файл ───────────────────────────
+    Тело запроса (import.xml или offers.xml) складывается в Redis с TTL; парсинг и
+    запись в БД происходят позже, на GET-шаге ``import``.
+
+    Args:
+        request: Входящий запрос; тело — байты XML-файла.
+        mode: Шаг протокола; ожидается ``file``.
+        type: Тип данных (не используется).
+        filename: Имя файла; принимаются только ``import.xml`` и ``offers.xml``.
+        db: Сессия БД (нужна для проверки авторизации).
+
+    Returns:
+        ``success`` при успехе, иначе ``failure\\n<причина>``.
+    """
+    if not _is_authorized(request, db):
+        logger.warning("exchange POST %s: отказано в доступе", mode)
+        return "failure\nНе авторизовано"
+
+    # ── Шаг 3: file — МойСклад отправляет XML файл, складываем сырьё в Redis ──
     if mode == "file":
+        # Принимаем только ожидаемые имена — иначе можно засорять Redis произвольными ключами
+        if filename not in ("import.xml", "offers.xml"):
+            return "failure\nНедопустимое имя файла"
         body = await request.body()
-        _file_storage[filename] = body
+        redis_client.set(_file_key(filename), body, ex=_TTL)
         logger.info("Received file: %s (%d bytes)", filename, len(body))
-
-        if filename == "import.xml":
-            try:
-                _pending_catalog = parse_import_xml(body)
-                print(f"Parsed: {len(_pending_catalog.categories)} categories, {len(_pending_catalog.products)} products", flush=True)
-            except Exception as exc:
-                print(f"PARSE ERROR import.xml: {exc}", flush=True)
-                _pending_catalog = None
-
-        elif filename == "offers.xml" and _pending_catalog is not None:
-            # Применяем цены и остатки сразу — до того как import запустит upsert
-            try:
-                parse_offers_xml(body, _pending_catalog)
-                prices = [p.price for p in _pending_catalog.products if p.price > 0]
-                print(f"Offers applied: {len(prices)} products with price", flush=True)
-            except Exception as exc:
-                print(f"PARSE ERROR offers.xml: {exc}", flush=True)
-
         return "success"
 
     return "failure\nНеизвестный mode"

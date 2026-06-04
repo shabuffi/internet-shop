@@ -13,6 +13,7 @@ class Settings(BaseSettings):
 
     @property
     def DATABASE_URL(self) -> str:
+        """Строка подключения SQLAlchemy к PostgreSQL (собрана из POSTGRES_*)."""
         return (
             f"postgresql+psycopg2://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}"
             f"@{self.POSTGRES_HOST}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
@@ -29,7 +30,6 @@ class Settings(BaseSettings):
     # МойСклад
     MOYSKLAD_LOGIN: str = ""
     MOYSKLAD_PASSWORD: str = ""
-    SYNC_INTERVAL_SECONDS: int = 300
 
 
 settings = Settings()

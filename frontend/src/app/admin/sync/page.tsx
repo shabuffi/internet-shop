@@ -11,15 +11,28 @@ const STATUS_COLOR: Record<string, string> = { success: "var(--success)", error:
 export default function SyncPage() {
   const [logs, setLogs] = useState<SyncLog[]>([]);
   const [loading, setLoading] = useState(false);
+  const [fetchImgMsg, setFetchImgMsg] = useState("");
 
   function load() { adminFetch<SyncLog[]>("/sync-logs").then(setLogs).catch(() => {}); }
   useEffect(() => { load(); }, []);
+
+  async function handleFetchImages() {
+    setLoading(true); setFetchImgMsg("");
+    try {
+      const r = await adminFetch<{ message: string }>("/fetch-images", { method: "POST" });
+      setFetchImgMsg(r.message);
+    } catch { setFetchImgMsg("Ошибка"); } finally { setLoading(false); }
+  }
 
   return (
     <AdminShell>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 32 }}>
         <h1 style={{ fontSize: 24, fontWeight: 700, letterSpacing: -0.3 }}>Синхронизация</h1>
-        <div style={{ display: "flex", gap: 12 }}>
+        <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+          <button className="btn btn-ghost" onClick={handleFetchImages} disabled={loading} style={{ fontSize: 14 }}>
+            Загрузить картинки
+          </button>
+          {fetchImgMsg && <span style={{ fontSize: 13, color: "var(--ink-secondary)" }}>{fetchImgMsg}</span>}
           <button className="btn btn-ghost" onClick={load} style={{ fontSize: 14 }}>Обновить</button>
         </div>
       </div>

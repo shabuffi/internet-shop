@@ -25,7 +25,19 @@ export default async function ProductPage({ params }: Props) {
         <Link href="/" className="back-link">← Каталог</Link>
 
         <div className="product-detail-grid">
-          <div className="product-detail-image">🛍</div>
+          <div className="product-detail-image" style={{ position: "relative", overflow: "hidden", background: "var(--surface)" }}>
+            {product.image_url ? (
+              <img
+                src={`/api/v1/products/${product.id}/image`}
+                alt={product.name}
+                style={{ width: "100%", height: "100%", objectFit: "cover" }}
+              />
+            ) : (
+              <span style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 64 }}>
+                🛍
+              </span>
+            )}
+          </div>
 
           <div className="product-detail-info">
             {product.category && (

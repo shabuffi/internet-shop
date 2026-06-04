@@ -17,6 +17,7 @@ class ProductOut(BaseModel):
     id: str
     name: str
     description: str | None = None
+    image_url: str | None = None
     article: str | None = None
     price: Decimal
     stock: int

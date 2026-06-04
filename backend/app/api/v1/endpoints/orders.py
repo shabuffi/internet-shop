@@ -11,12 +11,36 @@ router = APIRouter(prefix="/orders", tags=["Orders"])
 
 
 def _next_order_number(db: Session) -> str:
+    """Возвращает следующий человекочитаемый номер заказа.
+
+    Args:
+        db: Сессия БД.
+
+    Returns:
+        Номер вида ``ORD-0001`` (по количеству заказов в БД + 1).
+    """
     count = db.scalar(select(func.count()).select_from(Order)) or 0
     return f"ORD-{count + 1:04d}"
 
 
 @router.post("", response_model=OrderOut, status_code=201)
 def create_order(payload: OrderIn, db: Session = Depends(get_db)):
+    """Создаёт заказ из корзины и ставит фоновую отправку в МойСклад.
+
+    Цена каждой позиции берётся из БД (а не из запроса) — клиент не может её подделать.
+    Заказ сохраняется синхронно, а отправка в МойСклад уходит в Celery, чтобы покупатель
+    не ждал ответа от внешнего API.
+
+    Args:
+        payload: Данные покупателя и список позиций (``product_id`` + ``quantity``).
+        db: Сессия БД.
+
+    Returns:
+        Созданный заказ (:class:`OrderOut`) со статусом ``new`` и номером ``ORD-XXXX``.
+
+    Raises:
+        HTTPException: 422, если хотя бы один ``product_id`` не найден в БД.
+    """
     # Загружаем товары одним запросом
     product_ids = [i.product_id for i in payload.items]
     products = {

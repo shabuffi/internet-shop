@@ -43,6 +43,8 @@ class Product(Base):
     category_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("categories.id"), nullable=True)
     category: Mapped["Category | None"] = relationship("Category", back_populates="products")
 
+    image_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())

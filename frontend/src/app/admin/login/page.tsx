@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { setToken } from "@/lib/adminApi";
 
 export default function AdminLoginPage() {
   const router = useRouter();
@@ -18,11 +17,11 @@ export default function AdminLoginPage() {
       const res = await fetch("/api/v1/admin/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",   // принять httpOnly-куку из ответа
         body: JSON.stringify(form),
       });
       if (!res.ok) { const d = await res.json(); throw new Error(d.detail); }
-      const data = await res.json();
-      setToken(data.access_token);
+      // токен пришёл в httpOnly-куке (её поставил сервер) — в JS его не трогаем
       router.push("/admin");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Ошибка");

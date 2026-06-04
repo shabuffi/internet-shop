@@ -7,6 +7,10 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Dev/test зависимости (pytest) — чтобы `make test` работал в контейнере
+COPY requirements-dev.txt .
+RUN pip install --no-cache-dir -r requirements-dev.txt
+
 # Копируем код приложения
 COPY . .
 

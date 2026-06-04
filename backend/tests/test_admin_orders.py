@@ -1,0 +1,50 @@
+"""Тесты смены статуса заказа в админке (валидация + авторизация)."""
+
+from decimal import Decimal
+
+import pytest
+
+from app.db.models.admin import AdminUser
+from app.db.models.order import Order
+from app.api.v1.endpoints.admin import _create_token, _hash_password
+
+
+@pytest.fixture
+def token(db_session):
+    db_session.add(AdminUser(username="admin", password_hash=_hash_password("password123")))
+    db_session.commit()
+    return _create_token("admin")
+
+
+@pytest.fixture
+def order(db_session):
+    o = Order(id="o-1", number="ORD-0001", customer_name="Иван",
+              customer_phone="+79001234567", total_amount=Decimal("0"), status="new")
+    db_session.add(o)
+    db_session.commit()
+    return o
+
+
+def _auth(token):
+    return {"Authorization": f"Bearer {token}"}
+
+
+def test_update_status_valid(client, token, order):
+    resp = client.patch("/api/v1/admin/orders/o-1/status", json={"status": "shipped"}, headers=_auth(token))
+    assert resp.status_code == 200
+    assert resp.json()["status"] == "shipped"
+
+
+def test_update_status_invalid_value(client, token, order):
+    resp = client.patch("/api/v1/admin/orders/o-1/status", json={"status": "teleported"}, headers=_auth(token))
+    assert resp.status_code == 422
+
+
+def test_update_status_missing_order(client, token):
+    resp = client.patch("/api/v1/admin/orders/nope/status", json={"status": "new"}, headers=_auth(token))
+    assert resp.status_code == 404
+
+
+def test_update_status_requires_auth(client, order):
+    resp = client.patch("/api/v1/admin/orders/o-1/status", json={"status": "new"})
+    assert resp.status_code == 401

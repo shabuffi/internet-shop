@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { getToken, clearToken } from "@/lib/adminApi";
+import { adminFetch, adminLogout } from "@/lib/adminApi";
 
 const NAV = [
   { href: "/admin",          label: "Обзор",        icon: "📊" },
@@ -19,9 +19,10 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    if (!getToken()) { router.replace("/admin/login"); return; }
-    setReady(true);
-  }, [router]);
+    // Кука httpOnly из JS не читается — спрашиваем сервер, валидна ли сессия.
+    // adminFetch сам редиректит на /admin/login при 401.
+    adminFetch("/me").then(() => setReady(true)).catch(() => {});
+  }, []);
 
   if (!ready) return null;
 
@@ -53,7 +54,7 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
         </nav>
 
         <div style={{ padding: "16px 20px", borderTop: "1px solid var(--hairline-soft)" }}>
-          <button onClick={() => { clearToken(); router.push("/admin/login"); }}
+          <button onClick={async () => { await adminLogout(); router.push("/admin/login"); }}
             style={{ fontSize: 13, color: "var(--ink-tertiary)", background: "none", border: "none", cursor: "pointer" }}>
             Выйти
           </button>

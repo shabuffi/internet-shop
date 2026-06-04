@@ -13,11 +13,8 @@ celery_app.conf.update(
     result_serializer="json",
     accept_content=["json"],
     timezone="Europe/Moscow",
-    beat_schedule={
-        # Синхронизация каталога из МойСклад по расписанию
-        "sync-catalog": {
-            "task": "app.tasks.sync.sync_catalog",
-            "schedule": settings.SYNC_INTERVAL_SECONDS,
-        },
-    },
+    # Запланированных задач нет: каталог приходит push-моделью (CommerceML от МойСклад),
+    # а загрузка картинок запускается из админки вручную. beat-контейнер пока простаивает —
+    # если понадобится автозагрузка картинок по расписанию, добавить сюда fetch_product_images.
+    beat_schedule={},
 )

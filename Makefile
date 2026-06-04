@@ -1,4 +1,4 @@
-.PHONY: up down build logs migrate shell-backend shell-db
+.PHONY: up down build logs migrate shell-backend shell-db test
 
 # Запустить всё в фоне
 up:
@@ -47,3 +47,7 @@ shell-db:
 # Статус контейнеров
 status:
 	docker compose ps
+
+# Прогнать тесты backend (pytest в контейнере)
+test:
+	docker compose exec backend python3 -m pytest
