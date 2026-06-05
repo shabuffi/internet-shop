@@ -92,14 +92,19 @@ def upsert_catalog(db: Session, catalog: ParsedCatalog, source: str = "commercem
                 created += 1
             else:
                 product.name = parsed_product.name
-                product.description = parsed_product.description
                 product.article = parsed_product.article
                 product.code = parsed_product.code
-                product.image_url = parsed_product.image_url
                 product.price = parsed_product.price
                 product.stock = parsed_product.stock
                 product.category_id = cat_id
                 product.synced_at = _utcnow()
+                # Описание и картинку НЕ затираем пустыми из CommerceML — МойСклад их в
+                # обмене не присылает, они подгружаются из REST (fetch_product_images).
+                # Перезаписываем только если обмен реально что-то прислал.
+                if parsed_product.description:
+                    product.description = parsed_product.description
+                if parsed_product.image_url:
+                    product.image_url = parsed_product.image_url
                 updated += 1
 
         db.commit()

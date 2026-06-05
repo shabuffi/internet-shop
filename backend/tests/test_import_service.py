@@ -66,6 +66,28 @@ def test_upsert_category_parent_link(db_session):
     assert child.parent_id == parent.id
 
 
+def test_upsert_preserves_enriched_description_and_image(db_session):
+    """Повторный CommerceML-импорт без описания/картинки не должен их затирать.
+
+    Описание и image_url подгружаются из REST (enrichment), а МойСклад в обмене их
+    не присылает — поэтому пустые значения из обмена не должны перезаписывать данные.
+    """
+    # 1. Первый импорт создаёт товар (без описания/картинки — как из обмена)
+    upsert_catalog(db_session, _catalog(products=[ParsedProduct(moysklad_id="p1", name="Крем")]))
+    # 2. Enrichment заполнил описание и картинку из REST
+    p = db_session.query(Product).filter_by(moysklad_id="p1").first()
+    p.description = "Описание из REST"
+    p.image_url = "https://img/hydra"
+    db_session.commit()
+    # 3. Повторный обмен снова без описания/картинки — НЕ должен их затереть
+    upsert_catalog(db_session, _catalog(products=[ParsedProduct(moysklad_id="p1", name="Крем (обновлён)")]))
+
+    p = db_session.query(Product).filter_by(moysklad_id="p1").first()
+    assert p.name == "Крем (обновлён)"          # имя из обмена обновилось
+    assert p.description == "Описание из REST"    # описание сохранилось
+    assert p.image_url == "https://img/hydra"     # картинка сохранилась
+
+
 def test_upsert_logs_counts(db_session):
     log = upsert_catalog(db_session, _catalog(products=[
         ParsedProduct(moysklad_id="a", name="A"),
