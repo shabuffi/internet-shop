@@ -3,33 +3,44 @@ from app.tasks.celery_app import celery_app
 
 @celery_app.task(name="app.tasks.sync.fetch_product_images")
 def fetch_product_images():
-    """Celery-задача: дозагружает URL картинок из МойСклад для товаров без них.
+    """Celery-задача: дозагружает из REST МойСклад картинку И описание товаров.
 
-    Обрабатывает партию из максимум 50 активных товаров, у которых ещё нет
-    ``image_url`` (чтобы не перегружать API МойСклад). Запускается из админки кнопкой
-    «Загрузить картинки».
+    CommerceML не приносит описание/картинки надёжно, поэтому берём их из REST API,
+    находя товар по артикулу (id из CommerceML не совпадает с id REST). Обрабатывает
+    партию из максимум 50 активных товаров с артикулом, у которых ещё нет картинки или
+    описания. Запускается из админки кнопкой «Загрузить картинки».
 
     Returns:
-        Словарь ``{"updated": N}`` — сколько товаров получили картинку.
+        Словарь ``{"updated": N}`` — сколько товаров получили картинку и/или описание.
     """
-    from sqlalchemy import select
+    from sqlalchemy import select, or_
     from app.db.session import SessionLocal
     from app.db.models.product import Product
-    from app.integrations.moysklad.rest_client import get_product_image_url
+    from app.integrations.moysklad.rest_client import get_product_enrichment_by_article
 
     db = SessionLocal()
     try:
         products = db.scalars(
             select(Product)
-            .where(Product.image_url.is_(None), Product.is_active == True)
+            .where(
+                Product.is_active == True,
+                Product.article.isnot(None),
+                or_(Product.image_url.is_(None), Product.description.is_(None)),
+            )
             .limit(50)
         ).all()
 
         updated = 0
         for product in products:
-            url = get_product_image_url(product.moysklad_id)
-            if url:
-                product.image_url = url
+            description, image_url = get_product_enrichment_by_article(product.article)
+            changed = False
+            if image_url and not product.image_url:
+                product.image_url = image_url
+                changed = True
+            if description and not product.description:
+                product.description = description
+                changed = True
+            if changed:
                 updated += 1
 
         if updated:

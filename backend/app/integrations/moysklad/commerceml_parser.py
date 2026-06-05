@@ -60,6 +60,7 @@ class ParsedProduct:
     article: str | None = None
     code: str | None = None
     category_id: str | None = None
+    image_url: str | None = None
     price: Decimal = Decimal("0")
     stock: int = 0
 
@@ -216,6 +217,9 @@ def _parse_product(товар, ns: str = "") -> ParsedProduct | None:
         if first_id is not None and first_id.text:
             category_id = first_id.text.strip()
 
+    # Картинка из МойСклад (обычно URL на облако)
+    image_url = _text(товар, "Картинка", ns=ns)
+
     return ParsedProduct(
         moysklad_id=product_id,
         name=name,
@@ -223,4 +227,5 @@ def _parse_product(товар, ns: str = "") -> ParsedProduct | None:
         article=_text(товар, "Артикул", ns=ns),
         code=_text(товар, "БазоваяЕдиница", ns=ns),
         category_id=category_id,
+        image_url=image_url,
     )

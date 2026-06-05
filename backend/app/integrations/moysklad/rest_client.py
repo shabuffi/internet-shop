@@ -108,6 +108,44 @@ def find_product_href_by_article(article: str) -> str | None:
     return rows[0]["meta"]["href"] if rows else None
 
 
+def get_product_enrichment_by_article(article: str) -> tuple[str | None, str | None]:
+    """Возвращает ``(описание, url_картинки)`` товара из REST API по артикулу.
+
+    CommerceML не приносит описание и картинки надёжно (id из CommerceML не совпадает
+    с id REST API), поэтому дозагружаем их из REST. Поиск товара — по артикулу.
+
+    Args:
+        article: Артикул товара.
+
+    Returns:
+        Кортеж ``(description, image_url)``. Любой элемент может быть ``None``, если
+        товар не найден, или у него нет описания/картинки.
+    """
+    href = find_product_href_by_article(article)
+    if not href:
+        return None, None
+
+    try:
+        card = httpx.get(href, headers=_headers(), timeout=10).json()
+    except Exception:
+        return None, None
+    description = (card.get("description") or "").strip() or None
+
+    # Картинки лежат отдельным ресурсом /images у товара (по его REST-id)
+    rest_id = href.rstrip("/").split("/")[-1]
+    image_url = None
+    try:
+        r = httpx.get(f"{BASE}/entity/product/{rest_id}/images", headers=_headers(), timeout=10)
+        if r.status_code == 200:
+            rows = r.json().get("rows", [])
+            if rows:
+                image_url = rows[0].get("miniature", {}).get("href")
+    except Exception:
+        pass
+
+    return description, image_url
+
+
 def get_or_create_counterparty(name: str, phone: str) -> str:
     """Находит контрагента по телефону или создаёт нового.
 
