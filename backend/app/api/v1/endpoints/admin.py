@@ -148,6 +148,40 @@ def me(current: AdminUser = Depends(_get_current_admin)):
     return {"username": current.username}
 
 
+@router.post("/change-password")
+def change_password(
+    body: dict,
+    current: AdminUser = Depends(_get_current_admin),
+    db: Session = Depends(get_db),
+):
+    """Меняет пароль текущего админа.
+
+    Требует знания текущего пароля. Новый пароль хешируется bcrypt.
+
+    Args:
+        body: ``{"current_password": ..., "new_password": ...}``.
+        current: Авторизованный админ (из токена).
+        db: Сессия БД.
+
+    Returns:
+        Сообщение об успехе.
+
+    Raises:
+        HTTPException: 401, если текущий пароль неверный; 422, если новый короче 8 символов.
+    """
+    current_password = body.get("current_password", "")
+    new_password = body.get("new_password", "")
+
+    if not _verify_password(current_password, current.password_hash):
+        raise HTTPException(status_code=401, detail="Текущий пароль неверный")
+    if len(new_password) < 8:
+        raise HTTPException(status_code=422, detail="Новый пароль минимум 8 символов")
+
+    current.password_hash = _hash_password(new_password)
+    db.commit()
+    return {"message": "Пароль изменён"}
+
+
 @router.post("/setup", include_in_schema=False)
 def setup_admin(body: dict, db: Session = Depends(get_db)):
     """Создаёт первого admin-пользователя. Отключить после первого использования."""

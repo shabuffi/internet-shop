@@ -67,3 +67,37 @@ def test_settings_moysklad_password_stays_plaintext(client, db_session):
 
     row = db_session.get(ShopSettings, "moysklad_password")
     assert row.value == "ms-secret"
+
+
+def test_change_password_success(client, db_session):
+    _make_admin(db_session, password="oldpass123")
+    client.post("/api/v1/admin/login", json={"username": "admin", "password": "oldpass123"})
+    r = client.post("/api/v1/admin/change-password",
+                    json={"current_password": "oldpass123", "new_password": "newpass456"})
+    assert r.status_code == 200
+    # старый пароль больше не работает, новый — да
+    client.post("/api/v1/admin/logout")
+    assert client.post("/api/v1/admin/login", json={"username": "admin", "password": "oldpass123"}).status_code == 401
+    assert client.post("/api/v1/admin/login", json={"username": "admin", "password": "newpass456"}).status_code == 200
+
+
+def test_change_password_wrong_current(client, db_session):
+    _make_admin(db_session, password="oldpass123")
+    client.post("/api/v1/admin/login", json={"username": "admin", "password": "oldpass123"})
+    r = client.post("/api/v1/admin/change-password",
+                    json={"current_password": "WRONG", "new_password": "newpass456"})
+    assert r.status_code == 401
+
+
+def test_change_password_too_short(client, db_session):
+    _make_admin(db_session, password="oldpass123")
+    client.post("/api/v1/admin/login", json={"username": "admin", "password": "oldpass123"})
+    r = client.post("/api/v1/admin/change-password",
+                    json={"current_password": "oldpass123", "new_password": "short"})
+    assert r.status_code == 422
+
+
+def test_change_password_requires_auth(client):
+    r = client.post("/api/v1/admin/change-password",
+                    json={"current_password": "x", "new_password": "newpass456"})
+    assert r.status_code == 401

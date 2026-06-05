@@ -11,6 +11,9 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(false);
   const [testResult, setTestResult] = useState<{ ok: boolean; message: string } | null>(null);
   const [testing, setTesting] = useState(false);
+  const [pw, setPw] = useState({ current_password: "", new_password: "" });
+  const [pwMsg, setPwMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [pwLoading, setPwLoading] = useState(false);
 
   useEffect(() => {
     adminFetch<typeof form>("/settings").then(data => setForm(data)).catch(() => {});
@@ -36,6 +39,18 @@ export default function SettingsPage() {
     } catch (err) {
       setTestResult({ ok: false, message: err instanceof Error ? err.message : "Ошибка" });
     } finally { setTesting(false); }
+  }
+
+  async function handleChangePassword(e: React.FormEvent) {
+    e.preventDefault();
+    setPwMsg(null); setPwLoading(true);
+    try {
+      await adminFetch("/change-password", { method: "POST", body: JSON.stringify(pw) });
+      setPwMsg({ ok: true, text: "Пароль изменён" });
+      setPw({ current_password: "", new_password: "" });
+    } catch (err) {
+      setPwMsg({ ok: false, text: err instanceof Error ? err.message : "Ошибка" });
+    } finally { setPwLoading(false); }
   }
 
   const inputStyle = { display: "flex", flexDirection: "column" as const, gap: 6, marginBottom: 16 };
@@ -126,6 +141,34 @@ export default function SettingsPage() {
 
           <button className="btn btn-primary" type="submit" disabled={loading} style={{ marginTop: 8 }}>
             {loading ? "Сохраняем..." : "Сохранить настройки"}
+          </button>
+        </form>
+      </div>
+
+      {/* Смена пароля админа */}
+      <div style={{ background: "var(--canvas)", borderRadius: "var(--radius-lg)", border: "1px solid var(--hairline-soft)", padding: "28px 32px", maxWidth: 520, marginTop: 24 }}>
+        <p style={{ fontWeight: 600, fontSize: 16, marginBottom: 20 }}>Смена пароля админа</p>
+        <form onSubmit={handleChangePassword}>
+          <div style={inputStyle}>
+            <label className="form-label">Текущий пароль</label>
+            <input className="form-input" type="password" value={pw.current_password}
+              onChange={e => setPw(p => ({...p, current_password: e.target.value}))}
+              autoComplete="current-password" required />
+          </div>
+          <div style={inputStyle}>
+            <label className="form-label">Новый пароль</label>
+            <input className="form-input" type="password" value={pw.new_password}
+              onChange={e => setPw(p => ({...p, new_password: e.target.value}))}
+              autoComplete="new-password" required minLength={8} />
+            <p style={{ fontSize: 12, color: "var(--ink-secondary)" }}>Минимум 8 символов</p>
+          </div>
+          {pwMsg && (
+            <p style={{ fontSize: 14, marginBottom: 8, color: pwMsg.ok ? "var(--success)" : "var(--critical)" }}>
+              {pwMsg.ok ? "✓ " : "✕ "}{pwMsg.text}
+            </p>
+          )}
+          <button className="btn btn-primary" type="submit" disabled={pwLoading} style={{ marginTop: 8 }}>
+            {pwLoading ? "Меняем..." : "Сменить пароль"}
           </button>
         </form>
       </div>
