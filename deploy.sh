@@ -19,18 +19,22 @@ if [ ! -f .env.prod ]; then
     exit 1
 fi
 
+# --env-file .env.prod нужен, чтобы Compose подставлял ${POSTGRES_*} в сервис db
+# (env_file внутри сервисов прокидывает переменные только в контейнеры, не в подстановку)
+COMPOSE="docker compose --env-file .env.prod -f docker-compose.prod.yml"
+
 # 3. Собираем и запускаем
 echo "Building images..."
-docker compose -f docker-compose.prod.yml build
+$COMPOSE build
 
 echo "Starting services..."
-docker compose -f docker-compose.prod.yml up -d
+$COMPOSE up -d
 
 echo "Waiting for DB..."
 sleep 5
 
 echo "Running migrations..."
-docker compose -f docker-compose.prod.yml exec -T backend alembic upgrade head
+$COMPOSE exec -T backend alembic upgrade head
 
 echo ""
 echo "=== Deploy complete! ==="
