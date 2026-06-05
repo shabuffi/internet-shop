@@ -36,6 +36,11 @@ sleep 5
 echo "Running migrations..."
 $COMPOSE exec -T backend alembic upgrade head
 
+# Перезапускаем nginx, чтобы он перечитал новые IP пересозданных backend/frontend
+# (иначе после деплоя ловим 502 Bad Gateway — nginx помнит старые адреса контейнеров)
+echo "Restarting nginx..."
+$COMPOSE restart nginx
+
 echo ""
 echo "=== Deploy complete! ==="
 echo "Shop is running at http://$(curl -s ifconfig.me 2>/dev/null || echo 'YOUR_SERVER_IP')"
