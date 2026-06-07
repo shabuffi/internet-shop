@@ -3,6 +3,7 @@ export const dynamic = 'force-dynamic';
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getProduct } from "@/lib/api";
+import { formatPrice } from "@/lib/format";
 import AddToCartButton from "@/components/AddToCartButton";
 
 interface Props {
@@ -19,45 +20,62 @@ export default async function ProductPage({ params }: Props) {
     notFound();
   }
 
-  return (
-    <div className="product-detail-page">
-      <div className="container">
-        <Link href="/" className="back-link">← Каталог</Link>
+  const inStock = product.stock > 0;
+  const specs: [string, string][] = [
+    ["Артикул", product.article || "—"],
+    ["Категория", product.category?.name || "—"],
+    ["Наличие", inStock ? `На складе · ${product.stock} шт` : "Под заказ"],
+    ["Доставка", "1–3 дня"],
+  ];
 
-        <div className="product-detail-grid">
-          <div className="product-detail-image" style={{ position: "relative", overflow: "hidden", background: "var(--surface)" }}>
-            {product.image_url ? (
-              <img
-                src={`/api/v1/products/${product.id}/image`}
-                alt={product.name}
-                style={{ width: "100%", height: "100%", objectFit: "cover" }}
-              />
-            ) : (
-              <span style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 64 }}>
-                🛍
-              </span>
-            )}
+  return (
+    <div className="page">
+      <div className="container">
+        <div className="breadcrumb">
+          <Link href="/">Каталог</Link>
+          {product.category && <><span>›</span><span>{product.category.name}</span></>}
+          <span>›</span>
+          <span style={{ color: "var(--charcoal)" }}>{product.name}</span>
+        </div>
+
+        <div className="pdp" style={{ paddingTop: "var(--s-6)", paddingBottom: "var(--s-16)" }}>
+          <div className="pdp__media">
+            <div className="pdp__hero">
+              <div className="photo">
+                {product.image_url
+                  ? <img src={`/api/v1/products/${product.id}/image`} alt={product.name} />
+                  : <span className="photo__ph" style={{ fontSize: 64 }}>🛍</span>}
+              </div>
+            </div>
           </div>
 
-          <div className="product-detail-info">
-            {product.category && (
-              <p style={{ fontSize: 13, color: "var(--ink-secondary)", textTransform: "uppercase", letterSpacing: "0.5px" }}>
-                {product.category.name}
-              </p>
-            )}
-            <h1 className="detail-name">{product.name}</h1>
-            {product.article && <p className="detail-article">Артикул: {product.article}</p>}
-            <p className="detail-price">{Number(product.price).toFixed(2)} ₽</p>
+          <div className="pdp__info">
+            {product.category && <div className="pdp__cat">{product.category.name}</div>}
+            <h1 className="pdp__title">{product.name}</h1>
+            <div className="row" style={{ gap: "var(--s-4)" }}>
+              {product.article && <span className="pdp__sku">Арт. {product.article}</span>}
+              {inStock
+                ? <span className="badge badge--stock"><span className="badge__dot" />В наличии</span>
+                : <span className="badge badge--out"><span className="badge__dot" />Нет в наличии</span>}
+            </div>
 
-            {product.description && (
-              <p className="detail-description">{product.description}</p>
-            )}
+            <div className="pdp__price">{formatPrice(product.price)}</div>
 
-            <p className={`detail-stock ${product.stock > 0 ? "in-stock" : "out-of-stock"}`}>
-              {product.stock > 0 ? `✓ В наличии · ${product.stock} шт` : "✕ Нет в наличии"}
-            </p>
+            {product.description && <p className="pdp__desc">{product.description}</p>}
 
             <AddToCartButton product={product} />
+
+            <div className="notice">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="6" width="13" height="11" rx="1" /><path d="M14 9h4l3 3v5h-7" /><circle cx="6" cy="18" r="1.6" /><circle cx="17" cy="18" r="1.6" /></svg>
+              Бесплатная доставка при заказе от 5 000 ₽
+            </div>
+
+            <div className="pdp__divider" />
+            <div className="pdp__specs">
+              {specs.map(([k, v]) => (
+                <div className="srow" key={k}><span>{k}</span><span style={{ fontWeight: 500 }}>{v}</span></div>
+              ))}
+            </div>
           </div>
         </div>
       </div>

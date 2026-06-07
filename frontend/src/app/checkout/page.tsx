@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useCart } from "@/context/CartContext";
+import { formatPrice } from "@/lib/format";
 
 export default function CheckoutPage() {
   const router = useRouter();
@@ -14,18 +15,19 @@ export default function CheckoutPage() {
 
   if (items.length === 0) {
     return (
-      <div className="checkout-page"><div className="container">
-        <div className="empty-state">
-          <div className="empty-state-icon">🛒</div>
-          <p className="empty-state-title">Корзина пуста</p>
-          <Link href="/" className="btn btn-primary">В каталог</Link>
+      <div className="container">
+        <div className="empty">
+          <div className="empty__icon">🛒</div>
+          <h3>Корзина пуста</h3>
+          <p>Сначала добавьте товары из каталога.</p>
+          <Link href="/" className="btn btn--primary">В каталог</Link>
         </div>
-      </div></div>
+      </div>
     );
   }
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) {
-    setForm(prev => ({ ...prev, [e.target.name]: e.target.value }));
+    setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -36,7 +38,7 @@ export default function CheckoutPage() {
       const res = await fetch("/api/v1/orders", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...form, items: items.map(i => ({ product_id: i.id, quantity: i.quantity })) }),
+        body: JSON.stringify({ ...form, items: items.map((i) => ({ product_id: i.id, quantity: i.quantity })) }),
       });
       if (!res.ok) { const d = await res.json(); throw new Error(d.detail || "Ошибка"); }
       const order = await res.json();
@@ -50,68 +52,73 @@ export default function CheckoutPage() {
   }
 
   return (
-    <div className="checkout-page">
-      <div className="container">
-        <Link href="/cart" className="back-link">← Корзина</Link>
-        <h1 className="catalog-title" style={{ marginBottom: 32 }}>Оформление заказа</h1>
+    <div className="container section" style={{ paddingTop: "var(--s-8)" }}>
+      <div className="breadcrumb" style={{ padding: 0, marginBottom: "var(--s-5)" }}>
+        <Link href="/cart">Корзина</Link><span>›</span><span style={{ color: "var(--charcoal)" }}>Оформление</span>
+      </div>
+      <h1 className="section-title">Оформление заказа</h1>
 
-        <div className="checkout-layout">
-          <form onSubmit={handleSubmit}>
-            <div className="checkout-form-card">
-              <p className="form-section-title">Контактные данные</p>
-              <div className="form-grid">
-                <div className="form-group">
-                  <label className="form-label">Имя *</label>
-                  <input className="form-input" name="customer_name" value={form.customer_name}
-                    onChange={handleChange} required placeholder="Ваше имя" />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Телефон *</label>
-                  <input className="form-input" name="customer_phone" value={form.customer_phone}
-                    onChange={handleChange} required placeholder="+7 900 000-00-00" type="tel" />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Email</label>
-                  <input className="form-input" name="customer_email" value={form.customer_email}
-                    onChange={handleChange} placeholder="email@example.com" type="email" />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Адрес доставки</label>
-                  <input className="form-input" name="delivery_address" value={form.delivery_address}
-                    onChange={handleChange} placeholder="Город, улица, дом, квартира" />
-                </div>
-                <div className="form-group form-group-full">
-                  <label className="form-label">Комментарий</label>
-                  <textarea className="form-input" name="comment" value={form.comment}
-                    onChange={handleChange} rows={3} placeholder="Пожелания к заказу" />
-                </div>
+      <form onSubmit={handleSubmit} className="checkout">
+        <div>
+          <div className="checkout__section">
+            <h3><span className="checkout__num">1</span>Контактные данные</h3>
+            <div className="formgrid">
+              <div className="field">
+                <label>Имя <span className="req">*</span></label>
+                <input className="input" name="customer_name" value={form.customer_name} onChange={handleChange} required placeholder="Анна" />
               </div>
-            </div>
-
-            {error && <p className="form-error" style={{ marginTop: 12 }}>{error}</p>}
-
-            <button className="btn btn-buy" type="submit" disabled={loading}
-              style={{ width: "100%", marginTop: 20, fontSize: 16, padding: "16px 24px" }}>
-              {loading ? "Оформляем..." : `Подтвердить заказ · ${totalAmount.toFixed(2)} ₽`}
-            </button>
-          </form>
-
-          <div className="order-summary-card">
-            <p className="summary-title">Ваш заказ</p>
-            {items.map(item => (
-              <div key={item.id} className="summary-item">
-                <span className="summary-item-name">{item.name} × {item.quantity}</span>
-                <span className="summary-item-price">{(Number(item.price) * item.quantity).toFixed(2)} ₽</span>
+              <div className="field">
+                <label>Телефон <span className="req">*</span></label>
+                <input className="input" name="customer_phone" value={form.customer_phone} onChange={handleChange} required type="tel" placeholder="+7 999 000-00-00" />
               </div>
-            ))}
-            <div className="summary-divider" />
-            <div className="summary-total">
-              <span>Итого</span>
-              <span>{totalAmount.toFixed(2)} ₽</span>
+              <div className="field span2">
+                <label>Email</label>
+                <input className="input" name="customer_email" value={form.customer_email} onChange={handleChange} type="email" placeholder="anna@mail.ru" />
+              </div>
             </div>
           </div>
+
+          <div className="checkout__section">
+            <h3><span className="checkout__num">2</span>Доставка</h3>
+            <div className="formgrid">
+              <div className="field span2">
+                <label>Адрес</label>
+                <input className="input" name="delivery_address" value={form.delivery_address} onChange={handleChange} placeholder="Город, улица, дом, квартира" />
+              </div>
+              <div className="field span2">
+                <label>Комментарий к заказу</label>
+                <textarea className="textarea" name="comment" value={form.comment} onChange={handleChange} placeholder="Код домофона, пожелания по доставке…" />
+              </div>
+            </div>
+          </div>
+
+          {error && <p className="form-error">{error}</p>}
         </div>
-      </div>
+
+        <aside className="osummary">
+          <h3 style={{ margin: "0 0 var(--s-5)", fontSize: "var(--t-h3)", fontWeight: 600 }}>Ваш заказ</h3>
+          <div className="osummary__items">
+            {items.map((it) => (
+              <div className="osummary__item" key={it.id}>
+                <div className="photo" style={{ position: "relative" }}>
+                  <span className="photo__ph" style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>🛍</span>
+                  <img src={`/api/v1/products/${it.id}/image`} alt={it.name} style={{ position: "relative", zIndex: 1 }}
+                    onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
+                </div>
+                <div><div className="nm">{it.name}</div><div className="qt">{it.quantity} шт{it.article ? ` · ${it.article}` : ""}</div></div>
+                <div className="pr">{formatPrice(Number(it.price) * it.quantity)}</div>
+              </div>
+            ))}
+          </div>
+          <div className="summary__row"><span>Товары</span><b>{formatPrice(totalAmount)}</b></div>
+          <div className="summary__row"><span>Доставка</span><b>Бесплатно</b></div>
+          <div className="summary__total"><span>К оплате</span><b>{formatPrice(totalAmount)}</b></div>
+          <button className="btn btn--primary btn--lg btn--block" type="submit" disabled={loading} style={{ marginTop: "var(--s-4)" }}>
+            {loading ? "Оформляем…" : "Подтвердить заказ"}
+          </button>
+          <p className="fine" style={{ textAlign: "center", marginTop: "var(--s-3)" }}>Нажимая кнопку, вы соглашаетесь с условиями оферты</p>
+        </aside>
+      </form>
     </div>
   );
 }

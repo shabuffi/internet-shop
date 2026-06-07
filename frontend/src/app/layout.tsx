@@ -5,9 +5,36 @@ import { CartProvider } from "@/context/CartContext";
 import CartIcon from "@/components/CartIcon";
 
 export const metadata: Metadata = {
-  title: "Магазин",
+  title: "Контур — интернет-магазин",
   description: "Интернет-магазин с интеграцией МойСклад",
 };
+
+// Навигация и профиль — задел на будущее, пока скрыты. Включить → true.
+const SHOW_SOON = false;
+
+const FOOTER_COLS = [
+  { h: "Магазин", links: ["Каталог", "Новинки", "Распродажа", "Подарочные карты"] },
+  { h: "Помощь", links: ["Доставка и оплата", "Возврат", "Гарантия", "Связаться с нами"] },
+  { h: "Компания", links: ["О нас", "Магазины", "Блог", "Вакансии"] },
+];
+
+function SearchIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" style={{ display: "block", flex: "none" }}>
+      <circle cx="11" cy="11" r="7" /><line x1="21" y1="21" x2="16.5" y2="16.5" />
+    </svg>
+  );
+}
+
+function UserIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" style={{ display: "block" }}>
+      <circle cx="12" cy="8" r="4" /><path d="M4 21c0-4 3.6-6 8-6s8 2 8 6" />
+    </svg>
+  );
+}
 
 async function getShopName(): Promise<string> {
   try {
@@ -16,10 +43,10 @@ async function getShopName(): Promise<string> {
     });
     if (res.ok) {
       const data = await res.json();
-      return data.shop_name || "Магазин";
+      return data.shop_name || "Контур";
     }
   } catch {}
-  return "Магазин";
+  return "Контур";
 }
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
@@ -27,15 +54,64 @@ export default async function RootLayout({ children }: { children: React.ReactNo
 
   return (
     <html lang="ru">
+      <head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link
+          href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700&family=Spectral:wght@500;600;700&display=swap"
+          rel="stylesheet"
+        />
+      </head>
       <body>
         <CartProvider>
           <header className="header">
-            <div className="container header-inner">
-              <Link href="/" className="logo">{shopName}</Link>
-              <CartIcon />
+            <div className="container header__inner">
+              <Link href="/" className="brand">{shopName}<b>.</b></Link>
+
+              {SHOW_SOON && (
+                <nav className="nav hide-mobile">
+                  <Link href="/" className="active">Каталог</Link>
+                  <Link href="/">Новинки</Link>
+                  <Link href="/">Доставка</Link>
+                  <Link href="/">О магазине</Link>
+                </nav>
+              )}
+
+              <div className="header__actions">
+                <form action="/" method="get" className="search hide-mobile">
+                  <SearchIcon />
+                  <input name="search" placeholder="Поиск товаров" aria-label="Поиск товаров" />
+                </form>
+                {SHOW_SOON && (
+                  <button className="iconbtn hide-mobile" aria-label="Профиль"><UserIcon /></button>
+                )}
+                <CartIcon />
+              </div>
             </div>
           </header>
-          {children}
+
+          <main className="app-main">{children}</main>
+
+          <footer className="footer">
+            <div className="container">
+              <div className="footer__top">
+                <div className="footer__brand">
+                  <span className="brand">{shopName}<b>.</b></span>
+                  <p>Аккуратный интернет-магазин. Спокойный дизайн, честные цены, бережная доставка по России.</p>
+                </div>
+                {FOOTER_COLS.map((col) => (
+                  <div className="footer__col" key={col.h}>
+                    <h4>{col.h}</h4>
+                    {col.links.map((l) => <a key={l}>{l}</a>)}
+                  </div>
+                ))}
+              </div>
+              <div className="footer__bottom">
+                <span>© {new Date().getFullYear()} {shopName}. Все права защищены.</span>
+                <span>Россия · ₽ · Русский</span>
+              </div>
+            </div>
+          </footer>
         </CartProvider>
       </body>
     </html>

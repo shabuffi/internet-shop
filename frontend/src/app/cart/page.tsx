@@ -2,65 +2,75 @@
 
 import Link from "next/link";
 import { useCart } from "@/context/CartContext";
+import { formatPrice } from "@/lib/format";
 
 export default function CartPage() {
-  const { items, totalAmount, removeItem, updateQuantity } = useCart();
+  const { items, totalItems, totalAmount, removeItem, updateQuantity } = useCart();
 
   if (items.length === 0) {
     return (
-      <div className="cart-page">
-        <div className="container">
-          <h1 className="catalog-title" style={{ marginBottom: 40 }}>Корзина</h1>
-          <div className="empty-state">
-            <div className="empty-state-icon">🛒</div>
-            <p className="empty-state-title">Корзина пуста</p>
-            <p className="empty-state-body">Добавьте товары из каталога</p>
-            <Link href="/" className="btn btn-primary">Перейти в каталог</Link>
-          </div>
+      <div className="container">
+        <div className="empty">
+          <div className="empty__icon">🛒</div>
+          <h3>В корзине пока пусто</h3>
+          <p>Загляните в каталог — там есть на что посмотреть.</p>
+          <Link href="/" className="btn btn--primary">Перейти в каталог</Link>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="cart-page">
-      <div className="container">
-        <h1 className="catalog-title" style={{ marginBottom: 32 }}>Корзина</h1>
+    <div className="container section" style={{ paddingTop: "var(--s-8)" }}>
+      <h1 className="section-title">
+        Корзина <span style={{ color: "var(--graphite)", fontWeight: 400 }}>· {totalItems}</span>
+      </h1>
 
-        <div className="cart-list">
+      <div className="cart">
+        <div className="cart__list">
           {items.map((item) => (
-            <div key={item.id} className="cart-item">
-              <div className="cart-item-info">
-                <p className="product-name">{item.name}</p>
-                {item.article && <p className="product-article">Арт. {item.article}</p>}
-                <p className="product-price" style={{ fontSize: 15, color: "var(--ink-secondary)" }}>
-                  {Number(item.price).toFixed(2)} ₽ × {item.quantity}
-                </p>
+            <div className="lineitem" key={item.id}>
+              <Link href={`/products/${item.id}`} className="lineitem__media">
+                <div className="photo" style={{ position: "relative" }}>
+                  <span className="photo__ph" style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>🛍</span>
+                  <img src={`/api/v1/products/${item.id}/image`} alt={item.name}
+                    style={{ position: "relative", zIndex: 1 }}
+                    onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
+                </div>
+              </Link>
+
+              <div>
+                <div className="lineitem__name">{item.name}</div>
+                {item.article && <div className="lineitem__sku">Арт. {item.article}</div>}
+                <div className="lineitem__controls">
+                  <div className="qty qty--sm">
+                    <button onClick={() => updateQuantity(item.id, item.quantity - 1)} disabled={item.quantity <= 1} aria-label="Меньше">−</button>
+                    <span>{item.quantity}</span>
+                    <button onClick={() => updateQuantity(item.id, item.quantity + 1)} aria-label="Больше">+</button>
+                  </div>
+                  <button className="linkbtn" onClick={() => removeItem(item.id)}>Удалить</button>
+                </div>
               </div>
 
-              <div className="cart-item-controls">
-                <button className="qty-btn" onClick={() => updateQuantity(item.id, item.quantity - 1)}>−</button>
-                <span className="qty-value">{item.quantity}</span>
-                <button className="qty-btn" onClick={() => updateQuantity(item.id, item.quantity + 1)}>+</button>
-              </div>
-
-              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                <p className="cart-item-subtotal">{(Number(item.price) * item.quantity).toFixed(2)} ₽</p>
-                <button className="remove-btn" onClick={() => removeItem(item.id)} title="Удалить">✕</button>
+              <div className="lineitem__right">
+                <div className="lineitem__price">{formatPrice(Number(item.price) * item.quantity)}</div>
               </div>
             </div>
           ))}
         </div>
 
-        <div className="cart-summary">
-          <div>
-            <p className="cart-total-label">Итого</p>
-            <p className="cart-total-amount">{totalAmount.toFixed(2)} ₽</p>
-          </div>
-          <Link href="/checkout" className="btn btn-buy" style={{ fontSize: 16, padding: "14px 32px" }}>
+        <aside className="summary">
+          <h3>Итого</h3>
+          <div className="summary__row"><span>Товары ({totalItems})</span><b>{formatPrice(totalAmount)}</b></div>
+          <div className="summary__row"><span>Доставка</span><b>Бесплатно</b></div>
+          <div className="summary__total"><span>К оплате</span><b>{formatPrice(totalAmount)}</b></div>
+          <Link href="/checkout" className="btn btn--primary btn--lg btn--block" style={{ marginTop: "var(--s-4)" }}>
             Оформить заказ
           </Link>
-        </div>
+          <Link href="/" className="btn btn--ghost btn--block" style={{ marginTop: "var(--s-3)", justifyContent: "center" }}>
+            Продолжить покупки
+          </Link>
+        </aside>
       </div>
     </div>
   );
