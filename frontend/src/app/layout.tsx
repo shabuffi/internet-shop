@@ -12,11 +12,6 @@ export const metadata: Metadata = {
 // Навигация и профиль — задел на будущее, пока скрыты. Включить → true.
 const SHOW_SOON = false;
 
-const FOOTER_COLS = [
-  { h: "Магазин", links: ["Каталог"] },
-  { h: "Помощь", links: ["Доставка и оплата", "Связаться с нами"] },
-];
-
 function SearchIcon() {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -98,12 +93,27 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                   <span className="brand">{shopName}<b>.</b></span>
                   <p>Аккуратный интернет-магазин. Спокойный дизайн, честные цены, бережная доставка по России.</p>
                 </div>
-                {FOOTER_COLS.map((col) => (
-                  <div className="footer__col" key={col.h}>
-                    <h4>{col.h}</h4>
-                    {col.links.map((l) => <a key={l}>{l}</a>)}
-                  </div>
-                ))}
+
+                <div className="footer__col">
+                  <h4>Магазин</h4>
+                  <Link href="/">Каталог</Link>
+                  <Link href="/cart">Корзина</Link>
+                  <Link href="/checkout">Оформление заказа</Link>
+                </div>
+
+                <div className="footer__col">
+                  <h4>Покупателю</h4>
+                  <a>Доставка и оплата</a>
+                  <a>Возврат и обмен</a>
+                  <a>Связаться с нами</a>
+                </div>
+
+                <div className="footer__col">
+                  <h4>Контакты</h4>
+                  <a href="tel:+79990000000">+7 (999) 000-00-00</a>
+                  <a href="mailto:info@example.ru">info@example.ru</a>
+                  <span>Пн–Пт · 10:00–19:00</span>
+                </div>
               </div>
               <div className="footer__bottom">
                 <span>© {new Date().getFullYear()} {shopName}. Все права защищены.</span>
