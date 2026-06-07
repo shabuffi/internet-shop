@@ -65,11 +65,6 @@ export default async function ProductPage({ params }: Props) {
 
             <AddToCartButton product={product} />
 
-            <div className="notice">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="6" width="13" height="11" rx="1" /><path d="M14 9h4l3 3v5h-7" /><circle cx="6" cy="18" r="1.6" /><circle cx="17" cy="18" r="1.6" /></svg>
-              Бесплатная доставка при заказе от 5 000 ₽
-            </div>
-
             <div className="pdp__divider" />
             <div className="pdp__specs">
               {specs.map(([k, v]) => (
