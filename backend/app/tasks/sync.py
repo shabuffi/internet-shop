@@ -25,15 +25,22 @@ def fetch_product_images():
             .where(
                 Product.is_active == True,
                 Product.article.isnot(None),
-                or_(Product.image_url.is_(None), Product.description.is_(None)),
+                or_(
+                    Product.image_url.is_(None),
+                    Product.description.is_(None),
+                    Product.moysklad_rest_id.is_(None),
+                ),
             )
             .limit(50)
         ).all()
 
         updated = 0
         for product in products:
-            description, image_url = get_product_enrichment_by_article(product.article)
+            rest_id, description, image_url = get_product_enrichment_by_article(product.article)
             changed = False
+            if rest_id and not product.moysklad_rest_id:
+                product.moysklad_rest_id = rest_id  # запоминаем REST-id для отправки заказов
+                changed = True
             if image_url and not product.image_url:
                 product.image_url = image_url
                 changed = True
@@ -55,9 +62,10 @@ def fetch_product_images():
 def push_order_to_moysklad(self, order_id: str):
     """Celery-задача: отправляет заказ в МойСклад (REST API).
 
-    Идемпотентна: если у заказа уже есть ``moysklad_id`` — выходит без действий. Товары
-    в МойСклад ищутся по артикулу. При недоступности МойСклад повторяет до 3 раз с
-    паузой 60 секунд (``bind=True`` нужен для доступа к ``self.retry``).
+    Идемпотентна: если у заказа уже есть ``moysklad_id`` — выходит без действий. Товар
+    в МойСклад берётся по сохранённому ``moysklad_rest_id`` (быстро, без запроса), а если
+    его ещё нет — ищется по артикулу (запасной путь). При недоступности МойСклад повторяет
+    до 3 раз с паузой 60 секунд (``bind=True`` нужен для доступа к ``self.retry``).
 
     Args:
         order_id: ID заказа в нашей БД.
@@ -67,11 +75,12 @@ def push_order_to_moysklad(self, order_id: str):
     """
     from app.db.session import SessionLocal
     from app.db.models.order import Order  # noqa
-    from app.db.models.product import Product  # noqa — нужен чтобы SQLAlchemy видел таблицу products
+    from app.db.models.product import Product
     from app.integrations.moysklad.rest_client import (
         get_organization_href,
         find_product_href_by_article,
         create_customer_order,
+        product_href,
     )
 
     db = SessionLocal()
@@ -87,12 +96,16 @@ def push_order_to_moysklad(self, order_id: str):
 
         org_href = get_organization_href()
 
-        # Собираем позиции — ищем каждый товар в МойСклад по артикулу
+        # Собираем позиции: сначала по сохранённому REST-id (без запроса), иначе — по артикулу
         positions = []
         for item in order.items:
-            if not item.product_article:
-                continue
-            href = find_product_href_by_article(item.product_article)
+            href = None
+            product = db.get(Product, item.product_id)
+            if product and product.moysklad_rest_id:
+                href = product_href(product.moysklad_rest_id)
+            elif item.product_article:
+                href = find_product_href_by_article(item.product_article)
+
             if href:
                 positions.append({
                     "href": href,

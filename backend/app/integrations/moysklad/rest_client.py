@@ -108,31 +108,38 @@ def find_product_href_by_article(article: str) -> str | None:
     return rows[0]["meta"]["href"] if rows else None
 
 
-def get_product_enrichment_by_article(article: str) -> tuple[str | None, str | None]:
-    """Возвращает ``(описание, url_картинки)`` товара из REST API по артикулу.
+def product_href(rest_id: str) -> str:
+    """Строит href товара в REST API МойСклад по его rest_id."""
+    return f"{BASE}/entity/product/{rest_id}"
 
-    CommerceML не приносит описание и картинки надёжно (id из CommerceML не совпадает
-    с id REST API), поэтому дозагружаем их из REST. Поиск товара — по артикулу.
+
+def get_product_enrichment_by_article(article: str) -> tuple[str | None, str | None, str | None]:
+    """Возвращает ``(rest_id, описание, url_картинки)`` товара из REST API по артикулу.
+
+    CommerceML не приносит описание/картинки надёжно, а id из CommerceML не совпадает
+    с id REST API. Поэтому ищем товар по артикулу, запоминаем его REST-id (чтобы потом
+    не искать снова — например, при отправке заказа) и заодно берём описание и картинку.
 
     Args:
         article: Артикул товара.
 
     Returns:
-        Кортеж ``(description, image_url)``. Любой элемент может быть ``None``, если
-        товар не найден, или у него нет описания/картинки.
+        Кортеж ``(rest_id, description, image_url)``. Любой элемент может быть ``None``,
+        если товар не найден или у него нет описания/картинки.
     """
     href = find_product_href_by_article(article)
     if not href:
-        return None, None
+        return None, None, None
+
+    rest_id = href.rstrip("/").split("/")[-1]
 
     try:
         card = httpx.get(href, headers=_headers(), timeout=10).json()
     except Exception:
-        return None, None
+        return rest_id, None, None
     description = (card.get("description") or "").strip() or None
 
     # Картинки лежат отдельным ресурсом /images у товара (по его REST-id)
-    rest_id = href.rstrip("/").split("/")[-1]
     image_url = None
     try:
         r = httpx.get(f"{BASE}/entity/product/{rest_id}/images", headers=_headers(), timeout=10)
@@ -143,7 +150,7 @@ def get_product_enrichment_by_article(article: str) -> tuple[str | None, str | N
     except Exception:
         pass
 
-    return description, image_url
+    return rest_id, description, image_url
 
 
 def get_or_create_counterparty(name: str, phone: str) -> str:
