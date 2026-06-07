@@ -98,21 +98,6 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                   <h4>Магазин</h4>
                   <Link href="/">Каталог</Link>
                   <Link href="/cart">Корзина</Link>
-                  <Link href="/checkout">Оформление заказа</Link>
-                </div>
-
-                <div className="footer__col">
-                  <h4>Покупателю</h4>
-                  <a>Доставка и оплата</a>
-                  <a>Возврат и обмен</a>
-                  <a>Связаться с нами</a>
-                </div>
-
-                <div className="footer__col">
-                  <h4>Контакты</h4>
-                  <a href="tel:+79990000000">+7 (999) 000-00-00</a>
-                  <a href="mailto:info@example.ru">info@example.ru</a>
-                  <span>Пн–Пт · 10:00–19:00</span>
                 </div>
               </div>
               <div className="footer__bottom">
