@@ -172,7 +172,7 @@ button, input, textarea, select { font-family: inherit; }
 
 /* ---------- подвал ---------- */
 .footer { background: var(--ink-soft); color: var(--on-ink); margin-top: auto; }
-.footer__top { padding: var(--s-16) 0 var(--s-12); display: grid; grid-template-columns: 1.4fr repeat(3, 1fr); gap: var(--s-8); }
+.footer__top { padding: var(--s-16) 0 var(--s-12); display: grid; grid-template-columns: 2fr repeat(2, 1fr); gap: var(--s-8); }
 .footer__brand .brand { color: var(--on-ink); }
 .footer__brand p { color: rgba(250,249,247,.6); font-size: var(--t-sm); max-width: 30ch; margin: var(--s-4) 0 0; line-height: 1.6; }
 .footer__col h4 { font-size: var(--t-xs); letter-spacing: .14em; text-transform: uppercase; color: rgba(250,249,247,.5); margin: 0 0 var(--s-4); font-weight: 600; }
