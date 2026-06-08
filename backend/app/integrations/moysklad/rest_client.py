@@ -172,13 +172,17 @@ def get_product_enrichment_by_article(article: str) -> tuple[str | None, str | N
 def get_or_create_counterparty(name: str, phone: str, email: str = "") -> str:
     """Находит контрагента по телефону или создаёт нового.
 
+    Телефон — ключ: один номер = один контрагент. Если контрагент найден (повторный
+    заказ), его имя/email **обновляются** на переданные — чтобы данные не «застывали»
+    на самом первом заказе. Если не найден — создаётся новый.
+
     Args:
         name: Имя покупателя (полное — «Имя Фамилия»).
         phone: Телефон покупателя (ключ поиска).
-        email: Email покупателя (пишется в карточку при создании, если задан).
+        email: Email покупателя (пишется в карточку, если задан).
 
     Returns:
-        href найденного или созданного контрагента.
+        href найденного (с обновлёнными данными) или созданного контрагента.
     """
     # Ищем по номеру телефона
     r = httpx.get(
@@ -190,7 +194,17 @@ def get_or_create_counterparty(name: str, phone: str, email: str = "") -> str:
     r.raise_for_status()
     rows = r.json().get("rows", [])
     if rows:
-        return rows[0]["meta"]["href"]
+        href = rows[0]["meta"]["href"]
+        # Повторный заказ по тому же телефону → обновляем имя/email контрагента, чтобы
+        # данные были актуальными (иначе имя «застывает» на самом первом заказе).
+        update_payload = {"name": name}
+        if email:
+            update_payload["email"] = email
+        try:
+            httpx.put(href, json=update_payload, headers=_headers(), timeout=10)
+        except Exception:
+            pass
+        return href
 
     # Не нашли — создаём (с email, если он есть)
     payload = {"name": name, "phone": phone}

@@ -70,6 +70,35 @@ def test_get_or_create_counterparty_includes_email(monkeypatch):
     assert captured["json"]["email"] == "ivan@mail.ru"
 
 
+def test_get_or_create_counterparty_updates_existing(monkeypatch):
+    """Повторный заказ по тому же телефону обновляет имя/email контрагента."""
+    captured = {}
+
+    class SearchResp:
+        def raise_for_status(self):
+            pass
+        def json(self):
+            return {"rows": [{"meta": {"href": "https://x/cp/9"}}]}   # найден
+
+    class PutResp:
+        def raise_for_status(self):
+            pass
+
+    monkeypatch.setattr(rc.httpx, "get", lambda url, **kw: SearchResp())
+
+    def fake_put(url, **kw):
+        captured["url"] = url
+        captured["json"] = kw.get("json")
+        return PutResp()
+    monkeypatch.setattr(rc.httpx, "put", fake_put)
+
+    href = rc.get_or_create_counterparty("Софья Шабунова", "+79622440886", "s@mail.ru")
+    assert href == "https://x/cp/9"
+    assert captured["url"] == "https://x/cp/9"               # обновляем найденного
+    assert captured["json"]["name"] == "Софья Шабунова"     # имя актуализируется
+    assert captured["json"]["email"] == "s@mail.ru"
+
+
 def test_release_order_reserve_zeroes_positions(monkeypatch):
     calls = []
 
