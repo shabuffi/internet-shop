@@ -9,10 +9,8 @@ from app.db.models.product import Product
 
 @pytest.fixture
 def no_celery(monkeypatch):
-    """Глушим фоновые задачи заказа (отправка в МойСклад + уведомление), чтобы не лезть в брокер."""
-    import app.tasks.sync as sync_mod
+    """Глушим фоновую задачу уведомления, чтобы тест не лез в брокер Celery."""
     import app.tasks.notify as notify_mod
-    monkeypatch.setattr(sync_mod.push_order_to_moysklad, "delay", lambda *a, **k: None)
     monkeypatch.setattr(notify_mod.notify_new_order, "delay", lambda *a, **k: None)
 
 
@@ -153,9 +151,7 @@ def test_create_order_negative_quantity_rejected(client, db_session, no_celery):
 
 def test_create_order_queues_notification(client, db_session, monkeypatch):
     """Создание заказа ставит в очередь уведомление владельцу."""
-    import app.tasks.sync as sync_mod
     import app.tasks.notify as notify_mod
-    monkeypatch.setattr(sync_mod.push_order_to_moysklad, "delay", lambda *a, **k: None)
     queued = []
     monkeypatch.setattr(notify_mod.notify_new_order, "delay", lambda oid: queued.append(oid))
     _make_product(db_session, id="p-1", stock=5)

@@ -238,11 +238,9 @@ def get_settings(db: Session = Depends(get_db), _=Depends(_get_current_admin)):
         db: Сессия БД.
 
     Returns:
-        Словарь настроек: логины МойСклад и обмена, маски паролей, название магазина.
+        Словарь настроек: логин/пароль обмена, название магазина, креды уведомлений.
     """
     return {
-        "moysklad_login":     _get_setting(db, "moysklad_login"),
-        "moysklad_password":  "***" if _get_setting(db, "moysklad_password") else "",
         "exchange_login":     _get_setting(db, "exchange_login"),
         "exchange_password":  "***" if _get_setting(db, "exchange_password") else "",
         "shop_name":          _get_setting(db, "shop_name", "Магазин"),
@@ -259,8 +257,7 @@ def save_settings(body: dict, db: Session = Depends(get_db), _=Depends(_get_curr
     """Сохраняет настройки магазина.
 
     Поля со значением ``***`` пропускаются (оставить как было). ``exchange_password``
-    сохраняется как bcrypt-хеш; ``moysklad_password`` — открытым текстом (он исходящий,
-    нужен для запросов к МойСклад). Неизвестные ключи игнорируются.
+    сохраняется как bcrypt-хеш. Неизвестные ключи игнорируются.
 
     Args:
         body: Словарь ``{ключ: значение}`` из формы настроек.
@@ -270,10 +267,9 @@ def save_settings(body: dict, db: Session = Depends(get_db), _=Depends(_get_curr
         Сообщение об успешном сохранении.
     """
     allowed = {
-        "moysklad_login", "moysklad_password",
         "exchange_login", "exchange_password",
         "shop_name",
-        # токены уведомлений — исходящие секреты, храним открытым текстом (как moysklad_password)
+        # токены уведомлений — исходящие секреты, храним открытым текстом
         "telegram_bot_token", "telegram_chat_id",
         "vk_group_token", "vk_peer_id",
     }
@@ -281,7 +277,6 @@ def save_settings(body: dict, db: Session = Depends(get_db), _=Depends(_get_curr
         if key not in allowed or value == "***":
             continue
         # exchange_password — входящий секрет обмена: храним bcrypt-хеш, не открытый текст.
-        # (moysklad_password НЕ хешируем — он исходящий, нужен открытым для запросов к МойСклад.)
         if key == "exchange_password":
             _set_setting(db, key, _hash_password(str(value)))
         else:
@@ -352,7 +347,7 @@ def list_orders(
                 "id": o.id, "number": o.number, "status": o.status,
                 "customer_name": o.customer_name, "customer_phone": o.customer_phone,
                 "total_amount": str(o.total_amount),
-                "moysklad_id": o.moysklad_id,
+                "exported_at": o.exported_at.isoformat() if o.exported_at else None,
                 "created_at": o.created_at.isoformat(),
                 "items_count": len(o.items),
             }
@@ -412,38 +407,9 @@ def update_order_status(
 
     order.status = body.status
     db.commit()
-
-    if cancelling and order.moysklad_id:
-        # Снятие резерва в МойСклад — фоном, чтобы не ждать внешний API
-        from app.tasks.sync import release_order_in_moysklad
-        release_order_in_moysklad.delay(order.id)
-
+    # Локальный остаток уже возвращён выше. Резерв в МойСклад снимется на стороне МойСклад
+    # при обработке заказа (проброс отмены в МойСклад — отдельная доработка статусов).
     return {"id": order.id, "status": order.status}
-
-
-@router.post("/orders/{order_id}/resync")
-def resync_order(order_id: str, db: Session = Depends(get_db), _=Depends(_get_current_admin)):
-    """Повторно ставит заказ на отправку в МойСклад (если он ещё не уехал).
-
-    Args:
-        order_id: ID заказа.
-        db: Сессия БД.
-
-    Returns:
-        Сообщение о результате (поставлено в очередь / уже синхронизирован).
-
-    Raises:
-        HTTPException: 404, если заказ не найден.
-    """
-    order = db.get(Order, order_id)
-    if not order:
-        raise HTTPException(status_code=404, detail="Заказ не найден")
-    if order.moysklad_id:
-        return {"message": "Заказ уже синхронизирован", "moysklad_id": order.moysklad_id}
-
-    from app.tasks.sync import push_order_to_moysklad
-    push_order_to_moysklad.delay(order.id)
-    return {"message": "Отправка в МойСклад поставлена в очередь"}
 
 
 @router.get("/products")
@@ -480,28 +446,6 @@ def list_products_admin(
         "total": total,
         "page": page,
     }
-
-
-@router.post("/test-connection")
-def test_connection(_=Depends(_get_current_admin)):
-    """Проверяет подключение к МойСклад с сохранёнными credentials."""
-    try:
-        from app.integrations.moysklad.rest_client import get_organization_href
-        get_organization_href()
-        return {"ok": True, "message": "Подключение успешно. Организация найдена."}
-    except Exception as e:
-        return {"ok": False, "message": str(e)}
-
-
-@router.post("/fetch-images")
-def trigger_fetch_images(_=Depends(_get_current_admin)):
-    """Запускает задачу загрузки изображений из МойСклад для товаров без картинок."""
-    try:
-        from app.tasks.sync import fetch_product_images
-        fetch_product_images.delay()
-        return {"message": "Задача поставлена в очередь"}
-    except Exception as e:
-        return {"message": f"Ошибка: {e}"}
 
 
 @router.get("/store-info")

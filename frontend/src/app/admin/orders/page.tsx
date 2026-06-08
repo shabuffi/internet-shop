@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import AdminShell from "@/components/AdminShell";
 import { adminFetch } from "@/lib/adminApi";
 
-interface AdminOrder { id: string; number: string; status: string; customer_name: string; customer_phone: string; total_amount: string; moysklad_id: string | null; created_at: string; items_count: number; }
+interface AdminOrder { id: string; number: string; status: string; customer_name: string; customer_phone: string; total_amount: string; exported_at: string | null; created_at: string; items_count: number; }
 
 const STATUS_LABEL: Record<string, string> = { new: "Новый", confirmed: "Подтверждён", shipped: "Отправлен", delivered: "Доставлен", cancelled: "Отменён" };
 const STATUS_ORDER = ["new", "confirmed", "shipped", "delivered", "cancelled"];
@@ -14,27 +14,12 @@ export default function AdminOrdersPage() {
   const [orders, setOrders] = useState<AdminOrder[]>([]);
   const [total, setTotal] = useState(0);
   const [savingId, setSavingId] = useState<string | null>(null);
-  const [resyncId, setResyncId] = useState<string | null>(null);
   const [error, setError] = useState("");
 
   function load() {
     adminFetch<{ items: AdminOrder[]; total: number }>("/orders").then(d => { setOrders(d.items); setTotal(d.total); }).catch(() => {});
   }
   useEffect(() => { load(); }, []);
-
-  async function handleResync(orderId: string) {
-    setError("");
-    setResyncId(orderId);
-    try {
-      await adminFetch(`/orders/${orderId}/resync`, { method: "POST" });
-      // отправка идёт фоном — перечитываем чуть позже, чтобы увидеть новый статус
-      setTimeout(load, 2500);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Не удалось отправить");
-    } finally {
-      setResyncId(null);
-    }
-  }
 
   async function handleStatusChange(orderId: string, status: string) {
     setError("");
@@ -66,7 +51,7 @@ export default function AdminOrdersPage() {
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
             <thead>
               <tr style={{ borderBottom: "1px solid var(--hairline-soft)" }}>
-                {["Номер", "Клиент", "Телефон", "Позиций", "Сумма", "Статус", "МойСклад", "Дата"].map(h => (
+                {["Номер", "Клиент", "Телефон", "Позиций", "Сумма", "Статус", "Выгрузка", "Дата"].map(h => (
                   <th key={h} style={{ padding: "12px 16px", textAlign: "left", fontWeight: 600, color: "var(--ink-secondary)", fontSize: 12 }}>{h}</th>
                 ))}
               </tr>
@@ -98,24 +83,10 @@ export default function AdminOrdersPage() {
                     </select>
                   </td>
                   <td style={{ padding: "14px 16px", fontSize: 12 }}>
-                    {o.moysklad_id ? (
-                      <span style={{ color: "var(--success)" }}>✓ Синхр.</span>
+                    {o.exported_at ? (
+                      <span style={{ color: "var(--success)" }} title="Выгружен в МойСклад">✓ Выгружен</span>
                     ) : (
-                      <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
-                        <span style={{ color: "var(--ink-tertiary)" }}>Ожидает</span>
-                        <button
-                          onClick={() => handleResync(o.id)}
-                          disabled={resyncId === o.id}
-                          title="Повторить отправку в МойСклад"
-                          style={{
-                            fontSize: 12, fontWeight: 600, padding: "4px 10px", borderRadius: 6,
-                            border: "1px solid var(--hairline-soft)", background: "var(--canvas)",
-                            color: "var(--primary)", cursor: "pointer", opacity: resyncId === o.id ? 0.5 : 1,
-                          }}
-                        >
-                          {resyncId === o.id ? "…" : "Повторить"}
-                        </button>
-                      </span>
+                      <span style={{ color: "var(--ink-tertiary)" }} title="МойСклад заберёт заказ при следующем обмене">Ожидает</span>
                     )}
                   </td>
                   <td style={{ padding: "14px 16px", color: "var(--ink-secondary)" }}>

@@ -26,12 +26,9 @@ class Product(Base):
 
     # Внутренний UUID нашей БД
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    # UUID товара в МойСклад — уникален, по нему обновляем товар при синхронизации
+    # Ид товара из выгрузки CommerceML — уникален, по нему обновляем товар при импорте
+    # и сопоставляем позиции при выгрузке заказов в МойСклад (Коды связи: уникальные для магазина).
     moysklad_id: Mapped[str] = mapped_column(String(36), unique=True, index=True)
-    # id товара в REST API МойСклад (ОТЛИЧАЕТСЯ от moysklad_id из CommerceML!).
-    # Заполняется при обогащении по артикулу; по нему быстро и надёжно отправляем заказы
-    # (без поиска по артикулу на каждую позицию).
-    moysklad_rest_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
 
     name: Mapped[str] = mapped_column(String(500))
     description: Mapped[str | None] = mapped_column(Text, nullable=True)

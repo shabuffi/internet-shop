@@ -50,75 +50,37 @@ def test_update_status_requires_auth(client, order):
     assert resp.status_code == 401
 
 
-# ─── повтор отправки в МойСклад ──────────────────────────────────────────────
+# ─── отмена заказа: возврат остатка на сайт ──────────────────────────────────
 
-def test_resync_pending_order_queues(client, token, order, monkeypatch):
-    import app.tasks.sync as sync_mod
-    queued = []
-    monkeypatch.setattr(sync_mod.push_order_to_moysklad, "delay", lambda oid: queued.append(oid))
-    resp = client.post("/api/v1/admin/orders/o-1/resync", headers=_auth(token))
-    assert resp.status_code == 200
-    assert queued == ["o-1"]   # заказ поставлен в очередь
-
-
-def test_resync_already_synced(client, token, db_session):
-    db_session.add(Order(id="o-2", number="ORD-0002", customer_name="Иван",
-                         customer_phone="+79001234567", total_amount=Decimal("0"),
-                         status="new", moysklad_id="ms-xyz"))
-    db_session.commit()
-    resp = client.post("/api/v1/admin/orders/o-2/resync", headers=_auth(token))
-    assert resp.status_code == 200
-    assert "синхрон" in resp.json()["message"].lower()
-
-
-def test_resync_missing_order(client, token):
-    resp = client.post("/api/v1/admin/orders/nope/resync", headers=_auth(token))
-    assert resp.status_code == 404
-
-
-def test_resync_requires_auth(client, order):
-    resp = client.post("/api/v1/admin/orders/o-1/resync")
-    assert resp.status_code == 401
-
-
-# ─── отмена заказа: возврат остатка + снятие резерва ─────────────────────────
-
-def test_cancel_order_restores_stock_and_queues_release(client, token, db_session, monkeypatch):
+def test_cancel_order_restores_stock(client, token, db_session):
     from app.db.models.product import Product
     from app.db.models.order import OrderItem
-    import app.tasks.sync as sync_mod
 
     db_session.add(Product(id="pp", moysklad_id="ms-pp", name="Товар", article="ART",
                            price=Decimal("100"), stock=3))
     db_session.add(Order(id="oc", number="ORD-9", customer_name="И", customer_phone="+79001234567",
-                         total_amount=Decimal("200"), status="new", moysklad_id="ms-order",
+                         total_amount=Decimal("200"), status="new",
                          items=[OrderItem(product_id="pp", product_name="Товар", product_article="ART",
                                           price=Decimal("100"), quantity=2)]))
     db_session.commit()
-
-    queued = []
-    monkeypatch.setattr(sync_mod.release_order_in_moysklad, "delay", lambda oid: queued.append(oid))
 
     resp = client.patch("/api/v1/admin/orders/oc/status", json={"status": "cancelled"}, headers=_auth(token))
     assert resp.status_code == 200
     db_session.expire_all()
     assert db_session.get(Product, "pp").stock == 5   # 3 + 2 возвращено
-    assert queued == ["oc"]                            # снятие резерва поставлено в очередь
 
 
-def test_cancel_already_cancelled_no_double_restore(client, token, db_session, monkeypatch):
+def test_cancel_already_cancelled_no_double_restore(client, token, db_session):
     from app.db.models.product import Product
     from app.db.models.order import OrderItem
-    import app.tasks.sync as sync_mod
 
     db_session.add(Product(id="pp2", moysklad_id="ms-pp2", name="Товар", article="ART2",
                            price=Decimal("100"), stock=5))
     db_session.add(Order(id="oc2", number="ORD-10", customer_name="И", customer_phone="+79001234567",
-                         total_amount=Decimal("100"), status="cancelled", moysklad_id="ms-order2",
+                         total_amount=Decimal("100"), status="cancelled",
                          items=[OrderItem(product_id="pp2", product_name="Товар", product_article="ART2",
                                           price=Decimal("100"), quantity=2)]))
     db_session.commit()
-    monkeypatch.setattr(sync_mod.release_order_in_moysklad, "delay", lambda oid: None)
 
     resp = client.patch("/api/v1/admin/orders/oc2/status", json={"status": "cancelled"}, headers=_auth(token))
     assert resp.status_code == 200

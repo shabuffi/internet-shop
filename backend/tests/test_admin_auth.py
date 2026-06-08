@@ -59,16 +59,6 @@ def test_settings_hashes_exchange_password(client, db_session):
     assert row.value.startswith("$2")      # признак bcrypt-хеша
 
 
-def test_settings_moysklad_password_stays_plaintext(client, db_session):
-    """moysklad_password — исходящий секрет, хранится открытым (нужен для запросов к МойСклад)."""
-    _make_admin(db_session)
-    client.post("/api/v1/admin/login", json={"username": "admin", "password": "password123"})
-    client.post("/api/v1/admin/settings", json={"moysklad_password": "ms-secret"})
-
-    row = db_session.get(ShopSettings, "moysklad_password")
-    assert row.value == "ms-secret"
-
-
 def test_change_password_success(client, db_session):
     _make_admin(db_session, password="oldpass123")
     client.post("/api/v1/admin/login", json={"username": "admin", "password": "oldpass123"})

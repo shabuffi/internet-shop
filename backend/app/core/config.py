@@ -30,10 +30,6 @@ class Settings(BaseSettings):
     DEBUG: bool = False
     ALLOWED_ORIGINS: list[str] = ["http://localhost:3000"]
 
-    # МойСклад
-    MOYSKLAD_LOGIN: str = ""
-    MOYSKLAD_PASSWORD: str = ""
-
     # Уведомления о новых заказах (фолбэк к значениям из админки / ShopSettings)
     TELEGRAM_BOT_TOKEN: str = ""
     TELEGRAM_CHAT_ID: str = ""
