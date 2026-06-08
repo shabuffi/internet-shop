@@ -111,9 +111,11 @@ def create_order(payload: OrderIn, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(order)
 
-    # Запускаем фоновую задачу отправки в МойСклад
+    # Запускаем фоновые задачи: отправка в МойСклад + уведомление владельцу.
     # delay() — поставить в очередь Celery (не ждём результата)
     from app.tasks.sync import push_order_to_moysklad
+    from app.tasks.notify import notify_new_order
     push_order_to_moysklad.delay(order.id)
+    notify_new_order.delay(order.id)
 
     return order

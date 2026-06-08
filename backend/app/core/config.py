@@ -31,5 +31,11 @@ class Settings(BaseSettings):
     MOYSKLAD_LOGIN: str = ""
     MOYSKLAD_PASSWORD: str = ""
 
+    # Уведомления о новых заказах (фолбэк к значениям из админки / ShopSettings)
+    TELEGRAM_BOT_TOKEN: str = ""
+    TELEGRAM_CHAT_ID: str = ""
+    VK_GROUP_TOKEN: str = ""
+    VK_PEER_ID: str = ""
+
 
 settings = Settings()

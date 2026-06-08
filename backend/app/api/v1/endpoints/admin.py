@@ -246,6 +246,11 @@ def get_settings(db: Session = Depends(get_db), _=Depends(_get_current_admin)):
         "exchange_login":     _get_setting(db, "exchange_login"),
         "exchange_password":  "***" if _get_setting(db, "exchange_password") else "",
         "shop_name":          _get_setting(db, "shop_name", "Магазин"),
+        # Уведомления о заказах: токены маскируем, id адресатов — нет (не секрет)
+        "telegram_bot_token": "***" if _get_setting(db, "telegram_bot_token") else "",
+        "telegram_chat_id":   _get_setting(db, "telegram_chat_id"),
+        "vk_group_token":     "***" if _get_setting(db, "vk_group_token") else "",
+        "vk_peer_id":         _get_setting(db, "vk_peer_id"),
     }
 
 
@@ -268,6 +273,9 @@ def save_settings(body: dict, db: Session = Depends(get_db), _=Depends(_get_curr
         "moysklad_login", "moysklad_password",
         "exchange_login", "exchange_password",
         "shop_name",
+        # токены уведомлений — исходящие секреты, храним открытым текстом (как moysklad_password)
+        "telegram_bot_token", "telegram_chat_id",
+        "vk_group_token", "vk_peer_id",
     }
     for key, value in body.items():
         if key not in allowed or value == "***":

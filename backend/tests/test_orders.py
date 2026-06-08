@@ -9,9 +9,11 @@ from app.db.models.product import Product
 
 @pytest.fixture
 def no_celery(monkeypatch):
-    """Глушим отправку в МойСклад (Celery), чтобы тест не лез в брокер."""
+    """Глушим фоновые задачи заказа (отправка в МойСклад + уведомление), чтобы не лезть в брокер."""
     import app.tasks.sync as sync_mod
+    import app.tasks.notify as notify_mod
     monkeypatch.setattr(sync_mod.push_order_to_moysklad, "delay", lambda *a, **k: None)
+    monkeypatch.setattr(notify_mod.notify_new_order, "delay", lambda *a, **k: None)
 
 
 def _make_product(db, id="p-1", price=Decimal("100.00"), stock=5, active=True):
@@ -147,3 +149,19 @@ def test_create_order_negative_quantity_rejected(client, db_session, no_celery):
         "items": [{"product_id": "p-1", "quantity": -3}],
     })
     assert resp.status_code == 422
+
+
+def test_create_order_queues_notification(client, db_session, monkeypatch):
+    """Создание заказа ставит в очередь уведомление владельцу."""
+    import app.tasks.sync as sync_mod
+    import app.tasks.notify as notify_mod
+    monkeypatch.setattr(sync_mod.push_order_to_moysklad, "delay", lambda *a, **k: None)
+    queued = []
+    monkeypatch.setattr(notify_mod.notify_new_order, "delay", lambda oid: queued.append(oid))
+    _make_product(db_session, id="p-1", stock=5)
+    resp = client.post("/api/v1/orders", json={
+        "customer_name": "Иван", "customer_phone": "+79001234567",
+        "items": [{"product_id": "p-1", "quantity": 1}],
+    })
+    assert resp.status_code == 201
+    assert len(queued) == 1

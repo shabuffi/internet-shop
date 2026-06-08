@@ -5,7 +5,7 @@ import AdminShell from "@/components/AdminShell";
 import { adminFetch } from "@/lib/adminApi";
 
 export default function SettingsPage() {
-  const [form, setForm] = useState({ moysklad_login: "", moysklad_password: "", exchange_login: "", exchange_password: "", shop_name: "" });
+  const [form, setForm] = useState({ moysklad_login: "", moysklad_password: "", exchange_login: "", exchange_password: "", shop_name: "", telegram_bot_token: "", telegram_chat_id: "", vk_group_token: "", vk_peer_id: "" });
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -120,6 +120,44 @@ export default function SettingsPage() {
               onChange={e => setForm(p => ({...p, exchange_password: e.target.value}))}
               placeholder="Введите новый пароль или оставьте ***"
               type="password" autoComplete="off" />
+          </div>
+
+          <div style={{ height: 1, background: "var(--hairline-soft)", margin: "20px 0" }} />
+
+          <p style={{ fontWeight: 600, fontSize: 16, marginBottom: 6 }}>Уведомления о заказах</p>
+          <p style={{ fontSize: 13, color: "var(--ink-secondary)", marginBottom: 20 }}>
+            Куда слать оповещение о новом заказе. Заполните любой канал (или оба) —
+            пустые игнорируются. <b>Telegram:</b> создайте бота у @BotFather → токен; узнайте
+            свой chat_id (напишите боту, затем @userinfobot). <b>ВК:</b> ключ доступа
+            сообщества; напишите сообществу первым, peer_id — ваш id ВК.
+          </p>
+
+          <div style={inputStyle}>
+            <label className="form-label">Telegram — токен бота</label>
+            <input className="form-input" value={form.telegram_bot_token}
+              onChange={e => setForm(p => ({...p, telegram_bot_token: e.target.value}))}
+              placeholder="123456:ABC-… или оставьте ***" type="password" autoComplete="off" />
+          </div>
+
+          <div style={inputStyle}>
+            <label className="form-label">Telegram — chat_id</label>
+            <input className="form-input" value={form.telegram_chat_id}
+              onChange={e => setForm(p => ({...p, telegram_chat_id: e.target.value}))}
+              placeholder="например, 123456789" autoComplete="off" />
+          </div>
+
+          <div style={inputStyle}>
+            <label className="form-label">ВК — ключ доступа сообщества</label>
+            <input className="form-input" value={form.vk_group_token}
+              onChange={e => setForm(p => ({...p, vk_group_token: e.target.value}))}
+              placeholder="vk1.a.… или оставьте ***" type="password" autoComplete="off" />
+          </div>
+
+          <div style={inputStyle}>
+            <label className="form-label">ВК — peer_id получателя</label>
+            <input className="form-input" value={form.vk_peer_id}
+              onChange={e => setForm(p => ({...p, vk_peer_id: e.target.value}))}
+              placeholder="ваш id ВКонтакте" autoComplete="off" />
           </div>
 
           <div style={{ height: 1, background: "var(--hairline-soft)", margin: "20px 0" }} />

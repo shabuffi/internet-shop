@@ -5,7 +5,7 @@ celery_app = Celery(
     "shop",
     broker=settings.REDIS_URL,
     backend=settings.REDIS_URL,
-    include=["app.tasks.sync"],
+    include=["app.tasks.sync", "app.tasks.notify"],
 )
 
 celery_app.conf.update(
