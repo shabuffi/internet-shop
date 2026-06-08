@@ -88,6 +88,22 @@ def get_organization_href() -> str:
     return rows[0]["meta"]["href"]
 
 
+def get_main_store_href() -> str | None:
+    """Возвращает href первого склада аккаунта (для резерва в заказе).
+
+    Returns:
+        href склада или ``None`` при ошибке/отсутствии складов (тогда заказ создаётся
+        без явного склада — на одно-складском аккаунте резерв применится к складу по умолчанию).
+    """
+    try:
+        r = httpx.get(f"{BASE}/entity/store", headers=_headers(), timeout=10)
+        r.raise_for_status()
+        rows = r.json().get("rows", [])
+        return rows[0]["meta"]["href"] if rows else None
+    except Exception:
+        return None
+
+
 def find_product_href_by_article(article: str) -> str | None:
     """Ищет товар в МойСклад по артикулу.
 
@@ -193,10 +209,14 @@ def create_customer_order(
     positions: list[dict],
     description: str = "",
 ) -> dict:
-    """Создаёт покупательский заказ в МойСклад.
+    """Создаёт покупательский заказ в МойСклад с резервом остатка.
 
     Контрагент находится/создаётся по телефону. Цена в позициях указывается в рублях и
-    внутри конвертируется в копейки (МойСклад хранит цены в копейках).
+    внутри конвертируется в копейки (МойСклад хранит цены в копейках). Каждая позиция
+    **резервируется на весь заказанный объём** (``reserve = quantity``) — в МойСклад растёт
+    «Резерв», «Доступно» падает, и следующая выгрузка остатков принесёт на сайт уже
+    корректное число (остаток не «отскакивает» после синхронизации). Резерв вешается на
+    основной склад аккаунта, если его удалось определить.
 
     Args:
         organization_href: href организации (из :func:`get_organization_href`).
@@ -221,12 +241,20 @@ def create_customer_order(
         "positions": [
             {
                 "quantity": p["quantity"],
+                "reserve": p["quantity"],               # резервируем весь заказанный объём
                 "price": int(float(p["price"]) * 100),  # рубли → копейки
                 "assortment": {"meta": {"href": p["href"], "type": "product", "mediaType": "application/json"}},
             }
             for p in positions
         ],
     }
+
+    # Указываем склад явно, чтобы резерв уменьшал «Доступно» на том же складе,
+    # с которого МойСклад выгружает остатки. Если склад не определился — заказ всё
+    # равно создаём (на одно-складском аккаунте резерв применится к складу по умолчанию).
+    store_href = get_main_store_href()
+    if store_href:
+        payload["store"] = {"meta": {"href": store_href, "type": "store", "mediaType": "application/json"}}
 
     r = httpx.post(
         f"{BASE}/entity/customerorder",
