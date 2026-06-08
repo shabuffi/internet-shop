@@ -169,12 +169,13 @@ def get_product_enrichment_by_article(article: str) -> tuple[str | None, str | N
     return rest_id, description, image_url
 
 
-def get_or_create_counterparty(name: str, phone: str) -> str:
+def get_or_create_counterparty(name: str, phone: str, email: str = "") -> str:
     """Находит контрагента по телефону или создаёт нового.
 
     Args:
-        name: Имя покупателя.
+        name: Имя покупателя (полное — «Имя Фамилия»).
         phone: Телефон покупателя (ключ поиска).
+        email: Email покупателя (пишется в карточку при создании, если задан).
 
     Returns:
         href найденного или созданного контрагента.
@@ -191,10 +192,13 @@ def get_or_create_counterparty(name: str, phone: str) -> str:
     if rows:
         return rows[0]["meta"]["href"]
 
-    # Не нашли — создаём
+    # Не нашли — создаём (с email, если он есть)
+    payload = {"name": name, "phone": phone}
+    if email:
+        payload["email"] = email
     r = httpx.post(
         f"{BASE}/entity/counterparty",
-        json={"name": name, "phone": phone},
+        json=payload,
         headers=_headers(),
         timeout=10,
     )
@@ -245,6 +249,7 @@ def create_customer_order(
     customer_phone: str,
     positions: list[dict],
     description: str = "",
+    customer_email: str = "",
 ) -> dict:
     """Создаёт покупательский заказ в МойСклад с резервом остатка.
 
@@ -262,6 +267,7 @@ def create_customer_order(
         positions: Список позиций вида
             ``[{"href": "<product href>", "quantity": 2, "price": 1250.0}]`` (цена в рублях).
         description: Комментарий к заказу; если пуст — собирается автоматически.
+        customer_email: Email покупателя — пишется в карточку контрагента (если задан).
 
     Returns:
         JSON созданного заказа от МойСклад (содержит, в т.ч., ``id``).
@@ -269,7 +275,7 @@ def create_customer_order(
     Raises:
         httpx.HTTPStatusError: При ошибке создания заказа.
     """
-    agent_href = get_or_create_counterparty(customer_name, customer_phone)
+    agent_href = get_or_create_counterparty(customer_name, customer_phone, customer_email)
 
     payload = {
         "organization": {"meta": {"href": organization_href, "type": "organization", "mediaType": "application/json"}},

@@ -9,7 +9,7 @@ import { formatPrice } from "@/lib/format";
 export default function CheckoutPage() {
   const router = useRouter();
   const { items, totalAmount, clearCart } = useCart();
-  const [form, setForm] = useState({ customer_name: "", customer_phone: "", customer_email: "", delivery_address: "", comment: "" });
+  const [form, setForm] = useState({ customer_first_name: "", customer_last_name: "", customer_phone: "", customer_email: "", delivery_address: "", comment: "" });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -38,7 +38,14 @@ export default function CheckoutPage() {
       const res = await fetch("/api/v1/orders", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...form, items: items.map((i) => ({ product_id: i.id, quantity: i.quantity })) }),
+        body: JSON.stringify({
+          customer_name: `${form.customer_first_name} ${form.customer_last_name}`.trim(),
+          customer_phone: form.customer_phone,
+          customer_email: form.customer_email,
+          delivery_address: form.delivery_address,
+          comment: form.comment,
+          items: items.map((i) => ({ product_id: i.id, quantity: i.quantity })),
+        }),
       });
       if (!res.ok) {
         const d = await res.json();
@@ -75,7 +82,11 @@ export default function CheckoutPage() {
             <div className="formgrid">
               <div className="field">
                 <label>Имя <span className="req">*</span></label>
-                <input className="input" name="customer_name" value={form.customer_name} onChange={handleChange} required placeholder="Анна" />
+                <input className="input" name="customer_first_name" value={form.customer_first_name} onChange={handleChange} required placeholder="Анна" />
+              </div>
+              <div className="field">
+                <label>Фамилия <span className="req">*</span></label>
+                <input className="input" name="customer_last_name" value={form.customer_last_name} onChange={handleChange} required placeholder="Иванова" />
               </div>
               <div className="field">
                 <label>Телефон <span className="req">*</span></label>

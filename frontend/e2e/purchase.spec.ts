@@ -19,7 +19,8 @@ test.describe("Покупка", () => {
     // оформление
     await page.getByRole("link", { name: "Оформить заказ" }).click();
     await expect(page).toHaveURL(/\/checkout/);
-    await page.fill('input[name="customer_name"]', "Тест Тестов");
+    await page.fill('input[name="customer_first_name"]', "Тест");
+    await page.fill('input[name="customer_last_name"]', "Тестов");
     await page.fill('input[name="customer_phone"]', "+7 900 123-45-67");
     await page.getByRole("button", { name: "Подтвердить заказ" }).click();
 

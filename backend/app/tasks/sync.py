@@ -119,12 +119,27 @@ def push_order_to_moysklad(self, order_id: str):
             print(f"No positions to sync for order {order.number}", flush=True)
             return
 
+        # Комментарий заказа — полный блок данных покупателя (чтобы всё было видно
+        # прямо на «Заказе покупателя» в МойСклад, без захода на сайт)
+        desc_lines = [
+            f"Заказ {order.number} с сайта",
+            f"Покупатель: {order.customer_name}",
+            f"Телефон: {order.customer_phone}",
+        ]
+        if order.customer_email:
+            desc_lines.append(f"Email: {order.customer_email}")
+        if order.delivery_address:
+            desc_lines.append(f"Адрес: {order.delivery_address}")
+        if order.comment:
+            desc_lines.append(f"Комментарий: {order.comment}")
+
         result = create_customer_order(
             organization_href=org_href,
             customer_name=order.customer_name,
             customer_phone=order.customer_phone,
             positions=positions,
-            description=f"Заказ {order.number} с сайта. Тел: {order.customer_phone}",
+            description="\n".join(desc_lines),
+            customer_email=order.customer_email or "",
         )
 
         order.moysklad_id = result["id"]
