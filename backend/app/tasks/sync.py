@@ -140,6 +140,35 @@ def push_order_to_moysklad(self, order_id: str):
         db.close()
 
 
+@celery_app.task(name="app.tasks.sync.release_order_in_moysklad")
+def release_order_in_moysklad(order_id: str):
+    """Celery-задача: снимает резерв заказа в МойСклад (при отмене заказа).
+
+    Если заказ не уехал в МойСклад (нет ``moysklad_id``) — ничего не делает. Сам заказ в
+    МойСклад сохраняется, обнуляется только резерв позиций.
+
+    Args:
+        order_id: ID заказа в нашей БД.
+
+    Returns:
+        Словарь ``{"released": bool}``.
+    """
+    from app.db.session import SessionLocal
+    from app.db.models.order import Order
+    from app.integrations.moysklad.rest_client import release_order_reserve
+
+    db = SessionLocal()
+    try:
+        order = db.get(Order, order_id)
+        if not order or not order.moysklad_id:
+            return {"released": False}
+        ok = release_order_reserve(order.moysklad_id)
+        print(f"release_order_in_moysklad: {order.number} → {'резерв снят' if ok else 'ошибка'}", flush=True)
+        return {"released": ok}
+    finally:
+        db.close()
+
+
 @celery_app.task(name="app.tasks.sync.resync_pending_orders")
 def resync_pending_orders():
     """Celery-задача (по расписанию): пере-отправляет заказы, не уехавшие в МойСклад.

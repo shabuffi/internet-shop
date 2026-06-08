@@ -8,7 +8,7 @@ from typing import Literal
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
-from sqlalchemy import select
+from sqlalchemy import select, update
 
 from app.core.config import settings
 from app.db.session import get_db
@@ -380,6 +380,10 @@ def update_order_status(
     Допустимые статусы валидирует Pydantic (``OrderStatusUpdate``) — недопустимое
     значение даёт 422 ещё до тела функции.
 
+    При переходе в ``cancelled`` (если заказ ещё не был отменён): возвращаем остаток на
+    сайт (атомарный инкремент по позициям) и ставим фоновую задачу снять резерв в МойСклад.
+    Так отмена освобождает товар и на сайте, и на складе.
+
     Args:
         order_id: ID заказа.
         body: Новый статус (``new`` / ``confirmed`` / ``shipped`` / ``delivered`` /
@@ -396,8 +400,24 @@ def update_order_status(
     if not order:
         raise HTTPException(status_code=404, detail="Заказ не найден")
 
+    # Отмена ранее не отменённого заказа — возвращаем зарезервированный товар.
+    cancelling = body.status == "cancelled" and order.status != "cancelled"
+    if cancelling:
+        for item in order.items:
+            db.execute(
+                update(Product)
+                .where(Product.id == item.product_id)
+                .values(stock=Product.stock + item.quantity)
+            )
+
     order.status = body.status
     db.commit()
+
+    if cancelling and order.moysklad_id:
+        # Снятие резерва в МойСклад — фоном, чтобы не ждать внешний API
+        from app.tasks.sync import release_order_in_moysklad
+        release_order_in_moysklad.delay(order.id)
+
     return {"id": order.id, "status": order.status}
 
 

@@ -36,6 +36,44 @@ def test_create_customer_order_reserves_quantity(monkeypatch):
     assert captured["json"]["store"]["meta"]["href"] == "https://x/store/1"
 
 
+def test_release_order_reserve_zeroes_positions(monkeypatch):
+    calls = []
+
+    class GetResp:
+        def raise_for_status(self):
+            pass
+        def json(self):
+            return {"rows": [{"id": "pos1"}, {"id": "pos2"}]}
+
+    class PutResp:
+        def raise_for_status(self):
+            pass
+
+    def fake_get(url, **kw):
+        calls.append(("GET", url))
+        return GetResp()
+
+    def fake_put(url, **kw):
+        calls.append(("PUT", url, kw.get("json")))
+        return PutResp()
+
+    monkeypatch.setattr(rc.httpx, "get", fake_get)
+    monkeypatch.setattr(rc.httpx, "put", fake_put)
+
+    assert rc.release_order_reserve("order-123") is True
+    puts = [c for c in calls if c[0] == "PUT"]
+    assert len(puts) == 2                              # по позиции на каждую
+    assert all(c[2] == {"reserve": 0} for c in puts)   # резерв обнуляется
+    assert "pos1" in puts[0][1] and "pos2" in puts[1][1]
+
+
+def test_release_order_reserve_handles_error(monkeypatch):
+    def boom(*a, **k):
+        raise RuntimeError("network")
+    monkeypatch.setattr(rc.httpx, "get", boom)
+    assert rc.release_order_reserve("order-x") is False  # не пробрасывает исключение
+
+
 def test_create_customer_order_without_store(monkeypatch):
     """Если склад не определился — заказ создаётся без store, но с резервом."""
     captured = {}

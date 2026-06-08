@@ -202,6 +202,43 @@ def get_or_create_counterparty(name: str, phone: str) -> str:
     return r.json()["meta"]["href"]
 
 
+def release_order_reserve(order_moysklad_id: str) -> bool:
+    """Снимает резерв со всех позиций заказа покупателя (``reserve = 0``).
+
+    Используется при отмене заказа: освобождает зарезервированный товар в МойСклад
+    («Доступно» возвращается), сам заказ при этом сохраняется. Идёт по позициям заказа
+    и обнуляет резерв у каждой.
+
+    Args:
+        order_moysklad_id: id «Заказа покупателя» в МойСклад.
+
+    Returns:
+        ``True`` при успехе, иначе ``False`` (ошибка логируется, исключение не пробрасывается).
+    """
+    try:
+        r = httpx.get(
+            f"{BASE}/entity/customerorder/{order_moysklad_id}/positions",
+            headers=_headers(),
+            timeout=10,
+        )
+        r.raise_for_status()
+        rows = r.json().get("rows", [])
+        for pos in rows:
+            pos_id = pos.get("id")
+            if not pos_id:
+                continue
+            httpx.put(
+                f"{BASE}/entity/customerorder/{order_moysklad_id}/positions/{pos_id}",
+                json={"reserve": 0},
+                headers=_headers(),
+                timeout=10,
+            )
+        return True
+    except Exception as exc:
+        print(f"Не удалось снять резерв заказа {order_moysklad_id}: {exc}", flush=True)
+        return False
+
+
 def create_customer_order(
     organization_href: str,
     customer_name: str,
