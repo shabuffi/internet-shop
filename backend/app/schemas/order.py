@@ -1,12 +1,12 @@
 from decimal import Decimal
 from datetime import datetime
-from pydantic import BaseModel, ConfigDict, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 import re
 
 
 class OrderItemIn(BaseModel):
     product_id: str
-    quantity: int = 1
+    quantity: int = Field(1, ge=1)  # минимум 1 — защита от отрицательного «списания» остатка
 
 
 class OrderIn(BaseModel):

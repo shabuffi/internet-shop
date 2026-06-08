@@ -40,7 +40,17 @@ export default function CheckoutPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...form, items: items.map((i) => ({ product_id: i.id, quantity: i.quantity })) }),
       });
-      if (!res.ok) { const d = await res.json(); throw new Error(d.detail || "Ошибка"); }
+      if (!res.ok) {
+        const d = await res.json();
+        // 409 — не хватает остатка: detail = { message, items: [{ name, available }] }
+        if (res.status === 409 && d.detail?.items) {
+          const list = d.detail.items
+            .map((i: { name: string; available: number }) => `${i.name} (в наличии: ${i.available})`)
+            .join(", ");
+          throw new Error(`Недостаточно товара на складе: ${list}`);
+        }
+        throw new Error(typeof d.detail === "string" ? d.detail : "Ошибка оформления заказа");
+      }
       const order = await res.json();
       clearCart();
       router.push(`/checkout/success?order=${order.number}`);
