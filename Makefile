@@ -1,4 +1,4 @@
-.PHONY: up down build logs migrate shell-backend shell-db test
+.PHONY: up down build logs migrate shell-backend shell-db test test-e2e
 
 # Запустить всё в фоне
 up:
@@ -51,3 +51,8 @@ status:
 # Прогнать тесты backend (pytest в контейнере)
 test:
 	docker compose exec backend python3 -m pytest
+
+# Прогнать E2E-тесты фронта (Playwright, с хоста против поднятого стека).
+# Требует: make up (стек запущен) + cd frontend && npm install (один раз).
+test-e2e:
+	cd frontend && npx playwright test
