@@ -14,16 +14,21 @@ CommerceML exchange endpoint для приёма данных от МойСкл�
 import base64
 import logging
 import secrets
+from datetime import datetime, timezone
 
 import bcrypt
 from fastapi import APIRouter, Request, Depends, Query
-from fastapi.responses import PlainTextResponse
+from fastapi.responses import PlainTextResponse, Response
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.redis_client import redis_client
 from app.db.session import get_db
 from app.db.models.admin import ShopSettings
+from app.db.models.order import Order
+from app.db.models.product import Product
 from app.integrations.moysklad.commerceml_parser import parse_import_xml, parse_offers_xml
+from app.integrations.moysklad.commerceml_orders import build_orders_xml
 from app.services.import_service import upsert_catalog
 from app.services.media_storage import is_image_filename, save_image
 
@@ -46,6 +51,67 @@ def _file_key(name: str) -> str:
         Ключ вида ``exchange:file:import.xml``.
     """
     return _FILE_KEY.format(name=name)
+
+
+# Ключ Redis: id заказов, отданных в последнем mode=query (помечаем их на mode=success)
+_PENDING_ORDERS_KEY = "exchange:sale:pending_orders"
+
+
+def _orders_query_response(db: Session) -> Response:
+    """Отдаёт МойСклад невыгруженные заказы в виде CommerceML-XML (шаг ``mode=query``).
+
+    Берёт заказы с ``exported_at IS NULL`` (и не отменённые), сопоставляет позиции с
+    каталогом по ``moysklad_id`` и запоминает их id в Redis — чтобы пометить
+    выгруженными на шаге ``mode=success``.
+
+    Args:
+        db: Сессия БД.
+
+    Returns:
+        :class:`Response` с XML заказов (``application/xml``).
+    """
+    orders = db.scalars(
+        select(Order)
+        .where(Order.exported_at.is_(None), Order.status != "cancelled")
+        .order_by(Order.created_at)
+    ).all()
+
+    # Сопоставляем позиции с каталогом МойСклад по moysklad_id товара
+    product_ids = {item.product_id for o in orders for item in o.items}
+    ms_id_by_product = {}
+    if product_ids:
+        for p in db.scalars(select(Product).where(Product.id.in_(product_ids))):
+            ms_id_by_product[p.id] = p.moysklad_id
+
+    xml = build_orders_xml(orders, ms_id_by_product)
+
+    # Запоминаем, какие заказы отдали — чтобы пометить выгруженными на mode=success
+    if orders:
+        redis_client.set(_PENDING_ORDERS_KEY, ",".join(o.id for o in orders), ex=_TTL)
+    logger.info("EXCHANGE query: отдано заказов %d", len(orders))
+    return Response(content=xml, media_type="application/xml")
+
+
+def _mark_orders_exported(db: Session) -> None:
+    """Помечает выгруженными заказы, отданные в последнем ``mode=query`` (шаг ``success``).
+
+    Args:
+        db: Сессия БД.
+    """
+    pending = redis_client.get(_PENDING_ORDERS_KEY)
+    if not pending:
+        return
+    ids = pending.decode("utf-8").split(",")
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    marked = 0
+    for oid in ids:
+        order = db.get(Order, oid)
+        if order and order.exported_at is None:
+            order.exported_at = now
+            marked += 1
+    db.commit()
+    redis_client.delete(_PENDING_ORDERS_KEY)
+    logger.info("EXCHANGE success: помечено выгруженными %d", marked)
 
 
 # ── Аутентификация обмена ─────────────────────────────────────────────────────
@@ -186,6 +252,14 @@ async def exchange_get(
     # МойСклад спрашивает параметры: поддерживаем ли zip, максимальный размер файла
     if mode == "init":
         return "zip=no\nfile_limit=10485760"  # 10 MB
+
+    # ── Выдача заказов: МойСклад сам забирает заказы из магазина ──────────────
+    # query → отдаём невыгруженные заказы XML; success → помечаем их выгруженными.
+    if mode == "query":
+        return _orders_query_response(db)
+    if mode == "success":
+        _mark_orders_exported(db)
+        return "success"
 
     # ── Шаг 4: import — собираем XML из Redis, парсим и запускаем upsert ──────
     if mode == "import":

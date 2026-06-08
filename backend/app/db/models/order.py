@@ -29,6 +29,10 @@ class Order(Base):
     # ID заказа в МойСклад (заполняется после синхронизации)
     moysklad_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
 
+    # Когда заказ выгружен в МойСклад через обмен CommerceML (МойСклад сам забирает
+    # заказы). NULL — ещё не выгружен; ставится при подтверждении выгрузки (mode=success).
+    exported_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
 
