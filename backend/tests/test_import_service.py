@@ -36,10 +36,10 @@ def test_upsert_creates_new(db_session):
 def test_upsert_updates_existing_by_moysklad_id(db_session):
     """Повторный импорт того же moysklad_id обновляет товар, а не плодит дубль."""
     upsert_catalog(db_session, _catalog(
-        products=[ParsedProduct(moysklad_id="p1", name="Старое имя", price=Decimal("100"), stock=5)]
+        products=[ParsedProduct(moysklad_id="p1", name="Старое имя", price=Decimal("100"), stock=5, has_offer=True)]
     ))
     log2 = upsert_catalog(db_session, _catalog(
-        products=[ParsedProduct(moysklad_id="p1", name="Новое имя", price=Decimal("250"), stock=2)]
+        products=[ParsedProduct(moysklad_id="p1", name="Новое имя", price=Decimal("250"), stock=2, has_offer=True)]
     ))
 
     assert log2.products_created == 0
@@ -86,6 +86,24 @@ def test_upsert_preserves_enriched_description_and_image(db_session):
     assert p.name == "Крем (обновлён)"          # имя из обмена обновилось
     assert p.description == "Описание из REST"    # описание сохранилось
     assert p.image_url == "https://img/hydra"     # картинка сохранилась
+
+
+def test_upsert_without_offer_preserves_price_stock(db_session):
+    """import.xml без offers (второй заход обмена — только с картинкой) не обнуляет цену/остаток."""
+    # Полный заход с offers — цена/остаток выставлены
+    upsert_catalog(db_session, _catalog(
+        products=[ParsedProduct(moysklad_id="p1", name="Крем", price=Decimal("100"), stock=5, has_offer=True)]
+    ))
+    # Второй заход БЕЗ offers (has_offer=False), но с картинкой — цена/остаток должны сохраниться
+    upsert_catalog(db_session, _catalog(
+        products=[ParsedProduct(moysklad_id="p1", name="Крем с картинкой", image_url="pic.png")]
+    ))
+
+    p = db_session.query(Product).filter_by(moysklad_id="p1").first()
+    assert p.name == "Крем с картинкой"     # имя обновилось
+    assert p.price == Decimal("100")         # цена сохранилась (не обнулилась)
+    assert p.stock == 5                       # остаток сохранился
+    assert p.image_url == "pic.png"           # картинка привязалась
 
 
 def test_upsert_logs_counts(db_session):

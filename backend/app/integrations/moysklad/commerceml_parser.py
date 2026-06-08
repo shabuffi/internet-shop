@@ -63,6 +63,10 @@ class ParsedProduct:
     image_url: str | None = None
     price: Decimal = Decimal("0")
     stock: int = 0
+    # Были ли для товара данные в offers.xml этого захода обмена. МойСклад может
+    # прислать import.xml без offers.xml (например, второй заход — только с картинкой);
+    # тогда цену/остаток перезаписывать нельзя, иначе они обнулятся.
+    has_offer: bool = False
 
 
 @dataclass
@@ -170,6 +174,7 @@ def parse_offers_xml(xml_bytes: bytes, catalog: ParsedCatalog) -> None:
         product = product_index.get(base_id)
         if not product:
             continue
+        product.has_offer = True  # для товара пришли цена/остаток в этом заходе обмена
 
         prices_el = предложение.find(_tag("Цены", ns))
         if prices_el is not None:

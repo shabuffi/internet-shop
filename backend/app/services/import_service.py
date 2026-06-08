@@ -95,10 +95,14 @@ def upsert_catalog(db: Session, catalog: ParsedCatalog, source: str = "commercem
                 product.name = parsed_product.name
                 product.article = parsed_product.article
                 product.code = parsed_product.code
-                product.price = parsed_product.price
-                product.stock = parsed_product.stock
                 product.category_id = cat_id
                 product.synced_at = _utcnow()
+                # Цену/остаток перезаписываем ТОЛЬКО если они пришли в offers.xml этого
+                # захода. Иначе import.xml без offers (например, второй заход с картинкой)
+                # обнулил бы их. (parsed.has_offer ставится в parse_offers_xml.)
+                if parsed_product.has_offer:
+                    product.price = parsed_product.price
+                    product.stock = parsed_product.stock
                 # Описание приходит в import.xml (<Описание>), картинка — отдельным файлом
                 # обмена (<Картинка> = имя файла). Перезаписываем только если обмен реально
                 # что-то прислал — чтобы пустое значение не затёрло уже сохранённое.
