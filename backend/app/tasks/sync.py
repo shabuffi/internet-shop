@@ -138,3 +138,35 @@ def push_order_to_moysklad(self, order_id: str):
         raise self.retry(exc=exc, countdown=60)
     finally:
         db.close()
+
+
+@celery_app.task(name="app.tasks.sync.resync_pending_orders")
+def resync_pending_orders():
+    """Celery-задача (по расписанию): пере-отправляет заказы, не уехавшие в МойСклад.
+
+    Подбирает заказы с ``moysklad_id IS NULL`` (МойСклад был недоступен дольше ретраев,
+    или задача потерялась) и ставит каждый на повторную отправку. ``push_order_to_moysklad``
+    идемпотентна — уже отправленные пропустит. Так заказы не теряются.
+
+    Returns:
+        Словарь ``{"queued": N}`` — сколько заказов поставлено в очередь.
+    """
+    from sqlalchemy import select
+    from app.db.session import SessionLocal
+    from app.db.models.order import Order
+
+    db = SessionLocal()
+    try:
+        pending = db.scalars(
+            select(Order)
+            .where(Order.moysklad_id.is_(None))
+            .order_by(Order.created_at)
+            .limit(50)
+        ).all()
+        for order in pending:
+            push_order_to_moysklad.delay(order.id)
+        if pending:
+            print(f"resync_pending_orders: поставлено {len(pending)} заказов", flush=True)
+        return {"queued": len(pending)}
+    finally:
+        db.close()

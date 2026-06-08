@@ -393,6 +393,31 @@ def update_order_status(
     return {"id": order.id, "status": order.status}
 
 
+@router.post("/orders/{order_id}/resync")
+def resync_order(order_id: str, db: Session = Depends(get_db), _=Depends(_get_current_admin)):
+    """Повторно ставит заказ на отправку в МойСклад (если он ещё не уехал).
+
+    Args:
+        order_id: ID заказа.
+        db: Сессия БД.
+
+    Returns:
+        Сообщение о результате (поставлено в очередь / уже синхронизирован).
+
+    Raises:
+        HTTPException: 404, если заказ не найден.
+    """
+    order = db.get(Order, order_id)
+    if not order:
+        raise HTTPException(status_code=404, detail="Заказ не найден")
+    if order.moysklad_id:
+        return {"message": "Заказ уже синхронизирован", "moysklad_id": order.moysklad_id}
+
+    from app.tasks.sync import push_order_to_moysklad
+    push_order_to_moysklad.delay(order.id)
+    return {"message": "Отправка в МойСклад поставлена в очередь"}
+
+
 @router.get("/products")
 def list_products_admin(
     page: int = 1,

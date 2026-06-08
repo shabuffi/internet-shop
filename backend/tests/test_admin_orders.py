@@ -48,3 +48,34 @@ def test_update_status_missing_order(client, token):
 def test_update_status_requires_auth(client, order):
     resp = client.patch("/api/v1/admin/orders/o-1/status", json={"status": "new"})
     assert resp.status_code == 401
+
+
+# ─── повтор отправки в МойСклад ──────────────────────────────────────────────
+
+def test_resync_pending_order_queues(client, token, order, monkeypatch):
+    import app.tasks.sync as sync_mod
+    queued = []
+    monkeypatch.setattr(sync_mod.push_order_to_moysklad, "delay", lambda oid: queued.append(oid))
+    resp = client.post("/api/v1/admin/orders/o-1/resync", headers=_auth(token))
+    assert resp.status_code == 200
+    assert queued == ["o-1"]   # заказ поставлен в очередь
+
+
+def test_resync_already_synced(client, token, db_session):
+    db_session.add(Order(id="o-2", number="ORD-0002", customer_name="Иван",
+                         customer_phone="+79001234567", total_amount=Decimal("0"),
+                         status="new", moysklad_id="ms-xyz"))
+    db_session.commit()
+    resp = client.post("/api/v1/admin/orders/o-2/resync", headers=_auth(token))
+    assert resp.status_code == 200
+    assert "синхрон" in resp.json()["message"].lower()
+
+
+def test_resync_missing_order(client, token):
+    resp = client.post("/api/v1/admin/orders/nope/resync", headers=_auth(token))
+    assert resp.status_code == 404
+
+
+def test_resync_requires_auth(client, order):
+    resp = client.post("/api/v1/admin/orders/o-1/resync")
+    assert resp.status_code == 401

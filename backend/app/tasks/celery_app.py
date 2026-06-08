@@ -13,8 +13,12 @@ celery_app.conf.update(
     result_serializer="json",
     accept_content=["json"],
     timezone="Europe/Moscow",
-    # Запланированных задач нет: каталог приходит push-моделью (CommerceML от МойСклад),
-    # а загрузка картинок запускается из админки вручную. beat-контейнер пока простаивает —
-    # если понадобится автозагрузка картинок по расписанию, добавить сюда fetch_product_images.
-    beat_schedule={},
+    beat_schedule={
+        # Каждые 10 минут пере-отправляем в МойСклад заказы, которые не уехали
+        # (МойСклад был недоступен дольше ретраев / задача потерялась). Идемпотентно.
+        "resync-pending-orders": {
+            "task": "app.tasks.sync.resync_pending_orders",
+            "schedule": 600.0,
+        },
+    },
 )

@@ -14,12 +14,27 @@ export default function AdminOrdersPage() {
   const [orders, setOrders] = useState<AdminOrder[]>([]);
   const [total, setTotal] = useState(0);
   const [savingId, setSavingId] = useState<string | null>(null);
+  const [resyncId, setResyncId] = useState<string | null>(null);
   const [error, setError] = useState("");
 
   function load() {
     adminFetch<{ items: AdminOrder[]; total: number }>("/orders").then(d => { setOrders(d.items); setTotal(d.total); }).catch(() => {});
   }
   useEffect(() => { load(); }, []);
+
+  async function handleResync(orderId: string) {
+    setError("");
+    setResyncId(orderId);
+    try {
+      await adminFetch(`/orders/${orderId}/resync`, { method: "POST" });
+      // отправка идёт фоном — перечитываем чуть позже, чтобы увидеть новый статус
+      setTimeout(load, 2500);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Не удалось отправить");
+    } finally {
+      setResyncId(null);
+    }
+  }
 
   async function handleStatusChange(orderId: string, status: string) {
     setError("");
@@ -82,8 +97,26 @@ export default function AdminOrdersPage() {
                       ))}
                     </select>
                   </td>
-                  <td style={{ padding: "14px 16px", fontSize: 12, color: o.moysklad_id ? "var(--success)" : "var(--ink-tertiary)" }}>
-                    {o.moysklad_id ? "✓ Синхр." : "Ожидает"}
+                  <td style={{ padding: "14px 16px", fontSize: 12 }}>
+                    {o.moysklad_id ? (
+                      <span style={{ color: "var(--success)" }}>✓ Синхр.</span>
+                    ) : (
+                      <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+                        <span style={{ color: "var(--ink-tertiary)" }}>Ожидает</span>
+                        <button
+                          onClick={() => handleResync(o.id)}
+                          disabled={resyncId === o.id}
+                          title="Повторить отправку в МойСклад"
+                          style={{
+                            fontSize: 12, fontWeight: 600, padding: "4px 10px", borderRadius: 6,
+                            border: "1px solid var(--hairline-soft)", background: "var(--canvas)",
+                            color: "var(--primary)", cursor: "pointer", opacity: resyncId === o.id ? 0.5 : 1,
+                          }}
+                        >
+                          {resyncId === o.id ? "…" : "Повторить"}
+                        </button>
+                      </span>
+                    )}
                   </td>
                   <td style={{ padding: "14px 16px", color: "var(--ink-secondary)" }}>
                     {new Date(o.created_at).toLocaleString("ru")}
