@@ -22,6 +22,9 @@ class Settings(BaseSettings):
     # Redis / Celery
     REDIS_URL: str = "redis://redis:6379/0"
 
+    # Каталог для картинок товаров, пришедших файлами в обмене CommerceML
+    MEDIA_DIR: str = "/app/media"
+
     # App
     SECRET_KEY: str
     DEBUG: bool = False

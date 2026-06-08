@@ -1,7 +1,21 @@
+import logging
+import sys
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
+
+# Логи приложения (logger'ы app.*) — uvicorn по умолчанию их не показывает. Даём
+# логгеру "app" собственный обработчик на INFO, чтобы logger.info(...) был виден в
+# docker logs (нужно, в т.ч., чтобы наблюдать протокол обмена МойСклад).
+_app_logger = logging.getLogger("app")
+if not _app_logger.handlers:
+    _handler = logging.StreamHandler(sys.stdout)
+    _handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s"))
+    _app_logger.addHandler(_handler)
+_app_logger.setLevel(logging.INFO)
+_app_logger.propagate = False
 
 app = FastAPI(
     title="Internet Shop API",

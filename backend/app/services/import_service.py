@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 from sqlalchemy.orm import Session
 from app.db.models.product import Product, Category, SyncLog
 from app.integrations.moysklad.commerceml_parser import ParsedCatalog
+from app.services.media_storage import image_name
 
 
 def _utcnow() -> datetime:
@@ -82,7 +83,7 @@ def upsert_catalog(db: Session, catalog: ParsedCatalog, source: str = "commercem
                     description=parsed_product.description,
                     article=parsed_product.article,
                     code=parsed_product.code,
-                    image_url=parsed_product.image_url,
+                    image_url=image_name(parsed_product.image_url),
                     price=parsed_product.price,
                     stock=parsed_product.stock,
                     category_id=cat_id,
@@ -98,13 +99,13 @@ def upsert_catalog(db: Session, catalog: ParsedCatalog, source: str = "commercem
                 product.stock = parsed_product.stock
                 product.category_id = cat_id
                 product.synced_at = _utcnow()
-                # Описание и картинку НЕ затираем пустыми из CommerceML — МойСклад их в
-                # обмене не присылает, они подгружаются из REST (fetch_product_images).
-                # Перезаписываем только если обмен реально что-то прислал.
+                # Описание приходит в import.xml (<Описание>), картинка — отдельным файлом
+                # обмена (<Картинка> = имя файла). Перезаписываем только если обмен реально
+                # что-то прислал — чтобы пустое значение не затёрло уже сохранённое.
                 if parsed_product.description:
                     product.description = parsed_product.description
                 if parsed_product.image_url:
-                    product.image_url = parsed_product.image_url
+                    product.image_url = image_name(parsed_product.image_url)
                 updated += 1
 
         db.commit()

@@ -36,6 +36,8 @@ services:
       redis:
         condition: service_healthy
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 2
+    volumes:
+      - media_data:/app/media       # картинки товаров из обмена CommerceML (persist)
 
   worker:
     build:
@@ -82,3 +84,4 @@ services:
 
 volumes:
   postgres_data:
+  media_data:

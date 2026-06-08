@@ -25,6 +25,7 @@ from app.db.session import get_db
 from app.db.models.admin import ShopSettings
 from app.integrations.moysklad.commerceml_parser import parse_import_xml, parse_offers_xml
 from app.services.import_service import upsert_catalog
+from app.services.media_storage import is_image_filename, save_image
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/1c/exchange", tags=["1C Exchange"])
@@ -158,6 +159,10 @@ async def exchange_get(
     Returns:
         Plain-text ответ протокола 1С: строка ``success...`` либо ``failure\\n<причина>``.
     """
+    # Временное логирование протокола (Этап 0 миграции на CommerceML): видеть, какие
+    # mode/type шлёт МойСклад — особенно запрос заказов (type=sale&mode=query).
+    logger.info("EXCHANGE GET mode=%s type=%s filename=%s", mode, type, filename)
+
     # ── Шаг 1: checkauth ──────────────────────────────────────────────────────
     # Стандарт 1С требует ровно три строки: "success", имя куки, значение куки
     if mode == "checkauth":
@@ -241,18 +246,26 @@ async def exchange_post(
     Returns:
         ``success`` при успехе, иначе ``failure\\n<причина>``.
     """
+    logger.info("EXCHANGE POST mode=%s type=%s filename=%s", mode, type, filename)
+
     if not _is_authorized(request, db):
         logger.warning("exchange POST %s: отказано в доступе", mode)
         return "failure\nНе авторизовано"
 
-    # ── Шаг 3: file — МойСклад отправляет XML файл, складываем сырьё в Redis ──
+    # ── Шаг 3: file — МойСклад отправляет файл ────────────────────────────────
     if mode == "file":
-        # Принимаем только ожидаемые имена — иначе можно засорять Redis произвольными ключами
-        if filename not in ("import.xml", "offers.xml"):
-            return "failure\nНедопустимое имя файла"
         body = await request.body()
-        redis_client.set(_file_key(filename), body, ex=_TTL)
-        logger.info("Received file: %s (%d bytes)", filename, len(body))
-        return "success"
+        # XML каталога/предложений — складываем сырьё в Redis (парсится на шаге import)
+        if filename in ("import.xml", "offers.xml"):
+            redis_client.set(_file_key(filename), body, ex=_TTL)
+            logger.info("Received file: %s (%d bytes)", filename, len(body))
+            return "success"
+        # Картинка товара (опция «Выгружать изображения») — сохраняем в медиа-хранилище
+        if is_image_filename(filename):
+            saved = save_image(filename, body)
+            logger.info("Received image: %s → %s (%d bytes)", filename, saved, len(body))
+            return "success"
+        logger.warning("Отклонён файл обмена с именем %s", filename)
+        return "failure\nНедопустимое имя файла"
 
     return "failure\nНеизвестный mode"

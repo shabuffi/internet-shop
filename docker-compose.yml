@@ -41,6 +41,7 @@ services:
       POSTGRES_HOST: db
     volumes:
       - ./backend:/app
+      - media_data:/app/media       # картинки товаров из обмена CommerceML (persist)
     ports:
       - "8000:8000"
     depends_on:
@@ -114,3 +115,4 @@ services:
 
 volumes:
   postgres_data:
+  media_data:
