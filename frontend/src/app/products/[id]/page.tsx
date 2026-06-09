@@ -5,7 +5,7 @@ import { notFound } from "next/navigation";
 import { getProduct } from "@/lib/api";
 import { formatPrice } from "@/lib/format";
 import AddToCartButton from "@/components/AddToCartButton";
-import { IconImage } from "@/components/icons";
+import ProductGallery from "@/components/ProductGallery";
 import type { Metadata } from "next";
 
 interface Props {
@@ -67,11 +67,7 @@ export default async function ProductPage({ params }: Props) {
         <div className="pdp" style={{ paddingTop: "var(--s-6)", paddingBottom: "var(--s-16)" }}>
           <div className="pdp__media">
             <div className="pdp__hero">
-              <div className="photo">
-                {product.image_url
-                  ? <img src={`/api/v1/products/${product.id}/image`} alt={product.name} />
-                  : <span className="photo__ph" style={{ fontSize: 64 }}><IconImage /></span>}
-              </div>
+              <ProductGallery productId={product.id} images={product.images} name={product.name} />
             </div>
           </div>
 

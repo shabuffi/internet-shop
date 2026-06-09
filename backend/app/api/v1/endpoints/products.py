@@ -77,30 +77,36 @@ def list_products(
 
 
 @router.get("/{product_id}/image")
-def get_product_image(product_id: str, db: Session = Depends(get_db)):
+def get_product_image(product_id: str, n: int = 0, db: Session = Depends(get_db)):
     """Отдаёт изображение товара из медиа-хранилища.
 
     Картинки приходят файлами в обмене CommerceML (см. exchange.py) и лежат в
-    ``MEDIA_DIR``; ``Product.image_url`` — имя файла. Отдаём байты напрямую с браузерным
-    кэшем (``Cache-Control``), без обращения к МойСклад и без пароля аккаунта.
+    ``MEDIA_DIR``. У товара может быть несколько картинок (``Product.images``); ``n`` —
+    индекс нужной (0 — первая, она же ``image_url``). Отдаём байты напрямую с браузерным
+    кэшем, без обращения к МойСклад и без пароля аккаунта.
 
     Args:
         product_id: Внутренний UUID товара.
+        n: Индекс картинки в галерее (по умолчанию 0 — первая).
         db: Сессия БД.
 
     Returns:
         :class:`Response` с байтами картинки и заголовком кэша.
 
     Raises:
-        HTTPException: 404, если товар не найден, у него нет картинки или файла нет в хранилище.
+        HTTPException: 404, если товар/картинка не найдены или файла нет в хранилище.
     """
     product = db.scalar(
         select(Product).where(Product.id == product_id, Product.is_active == True)
     )
-    if not product or not product.image_url:
+    if not product:
         raise HTTPException(status_code=404, detail="Изображение не найдено")
 
-    result = read_image(product.image_url)
+    images = product.images or ([product.image_url] if product.image_url else [])
+    if not images or n < 0 or n >= len(images):
+        raise HTTPException(status_code=404, detail="Изображение не найдено")
+
+    result = read_image(images[n])
     if result is None:
         raise HTTPException(status_code=404, detail="Изображение не найдено")
     data, content_type = result

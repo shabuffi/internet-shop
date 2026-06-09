@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 from decimal import Decimal
-from sqlalchemy import String, Text, Numeric, Integer, Boolean, DateTime, ForeignKey, func
+from sqlalchemy import String, Text, Numeric, Integer, Boolean, DateTime, ForeignKey, JSON, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.session import Base
 
@@ -45,6 +45,8 @@ class Product(Base):
     category: Mapped["Category | None"] = relationship("Category", back_populates="products")
 
     image_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Все картинки товара (имена файлов в медиа-хранилище). image_url — первая из них.
+    images: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
 
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())

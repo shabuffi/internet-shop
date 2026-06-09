@@ -9,6 +9,7 @@ export interface Product {
   name: string;
   description: string | null;
   image_url: string | null;
+  images: string[];
   article: string | null;
   price: string;
   stock: number;

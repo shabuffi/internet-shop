@@ -40,6 +40,18 @@ def test_parse_import_basic():
     assert p.price == Decimal("0")   # цена приходит отдельно, в offers.xml
 
 
+def test_parse_import_multiple_images():
+    """Несколько <Картинка> у товара собираются в images, первая — image_url."""
+    xml = _import_xml(products=(
+        "<Товар><Ид>p3</Ид><Наименование>Крем</Наименование>"
+        "<Картинка>import_files/a.png</Картинка>"
+        "<Картинка>import_files/b.png</Картинка></Товар>"
+    ))
+    p = parse_import_xml(xml).products[0]
+    assert p.images == ["import_files/a.png", "import_files/b.png"]
+    assert p.image_url == "import_files/a.png"
+
+
 def test_parse_import_optional_fields_missing():
     """Товар без описания/артикула/группы парсится, поля = None."""
     xml = _import_xml(products="<Товар><Ид>p2</Ид><Наименование>Без полей</Наименование></Товар>")

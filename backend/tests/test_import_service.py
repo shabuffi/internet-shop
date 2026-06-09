@@ -94,16 +94,18 @@ def test_upsert_without_offer_preserves_price_stock(db_session):
     upsert_catalog(db_session, _catalog(
         products=[ParsedProduct(moysklad_id="p1", name="Крем", price=Decimal("100"), stock=5, has_offer=True)]
     ))
-    # Второй заход БЕЗ offers (has_offer=False), но с картинкой — цена/остаток должны сохраниться
+    # Второй заход БЕЗ offers (has_offer=False), но с картинками — цена/остаток сохраняются
     upsert_catalog(db_session, _catalog(
-        products=[ParsedProduct(moysklad_id="p1", name="Крем с картинкой", image_url="pic.png")]
+        products=[ParsedProduct(moysklad_id="p1", name="Крем с картинкой",
+                                images=["import_files/pic.png", "import_files/pic2.png"])]
     ))
 
     p = db_session.query(Product).filter_by(moysklad_id="p1").first()
     assert p.name == "Крем с картинкой"     # имя обновилось
     assert p.price == Decimal("100")         # цена сохранилась (не обнулилась)
     assert p.stock == 5                       # остаток сохранился
-    assert p.image_url == "pic.png"           # картинка привязалась
+    assert p.image_url == "pic.png"           # первая картинка — image_url (basename)
+    assert p.images == ["pic.png", "pic2.png"]  # все картинки сохранены
 
 
 def test_upsert_logs_counts(db_session):

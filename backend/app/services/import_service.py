@@ -84,6 +84,7 @@ def upsert_catalog(db: Session, catalog: ParsedCatalog, source: str = "commercem
                     article=parsed_product.article,
                     code=parsed_product.code,
                     image_url=image_name(parsed_product.image_url),
+                    images=[image_name(x) for x in parsed_product.images],
                     price=parsed_product.price,
                     stock=parsed_product.stock,
                     category_id=cat_id,
@@ -108,8 +109,10 @@ def upsert_catalog(db: Session, catalog: ParsedCatalog, source: str = "commercem
                 # что-то прислал — чтобы пустое значение не затёрло уже сохранённое.
                 if parsed_product.description:
                     product.description = parsed_product.description
-                if parsed_product.image_url:
-                    product.image_url = image_name(parsed_product.image_url)
+                if parsed_product.images:
+                    imgs = [image_name(x) for x in parsed_product.images]
+                    product.images = imgs
+                    product.image_url = imgs[0] if imgs else None
                 updated += 1
 
         db.commit()

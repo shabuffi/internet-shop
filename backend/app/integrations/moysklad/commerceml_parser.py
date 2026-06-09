@@ -60,7 +60,8 @@ class ParsedProduct:
     article: str | None = None
     code: str | None = None
     category_id: str | None = None
-    image_url: str | None = None
+    image_url: str | None = None          # первая картинка (для списка/карточки/OG)
+    images: list[str] = field(default_factory=list)   # все картинки товара
     price: Decimal = Decimal("0")
     stock: int = 0
     # Были ли для товара данные в offers.xml этого захода обмена. МойСклад может
@@ -92,6 +93,14 @@ def _text(element, tag: str, default: str | None = None, ns: str = "") -> str | 
     if child is not None and child.text:
         return child.text.strip()
     return default
+
+
+def _texts(element, tag: str, ns: str = "") -> list[str]:
+    """Достаёт текст ВСЕХ дочерних элементов с тегом (пробует с namespace и без)."""
+    els = element.findall(_tag(tag, ns))
+    if not els and ns:
+        els = element.findall(tag)  # fallback без namespace
+    return [e.text.strip() for e in els if e.text and e.text.strip()]
 
 
 def _detect_ns(root) -> str:
@@ -222,8 +231,9 @@ def _parse_product(товар, ns: str = "") -> ParsedProduct | None:
         if first_id is not None and first_id.text:
             category_id = first_id.text.strip()
 
-    # Картинка из МойСклад (обычно URL на облако)
-    image_url = _text(товар, "Картинка", ns=ns)
+    # Все картинки товара (CommerceML может прислать несколько <Картинка>).
+    # Файлы картинок приходят отдельными POST'ами обмена; здесь — их имена/пути.
+    images = _texts(товар, "Картинка", ns=ns)
 
     return ParsedProduct(
         moysklad_id=product_id,
@@ -232,5 +242,6 @@ def _parse_product(товар, ns: str = "") -> ParsedProduct | None:
         article=_text(товар, "Артикул", ns=ns),
         code=_text(товар, "БазоваяЕдиница", ns=ns),
         category_id=category_id,
-        image_url=image_url,
+        image_url=images[0] if images else None,
+        images=images,
     )
