@@ -1,4 +1,4 @@
-.PHONY: up down build logs migrate shell-backend shell-db test test-e2e
+.PHONY: up down build logs migrate shell-backend shell-db test test-e2e backup
 
 # Запустить всё в фоне
 up:
@@ -56,3 +56,7 @@ test:
 # Требует: make up (стек запущен) + cd frontend && npm install (один раз).
 test-e2e:
 	cd frontend && npx playwright test
+
+# Бэкап БД (pg_dump с ротацией) в ./backups. На сервере поставить в cron — см. backup-db.sh
+backup:
+	./scripts/backup-db.sh
