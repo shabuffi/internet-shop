@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCart } from "@/context/CartContext";
 import { formatPrice } from "@/lib/format";
+import { IconImage, IconCart } from "@/components/icons";
 
 export default function CartPage() {
   const { items, totalItems, totalAmount, removeItem, updateQuantity } = useCart();
@@ -11,7 +12,7 @@ export default function CartPage() {
     return (
       <div className="container">
         <div className="empty">
-          <div className="empty__icon">🛒</div>
+          <div className="empty__icon"><IconCart width="1em" height="1em" /></div>
           <h3>В корзине пока пусто</h3>
           <p>Загляните в каталог — там есть на что посмотреть.</p>
           <Link href="/" className="btn btn--primary">Перейти в каталог</Link>
@@ -32,7 +33,7 @@ export default function CartPage() {
             <div className="lineitem" key={item.id}>
               <Link href={`/products/${item.id}`} className="lineitem__media">
                 <div className="photo" style={{ position: "relative" }}>
-                  <span className="photo__ph" style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>🛍</span>
+                  <span className="photo__ph" style={{ position: "absolute", inset: 0, fontSize: 22 }}><IconImage /></span>
                   <img src={`/api/v1/products/${item.id}/image`} alt={item.name}
                     style={{ position: "relative", zIndex: 1 }}
                     onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />

@@ -66,3 +66,34 @@ export function IconOrders(p: SVGProps<SVGSVGElement>) {
     </svg>
   );
 }
+
+// Заглушка «нет картинки» на витрине (вместо эмодзи 🛍). Размер задаётся через font-size
+// контейнера .photo__ph — поэтому по умолчанию ширина/высота 1em.
+export function IconImage(p: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base} width="1em" height="1em" strokeWidth={1.5} {...p}>
+      <rect x="3" y="3" width="18" height="18" rx="2" />
+      <circle cx="8.5" cy="8.5" r="1.6" />
+      <path d="M21 15l-5-5L5 21" />
+    </svg>
+  );
+}
+
+export function IconSearch(p: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base} width="1em" height="1em" {...p}>
+      <circle cx="11" cy="11" r="7" />
+      <line x1="21" y1="21" x2="16.5" y2="16.5" />
+    </svg>
+  );
+}
+
+export function IconCart(p: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base} width="1em" height="1em" {...p}>
+      <circle cx="9" cy="20" r="1.4" />
+      <circle cx="19" cy="20" r="1.4" />
+      <path d="M2 3h3l2.3 11.3a2 2 0 0 0 2 1.6h8.4a2 2 0 0 0 2-1.5L22 7H6" />
+    </svg>
+  );
+}

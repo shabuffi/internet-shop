@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 import { getProduct } from "@/lib/api";
 import { formatPrice } from "@/lib/format";
 import AddToCartButton from "@/components/AddToCartButton";
+import { IconImage } from "@/components/icons";
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -44,7 +45,7 @@ export default async function ProductPage({ params }: Props) {
               <div className="photo">
                 {product.image_url
                   ? <img src={`/api/v1/products/${product.id}/image`} alt={product.name} />
-                  : <span className="photo__ph" style={{ fontSize: 64 }}>🛍</span>}
+                  : <span className="photo__ph" style={{ fontSize: 64 }}><IconImage /></span>}
               </div>
             </div>
           </div>

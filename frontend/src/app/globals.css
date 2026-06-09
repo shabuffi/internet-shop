@@ -143,7 +143,8 @@ button, input, textarea, select { font-family: inherit; }
 }
 .photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .photo__ph {
-  position: relative; font-size: 40px; opacity: .65;
+  position: relative; font-size: 40px; opacity: .5; color: var(--graphite);
+  display: flex; align-items: center; justify-content: center;
 }
 .photo--portrait { aspect-ratio: 4 / 5; }
 .photo--square { aspect-ratio: 1 / 1; }

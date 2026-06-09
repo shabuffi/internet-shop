@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useCart } from "@/context/CartContext";
 import { formatPrice } from "@/lib/format";
+import { IconImage, IconCart } from "@/components/icons";
 
 export default function CheckoutPage() {
   const router = useRouter();
@@ -17,7 +18,7 @@ export default function CheckoutPage() {
     return (
       <div className="container">
         <div className="empty">
-          <div className="empty__icon">🛒</div>
+          <div className="empty__icon"><IconCart width="1em" height="1em" /></div>
           <h3>Корзина пуста</h3>
           <p>Сначала добавьте товары из каталога.</p>
           <Link href="/" className="btn btn--primary">В каталог</Link>
@@ -122,7 +123,7 @@ export default function CheckoutPage() {
             {items.map((it) => (
               <div className="osummary__item" key={it.id}>
                 <div className="photo" style={{ position: "relative" }}>
-                  <span className="photo__ph" style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>🛍</span>
+                  <span className="photo__ph" style={{ position: "absolute", inset: 0, fontSize: 20 }}><IconImage /></span>
                   <img src={`/api/v1/products/${it.id}/image`} alt={it.name} style={{ position: "relative", zIndex: 1 }}
                     onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
                 </div>

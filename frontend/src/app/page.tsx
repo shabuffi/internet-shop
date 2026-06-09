@@ -4,6 +4,7 @@ import Link from "next/link";
 import { getProducts, getCategories } from "@/lib/api";
 import { formatPrice } from "@/lib/format";
 import AddToCartCard from "@/components/AddToCartCard";
+import { IconImage, IconSearch } from "@/components/icons";
 
 interface Props {
   searchParams: Promise<{ category_id?: string; search?: string; page?: string }>;
@@ -76,7 +77,7 @@ export default async function CatalogPage({ searchParams }: Props) {
 
         {data.items.length === 0 ? (
           <div className="empty">
-            <div className="empty__icon">🔍</div>
+            <div className="empty__icon"><IconSearch width="1em" height="1em" /></div>
             <h3>Ничего не найдено</h3>
             <p>{search ? `По запросу «${search}» товаров нет.` : "В этой категории пока пусто."}</p>
             <Link href="/" className="btn btn--primary">Сбросить фильтры</Link>
@@ -95,7 +96,7 @@ export default async function CatalogPage({ searchParams }: Props) {
                     <div className="photo photo--portrait">
                       {p.image_url
                         ? <img src={`/api/v1/products/${p.id}/image`} alt={p.name} />
-                        : <span className="photo__ph">🛍</span>}
+                        : <span className="photo__ph"><IconImage /></span>}
                     </div>
                   </Link>
                   <div className="pcard__body">
