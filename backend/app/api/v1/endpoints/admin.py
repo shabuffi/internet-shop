@@ -334,11 +334,14 @@ def list_orders(
     """
     from sqlalchemy.orm import joinedload
     PAGE = 20
+    # .unique() обязателен: joinedload коллекции (Order.items) даёт дублирующиеся строки,
+    # и без unique() SQLAlchemy 2.0 кидает InvalidRequestError (иначе /orders падал 500,
+    # а фронт молча показывал «0 всего»).
     orders = db.scalars(
         select(Order).options(joinedload(Order.items))
         .order_by(Order.created_at.desc())
         .offset((page - 1) * PAGE).limit(PAGE)
-    ).all()
+    ).unique().all()
     total = db.scalar(select(__import__("sqlalchemy", fromlist=["func"]).func.count()).select_from(Order))
 
     return {

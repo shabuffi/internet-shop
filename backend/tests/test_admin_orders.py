@@ -86,3 +86,25 @@ def test_cancel_already_cancelled_no_double_restore(client, token, db_session):
     assert resp.status_code == 200
     db_session.expire_all()
     assert db_session.get(Product, "pp2").stock == 5   # повторная отмена не возвращает остаток ещё раз
+
+
+# ─── список заказов ──────────────────────────────────────────────────────────
+
+def test_list_orders_returns_orders_with_items(client, token, db_session):
+    """Список заказов отдаёт заказы с позициями (регрессия на joinedload без .unique())."""
+    from app.db.models.product import Product
+    from app.db.models.order import OrderItem
+
+    db_session.add(Product(id="lp", moysklad_id="ms-lp", name="Т", article="A",
+                           price=Decimal("10"), stock=5))
+    db_session.add(Order(id="lo", number="ORD-LIST", customer_name="Иван",
+                         customer_phone="+79001234567", total_amount=Decimal("20"), status="new",
+                         items=[OrderItem(product_id="lp", product_name="Т", price=Decimal("10"), quantity=2)]))
+    db_session.commit()
+
+    resp = client.get("/api/v1/admin/orders", headers=_auth(token))
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["total"] == 1
+    assert data["items"][0]["number"] == "ORD-LIST"
+    assert data["items"][0]["items_count"] == 1   # одна позиция (количество=2 внутри неё)
