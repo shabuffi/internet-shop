@@ -36,5 +36,12 @@ class Settings(BaseSettings):
     VK_GROUP_TOKEN: str = ""
     VK_PEER_ID: str = ""
 
+    # SMTP для письма-подтверждения покупателю
+    SMTP_HOST: str = ""
+    SMTP_PORT: int = 587
+    SMTP_USER: str = ""
+    SMTP_PASSWORD: str = ""
+    SMTP_FROM: str = ""
+
 
 settings = Settings()

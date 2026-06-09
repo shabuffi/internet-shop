@@ -5,7 +5,7 @@ import AdminShell from "@/components/AdminShell";
 import { adminFetch } from "@/lib/adminApi";
 
 export default function SettingsPage() {
-  const [form, setForm] = useState({ exchange_login: "", exchange_password: "", shop_name: "", telegram_bot_token: "", telegram_chat_id: "", vk_group_token: "", vk_peer_id: "" });
+  const [form, setForm] = useState({ exchange_login: "", exchange_password: "", shop_name: "", telegram_bot_token: "", telegram_chat_id: "", vk_group_token: "", vk_peer_id: "", smtp_host: "", smtp_port: "587", smtp_user: "", smtp_password: "", smtp_from: "" });
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -111,6 +111,49 @@ export default function SettingsPage() {
             <input className="form-input" value={form.vk_peer_id}
               onChange={e => setForm(p => ({...p, vk_peer_id: e.target.value}))}
               placeholder="ваш id ВКонтакте" autoComplete="off" />
+          </div>
+
+          <div style={{ height: 1, background: "var(--hairline-soft)", margin: "20px 0" }} />
+
+          <p style={{ fontWeight: 600, fontSize: 16, marginBottom: 6 }}>Письмо покупателю (SMTP)</p>
+          <p style={{ fontSize: 13, color: "var(--ink-secondary)", marginBottom: 20 }}>
+            Подтверждение заказа на email покупателя. Данные SMTP вашей почты (например,
+            Яндекс/Mail/Gmail). Если не заполнять — письма не отправляются.
+          </p>
+
+          <div style={inputStyle}>
+            <label className="form-label">SMTP-сервер (host)</label>
+            <input className="form-input" value={form.smtp_host}
+              onChange={e => setForm(p => ({...p, smtp_host: e.target.value}))}
+              placeholder="smtp.yandex.ru" autoComplete="off" />
+          </div>
+
+          <div style={inputStyle}>
+            <label className="form-label">Порт</label>
+            <input className="form-input" value={form.smtp_port}
+              onChange={e => setForm(p => ({...p, smtp_port: e.target.value}))}
+              placeholder="587" autoComplete="off" />
+          </div>
+
+          <div style={inputStyle}>
+            <label className="form-label">Логин (email отправителя)</label>
+            <input className="form-input" value={form.smtp_user}
+              onChange={e => setForm(p => ({...p, smtp_user: e.target.value}))}
+              placeholder="shop@yandex.ru" autoComplete="off" />
+          </div>
+
+          <div style={inputStyle}>
+            <label className="form-label">Пароль SMTP</label>
+            <input className="form-input" value={form.smtp_password}
+              onChange={e => setForm(p => ({...p, smtp_password: e.target.value}))}
+              placeholder="пароль приложения или оставьте ***" type="password" autoComplete="off" />
+          </div>
+
+          <div style={inputStyle}>
+            <label className="form-label">Адрес «От кого» (необязательно)</label>
+            <input className="form-input" value={form.smtp_from}
+              onChange={e => setForm(p => ({...p, smtp_from: e.target.value}))}
+              placeholder="по умолчанию = логин" autoComplete="off" />
           </div>
 
           <div style={{ height: 1, background: "var(--hairline-soft)", margin: "20px 0" }} />

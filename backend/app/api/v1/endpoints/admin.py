@@ -249,6 +249,12 @@ def get_settings(db: Session = Depends(get_db), _=Depends(_get_current_admin)):
         "telegram_chat_id":   _get_setting(db, "telegram_chat_id"),
         "vk_group_token":     "***" if _get_setting(db, "vk_group_token") else "",
         "vk_peer_id":         _get_setting(db, "vk_peer_id"),
+        # SMTP для письма покупателю: пароль маскируем
+        "smtp_host":          _get_setting(db, "smtp_host"),
+        "smtp_port":          _get_setting(db, "smtp_port", "587"),
+        "smtp_user":          _get_setting(db, "smtp_user"),
+        "smtp_password":      "***" if _get_setting(db, "smtp_password") else "",
+        "smtp_from":          _get_setting(db, "smtp_from"),
     }
 
 
@@ -272,6 +278,8 @@ def save_settings(body: dict, db: Session = Depends(get_db), _=Depends(_get_curr
         # токены уведомлений — исходящие секреты, храним открытым текстом
         "telegram_bot_token", "telegram_chat_id",
         "vk_group_token", "vk_peer_id",
+        # SMTP — для письма покупателю
+        "smtp_host", "smtp_port", "smtp_user", "smtp_password", "smtp_from",
     }
     for key, value in body.items():
         if key not in allowed or value == "***":
