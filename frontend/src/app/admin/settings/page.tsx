@@ -5,7 +5,7 @@ import AdminShell from "@/components/AdminShell";
 import { adminFetch } from "@/lib/adminApi";
 
 export default function SettingsPage() {
-  const [form, setForm] = useState({ exchange_login: "", exchange_password: "", shop_name: "", telegram_bot_token: "", telegram_chat_id: "", vk_group_token: "", vk_peer_id: "", smtp_host: "", smtp_port: "587", smtp_user: "", smtp_password: "", smtp_from: "" });
+  const [form, setForm] = useState({ exchange_login: "", exchange_password: "", shop_name: "", telegram_bot_token: "", telegram_chat_id: "", vk_group_token: "", vk_peer_id: "", notify_email: "", smtp_host: "", smtp_port: "587", smtp_user: "", smtp_password: "", smtp_from: "" });
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -79,10 +79,11 @@ export default function SettingsPage() {
 
           <p style={{ fontWeight: 600, fontSize: 16, marginBottom: 6 }}>Уведомления о заказах</p>
           <p style={{ fontSize: 13, color: "var(--ink-secondary)", marginBottom: 20 }}>
-            Куда слать оповещение о новом заказе. Заполните любой канал (или оба) —
-            пустые игнорируются. <b>Telegram:</b> создайте бота у @BotFather → токен; узнайте
-            свой chat_id (напишите боту, затем @userinfobot). <b>ВК:</b> ключ доступа
-            сообщества; напишите сообществу первым, peer_id — ваш id ВК.
+            Куда слать оповещение о новом заказе вам, владельцу. Заполните любой канал (или
+            несколько) — пустые игнорируются. <b>Telegram:</b> бот у @BotFather → токен;
+            chat_id — напишите боту, затем @userinfobot. <b>ВК:</b> ключ доступа сообщества;
+            напишите сообществу первым, peer_id — ваш id ВК. <b>Email:</b> ваша почта (плюс
+            заполните «Почтовый сервер» ниже).
           </p>
 
           <div style={inputStyle}>
@@ -113,12 +114,20 @@ export default function SettingsPage() {
               placeholder="ваш id ВКонтакте" autoComplete="off" />
           </div>
 
+          <div style={inputStyle}>
+            <label className="form-label">Email владельца (для писем о заказах)</label>
+            <input className="form-input" value={form.notify_email}
+              onChange={e => setForm(p => ({...p, notify_email: e.target.value}))}
+              placeholder="вы получите письмо на этот адрес" type="email" autoComplete="off" />
+          </div>
+
           <div style={{ height: 1, background: "var(--hairline-soft)", margin: "20px 0" }} />
 
-          <p style={{ fontWeight: 600, fontSize: 16, marginBottom: 6 }}>Письмо покупателю (SMTP)</p>
+          <p style={{ fontWeight: 600, fontSize: 16, marginBottom: 6 }}>Почтовый сервер (SMTP)</p>
           <p style={{ fontSize: 13, color: "var(--ink-secondary)", marginBottom: 20 }}>
-            Подтверждение заказа на email покупателя. Данные SMTP вашей почты (например,
-            Яндекс/Mail/Gmail). Если не заполнять — письма не отправляются.
+            Нужен, чтобы отправлять письма — и вам о заказах (email выше), и покупателю
+            подтверждение. Данные SMTP вашей почты (например, Яндекс/Mail/Gmail). Без них
+            письма не уходят (Telegram/ВК работают и без SMTP).
           </p>
 
           <div style={inputStyle}>

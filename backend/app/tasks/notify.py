@@ -34,23 +34,30 @@ def notify_new_order(order_id: str):
 
         sent = []
 
-        # ── Владельцу: Telegram / ВК ──
         text = build_order_message(order)
         cfg = get_notify_config()
+        name_row = db.get(ShopSettings, "shop_name")
+        shop_name = name_row.value if name_row and name_row.value else "Магазин"
+
+        # ── Владельцу: Telegram / ВК / Email ──
         if cfg["tg_token"] and cfg["tg_chat"]:
             if send_telegram(cfg["tg_token"], cfg["tg_chat"], text):
                 sent.append("telegram")
         if cfg["vk_token"] and cfg["vk_peer"]:
             if send_vk(cfg["vk_token"], cfg["vk_peer"], text):
                 sent.append("vk")
+        # email владельца — третий канал уведомлений (как ТГ/ВК); шлём то же сообщение
+        owner_row = db.get(ShopSettings, "notify_email")
+        owner_email = owner_row.value if owner_row and owner_row.value else None
+        if owner_email:
+            if send_email(owner_email, f"Новый заказ {order.number} — {shop_name}", text, from_name=shop_name):
+                sent.append("email-владельцу")
 
-        # ── Покупателю: письмо-подтверждение (если есть email и настроен SMTP) ──
+        # ── Покупателю: письмо-подтверждение (если у заказа есть email и настроен SMTP) ──
         if order.customer_email:
-            name_row = db.get(ShopSettings, "shop_name")
-            shop_name = name_row.value if name_row and name_row.value else "Магазин"
             subject, body = build_customer_email(order, shop_name)
             if send_email(order.customer_email, subject, body, from_name=shop_name):
-                sent.append("email")
+                sent.append("email-покупателю")
 
         if sent:
             print(f"notify_new_order: {order.number} → {', '.join(sent)}", flush=True)
