@@ -3,10 +3,19 @@ import Link from "next/link";
 import "./globals.css";
 import { CartProvider } from "@/context/CartContext";
 import CartIcon from "@/components/CartIcon";
+import { SITE_URL, SITE_NAME, SITE_DESCRIPTION } from "@/lib/site";
 
 export const metadata: Metadata = {
-  title: "Контур — интернет-магазин",
-  description: "Интернет-магазин с интеграцией МойСклад",
+  metadataBase: new URL(SITE_URL),
+  title: { default: `${SITE_NAME} — интернет-магазин`, template: `%s — ${SITE_NAME}` },
+  description: SITE_DESCRIPTION,
+  openGraph: {
+    type: "website",
+    siteName: SITE_NAME,
+    title: `${SITE_NAME} — интернет-магазин`,
+    description: SITE_DESCRIPTION,
+  },
+  robots: { index: true, follow: true },
 };
 
 // Навигация и профиль — задел на будущее, пока скрыты. Включить → true.

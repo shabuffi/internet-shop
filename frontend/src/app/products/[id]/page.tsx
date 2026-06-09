@@ -6,9 +6,34 @@ import { getProduct } from "@/lib/api";
 import { formatPrice } from "@/lib/format";
 import AddToCartButton from "@/components/AddToCartButton";
 import { IconImage } from "@/components/icons";
+import type { Metadata } from "next";
 
 interface Props {
   params: Promise<{ id: string }>;
+}
+
+// Метаданные карточки товара — заголовок, описание и OG-картинка (превью при репосте
+// ссылки в мессенджеры/соцсети показывает фото товара).
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const { id } = await params;
+  try {
+    const product = await getProduct(id);
+    const description = (product.description?.trim().slice(0, 160))
+      || `${product.name} — купить с доставкой.`;
+    const image = product.image_url ? `/api/v1/products/${product.id}/image` : undefined;
+    return {
+      title: product.name,
+      description,
+      openGraph: {
+        type: "website",
+        title: product.name,
+        description,
+        images: image ? [{ url: image }] : undefined,
+      },
+    };
+  } catch {
+    return { title: "Товар" };
+  }
 }
 
 export default async function ProductPage({ params }: Props) {
