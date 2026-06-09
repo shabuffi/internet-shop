@@ -6,9 +6,11 @@ import { adminFetch } from "@/lib/adminApi";
 
 interface AdminOrder { id: string; number: string; status: string; customer_name: string; customer_phone: string; total_amount: string; exported_at: string | null; created_at: string; items_count: number; }
 
-const STATUS_LABEL: Record<string, string> = { new: "Новый", confirmed: "Подтверждён", shipped: "Отправлен", delivered: "Доставлен", cancelled: "Отменён" };
-const STATUS_ORDER = ["new", "confirmed", "shipped", "delivered", "cancelled"];
-const STATUS_COLOR: Record<string, string> = { new: "var(--primary)", confirmed: "var(--ink)", shipped: "var(--ink)", delivered: "var(--success)", cancelled: "var(--critical)" };
+// Заказы ведутся в МойСклад; на сайте оставляем только «Новый» и «Отменён».
+// (остальные метки — для отображения возможных старых значений)
+const STATUS_LABEL: Record<string, string> = { new: "Новый", cancelled: "Отменён", confirmed: "Подтверждён", shipped: "Отправлен", delivered: "Доставлен" };
+const STATUS_ORDER = ["new", "cancelled"];
+const STATUS_COLOR: Record<string, string> = { new: "var(--primary)", cancelled: "var(--critical)", confirmed: "var(--ink)", shipped: "var(--ink)", delivered: "var(--success)" };
 
 export default function AdminOrdersPage() {
   const [orders, setOrders] = useState<AdminOrder[]>([]);
@@ -77,8 +79,8 @@ export default function AdminOrdersPage() {
                         opacity: savingId === o.id ? 0.5 : 1,
                       }}
                     >
-                      {STATUS_ORDER.map(s => (
-                        <option key={s} value={s}>{STATUS_LABEL[s]}</option>
+                      {(STATUS_ORDER.includes(o.status) ? STATUS_ORDER : [o.status, ...STATUS_ORDER]).map(s => (
+                        <option key={s} value={s}>{STATUS_LABEL[s] ?? s}</option>
                       ))}
                     </select>
                   </td>

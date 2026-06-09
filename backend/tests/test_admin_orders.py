@@ -30,13 +30,14 @@ def _auth(token):
 
 
 def test_update_status_valid(client, token, order):
-    resp = client.patch("/api/v1/admin/orders/o-1/status", json={"status": "shipped"}, headers=_auth(token))
+    resp = client.patch("/api/v1/admin/orders/o-1/status", json={"status": "cancelled"}, headers=_auth(token))
     assert resp.status_code == 200
-    assert resp.json()["status"] == "shipped"
+    assert resp.json()["status"] == "cancelled"
 
 
 def test_update_status_invalid_value(client, token, order):
-    resp = client.patch("/api/v1/admin/orders/o-1/status", json={"status": "teleported"}, headers=_auth(token))
+    # «shipped/confirmed/delivered» больше не принимаются — только new/cancelled
+    resp = client.patch("/api/v1/admin/orders/o-1/status", json={"status": "shipped"}, headers=_auth(token))
     assert resp.status_code == 422
 
 

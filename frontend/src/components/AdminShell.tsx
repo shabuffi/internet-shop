@@ -4,13 +4,14 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { adminFetch, adminLogout } from "@/lib/adminApi";
+import { IconOverview, IconSettings, IconSync, IconBox, IconOrders } from "@/components/icons";
 
 const NAV = [
-  { href: "/admin",          label: "Обзор",        icon: "📊" },
-  { href: "/admin/settings", label: "МойСклад",     icon: "⚙️" },
-  { href: "/admin/sync",     label: "Синхронизация",icon: "🔄" },
-  { href: "/admin/products", label: "Товары",        icon: "📦" },
-  { href: "/admin/orders",   label: "Заказы",        icon: "📋" },
+  { href: "/admin",          label: "Обзор",         Icon: IconOverview },
+  { href: "/admin/settings", label: "МойСклад",      Icon: IconSettings },
+  { href: "/admin/sync",     label: "Синхронизация", Icon: IconSync },
+  { href: "/admin/products", label: "Товары",        Icon: IconBox },
+  { href: "/admin/orders",   label: "Заказы",        Icon: IconOrders },
 ];
 
 export default function AdminShell({ children }: { children: React.ReactNode }) {
@@ -47,7 +48,7 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
                 background: active ? "var(--surface)" : "transparent",
                 marginBottom: 2, transition: "background .15s, color .15s",
               }}>
-                <span>{item.icon}</span> {item.label}
+                <item.Icon style={{ flexShrink: 0, opacity: active ? 1 : 0.7 }} /> {item.label}
               </Link>
             );
           })}

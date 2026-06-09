@@ -363,7 +363,9 @@ def list_orders(
 
 # Допустимые статусы заказа: new → confirmed → shipped → delivered / cancelled
 class OrderStatusUpdate(BaseModel):
-    status: Literal["new", "confirmed", "shipped", "delivered", "cancelled"]
+    # Заказы ведутся в МойСклад; на сайте оставляем только «Новый» и «Отменён»
+    # («Отменён» возвращает остаток на сайт). Промежуточные статусы убраны.
+    status: Literal["new", "cancelled"]
 
 
 @router.patch("/orders/{order_id}/status")
