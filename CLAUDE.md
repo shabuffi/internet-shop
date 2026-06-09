@@ -45,7 +45,7 @@ make migrate
 
 | Service | Image | Port | Role |
 |---|---|---|---|
-| `backend` | Python 3.12 / FastAPI | 8000 | REST API + CommerceML receiver |
+| `backend` | Python 3.12 / FastAPI | 8000 | Storefront API + CommerceML exchange (catalog in, orders out) |
 | `worker` | same image | — | Celery worker (background tasks) |
 | `beat` | same image | — | Celery beat (scheduled tasks) |
 | `db` | postgres:16 | 5432 | Primary database |
@@ -55,11 +55,22 @@ make migrate
 
 ### Data flow
 
+Интеграция **только через CommerceML** — пароль аккаунта МойСклад НЕ используется
+(нужна лишь выдуманная пара логин/пароль обмена). REST API МойСклад полностью убран.
+
 ```
-МойСклад ──CommerceML XML──▶ /api/v1/1c/exchange ──▶ import_service.upsert_catalog() ──▶ products table
-                                                                                             │
-Browser ──────────────────▶ Next.js (SSR) ──▶ /api/v1/products ──▶ products table ──────────┘
-Browser ──────── form ────▶ POST /api/v1/orders ──▶ orders table ──▶ (sync to МойСклад, Sprint 4)
+Каталог/остатки/картинки (вниз):
+МойСклад ──CommerceML (import.xml + offers.xml + файлы картинок)──▶ /api/v1/1c/exchange
+        ──▶ import_service.upsert_catalog() ──▶ products table; картинки ──▶ media_storage (том)
+
+Витрина:
+Browser ──▶ Next.js (SSR) ──▶ /api/v1/products ──▶ products table
+Browser ──▶ /api/v1/products/{id}/image ──▶ media_storage (отдаём файл картинки)
+
+Заказы (вверх):
+Browser ──form──▶ POST /api/v1/orders ──▶ orders table (+ списание остатка, уведомление ТГ/ВК)
+МойСклад ──GET ?type=sale&mode=query──▶ exchange отдаёт неэкспортированные заказы CommerceML-XML
+        ──GET ?mode=success──▶ помечаем exported_at; МойСклад сам создаёт контрагента и резерв
 ```
 
 ### Backend layout (`backend/app/`)
@@ -69,26 +80,39 @@ Browser ──────── form ────▶ POST /api/v1/orders ──
 - `db/session.py` — SQLAlchemy engine, `SessionLocal`, `Base`, `get_db` dependency
 - `db/models/` — ORM models: `product.py` (Product, Category, SyncLog), `order.py` (Order, OrderItem)
 - `migrations/` — Alembic; `env.py` imports all model modules so autogenerate works
-- `api/v1/endpoints/` — routers: `products.py`, `exchange.py`, (orders.py coming)
+- `api/v1/endpoints/` — routers: `products.py`, `exchange.py`, `orders.py`, `admin.py`
 - `schemas/` — Pydantic request/response models (separate from ORM models)
-- `services/` — business logic decoupled from HTTP: `import_service.upsert_catalog()`
-- `integrations/moysklad/commerceml_parser.py` — lxml XML parser, returns `ParsedCatalog`
-- `tasks/celery_app.py` — Celery app + beat schedule; `tasks/sync.py` — scheduled sync stub
+- `services/` — `import_service.upsert_catalog()`; `media_storage.py` (картинки из обмена)
+- `integrations/moysklad/commerceml_parser.py` — парсер каталога (import.xml/offers.xml);
+  `commerceml_orders.py` — сериализатор заказов в CommerceML-XML для выгрузки
+- `tasks/celery_app.py` — Celery app (beat пустой); `tasks/notify.py` — уведомления ТГ/ВК
+  (единственная фоновая задача; REST-задачи sync.py удалены)
 
 ### CommerceML exchange protocol
 
-МойСклад calls our endpoint in this exact order (all to `/api/v1/1c/exchange`):
+Один эндпоинт `/api/v1/1c/exchange` обслуживает **два направления** (см. `exchange.py`).
 
-1. `GET ?mode=checkauth` → must return exactly three lines: `success\n<cookie_name>\n<cookie_value>`
-2. `GET ?mode=init` → returns `zip=no\nfile_limit=10485760`
-3. `POST ?mode=file&filename=import.xml` → body is the catalog XML; parsed immediately into `_pending_catalog`
-4. `POST ?mode=file&filename=offers.xml` → body is prices/stock; applied to `_pending_catalog` immediately
-5. `GET ?mode=import&filename=import.xml` → triggers `upsert_catalog()`, clears state
-6. `GET ?mode=import&filename=offers.xml` → no-op (prices already applied in step 4)
+**Каталог вниз (МойСклад → магазин), `type=catalog`:**
+1. `GET ?mode=checkauth` → три строки `success\n<cookie_name>\n<cookie_value>`
+2. `GET ?mode=init` → `zip=no\nfile_limit=10485760`
+3. `POST ?mode=file&filename=import.xml` → каталог (имя/описание/артикул/`<Картинка>`); сырьё в Redis
+4. `POST ?mode=file&filename=offers.xml` → цены/остатки; сырьё в Redis
+5. `POST ?mode=file&filename=<uuid>_imageid.png` → **файл картинки** → `media_storage` (том)
+6. `GET ?mode=import&filename=import.xml` → `upsert_catalog()` (offers применяются здесь же)
 
-МойСклад sends CommerceML **without** an `xmlns` namespace declaration. The parser auto-detects this via `_detect_ns()` and handles both namespaced and bare tags.
+**Заказы вверх (магазин → МойСклад), `type=sale`** — МойСклад сам забирает заказы:
+1. `GET ?type=sale&mode=checkauth` / `mode=init`
+2. `GET ?type=sale&mode=query` → отдаём неэкспортированные заказы CommerceML-XML (`commerceml_orders.build_orders_xml`)
+3. `GET ?type=sale&mode=success` → помечаем заказы `exported_at`
 
-`_pending_catalog` and `_file_storage` are module-level globals. **Known tech debt:** not safe under multiple workers or restarts — replace with Redis in production.
+МойСклад шлёт CommerceML **без** `xmlns`. Парсер определяет это через `_detect_ns()` и
+понимает теги и с namespace, и без.
+
+Состояние обмена (токен сессии + сырьё файлов) — в **Redis** с TTL (переживает перезапуск
+и несколько воркеров). Картинки — на диске (том `media_data`).
+
+⚠️ Важно: если МойСклад в заходе с картинкой шлёт второй `import.xml` **без** offers,
+цену/остаток перезаписывать нельзя — гард `ParsedProduct.has_offer` (иначе обнулятся).
 
 ### Frontend layout (`frontend/src/`)
 
@@ -101,8 +125,10 @@ Browser ──────── form ────▶ POST /api/v1/orders ──
 
 ### Key conventions
 
+- **Integration is CommerceML-only**: пароль/токен аккаунта МойСклад НЕ нужен и НЕ хранится. Всё (каталог, остатки, картинки, заказы) идёт через обмен с выдуманной парой логин/пароль (`exchange_login`/`exchange_password` в админке). REST API МойСклад удалён.
 - **Prices**: stored as `Numeric(12,2)` in rubles. МойСклад historically stores in kopecks but the CommerceML `offers.xml` from this account sends rubles directly — do not divide by 100.
-- **Product identity**: `Product.moysklad_id` is the stable key for upserts; `Product.id` is our internal UUID.
+- **Product identity**: `Product.moysklad_id` — это `<Ид>` из выгрузки каталога; стабильный ключ для upsert И для сопоставления позиций при выгрузке заказов (Коды связи: уникальные для магазина). `Product.id` — наш внутренний UUID.
+- **Order export**: заказ выгружается, когда `exported_at IS NULL` и `status != cancelled`; МойСклад забирает по расписанию (pull). Мгновенно — только уведомление владельцу (ТГ/ВК) и списание остатка на сайте.
 - **Migrations**: always import new model modules in `migrations/env.py` before running autogenerate.
 - **ALLOWED_ORIGINS** in `.env` must be a JSON array string: `ALLOWED_ORIGINS=["http://localhost:3000"]`
 - **Local tunnel**: during development, `ngrok http 8000` exposes the CommerceML endpoint to МойСклад. The ngrok URL is pasted into МойСклад → Онлайн-торговля → Адрес магазина.
