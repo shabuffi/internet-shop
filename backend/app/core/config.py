@@ -43,5 +43,8 @@ class Settings(BaseSettings):
     SMTP_PASSWORD: str = ""
     SMTP_FROM: str = ""
 
+    # Мониторинг ошибок (Sentry) — включается, только если задан DSN
+    SENTRY_DSN: str = ""
+
 
 settings = Settings()

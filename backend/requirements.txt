@@ -15,7 +15,7 @@ pydantic-settings==2.6.1
 celery==5.4.0
 redis==5.2.1
 
-# HTTP client (для запросов к МойСклад)
+# HTTP client (уведомления в Telegram/ВК)
 httpx==0.28.1
 
 # XML parsing (для CommerceML)
@@ -24,6 +24,9 @@ lxml==5.3.0
 # Auth
 bcrypt==4.2.1
 PyJWT==2.10.1
+
+# Мониторинг ошибок (опционально — включается, если задан SENTRY_DSN)
+sentry-sdk[fastapi]==2.62.0
 
 # Utils
 python-dotenv==1.0.1

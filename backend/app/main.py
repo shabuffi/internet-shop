@@ -5,6 +5,10 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
+from app.core.sentry import init_sentry
+
+# Мониторинг ошибок (no-op, если SENTRY_DSN не задан) — до создания приложения
+init_sentry()
 
 # Логи приложения (logger'ы app.*) — uvicorn по умолчанию их не показывает. Даём
 # логгеру "app" собственный обработчик на INFO, чтобы logger.info(...) был виден в

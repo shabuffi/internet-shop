@@ -1,5 +1,9 @@
 from celery import Celery
 from app.core.config import settings
+from app.core.sentry import init_sentry
+
+# Мониторинг ошибок в воркере/бите (no-op без SENTRY_DSN)
+init_sentry()
 
 celery_app = Celery(
     "shop",
