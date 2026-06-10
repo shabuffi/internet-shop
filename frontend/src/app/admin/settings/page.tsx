@@ -4,6 +4,21 @@ import { useEffect, useState } from "react";
 import AdminShell from "@/components/AdminShell";
 import { adminFetch } from "@/lib/adminApi";
 
+// Раскрывающийся блок «Как настроить» — пошаговая инструкция рядом с полями (свёрнут по умолчанию).
+function HelpBox({ title, steps, note }: { title: string; steps: React.ReactNode[]; note?: React.ReactNode }) {
+  return (
+    <details style={{ marginBottom: 18, border: "1px solid var(--hairline-soft)", borderRadius: 10, background: "var(--surface)" }}>
+      <summary style={{ cursor: "pointer", padding: "11px 14px", fontSize: 13, fontWeight: 600, color: "var(--primary)" }}>
+        {title}
+      </summary>
+      <ol style={{ margin: 0, padding: "0 16px 6px 30px", fontSize: 13, color: "var(--ink-secondary)", lineHeight: 1.65 }}>
+        {steps.map((s, i) => <li key={i} style={{ marginBottom: 4 }}>{s}</li>)}
+      </ol>
+      {note && <p style={{ padding: "0 16px 14px", margin: 0, fontSize: 12, color: "var(--ink-tertiary)" }}>{note}</p>}
+    </details>
+  );
+}
+
 export default function SettingsPage() {
   const [form, setForm] = useState({ exchange_login: "", exchange_password: "", shop_name: "", telegram_bot_token: "", telegram_chat_id: "", vk_group_token: "", vk_peer_id: "", notify_email: "", smtp_host: "", smtp_port: "587", smtp_user: "", smtp_password: "", smtp_from: "" });
   const [saved, setSaved] = useState(false);
@@ -80,11 +95,20 @@ export default function SettingsPage() {
           <p style={{ fontWeight: 600, fontSize: 16, marginBottom: 6 }}>Уведомления о заказах</p>
           <p style={{ fontSize: 13, color: "var(--ink-secondary)", marginBottom: 20 }}>
             Куда слать оповещение о новом заказе вам, владельцу. Заполните любой канал (или
-            несколько) — пустые игнорируются. <b>Telegram:</b> бот у @BotFather → токен;
-            chat_id — напишите боту, затем @userinfobot. <b>ВК:</b> ключ доступа сообщества;
-            напишите сообществу первым, peer_id — ваш id ВК. <b>Email:</b> ваша почта (плюс
-            заполните «Почтовый сервер» ниже).
+            несколько) — пустые игнорируются. Не знаете, где взять токен/ключ? Откройте
+            «Как настроить» под нужным каналом.
           </p>
+
+          <HelpBox
+            title="Как настроить Telegram →"
+            steps={[
+              <>В Telegram найдите <b>@BotFather</b>, напишите ему <code>/start</code>.</>,
+              <>Отправьте <code>/newbot</code> → введите имя бота, затем username (должен заканчиваться на <b>bot</b>).</>,
+              <>BotFather пришлёт <b>токен</b> вида <code>7123456789:AAH…</code> — впишите его в поле «Telegram — токен бота».</>,
+              <>Найдите своего бота по username и нажмите <b>Start</b> (обязательно, иначе бот не сможет вам писать).</>,
+              <>Найдите <b>@userinfobot</b>, напишите <code>/start</code> → он пришлёт ваш <b>Id</b> (число) → это «Telegram — chat_id».</>,
+            ]}
+          />
 
           <div style={inputStyle}>
             <label className="form-label">Telegram — токен бота</label>
@@ -99,6 +123,17 @@ export default function SettingsPage() {
               onChange={e => setForm(p => ({...p, telegram_chat_id: e.target.value}))}
               placeholder="например, 123456789" autoComplete="off" />
           </div>
+
+          <HelpBox
+            title="Как настроить ВКонтакте →"
+            steps={[
+              <>ВК → «Сообщества» → «Создать сообщество» (если ещё нет).</>,
+              <>В сообществе: «Управление» → «Сообщения» → включить сообщения сообщества.</>,
+              <>«Управление» → «Настройки» → «Работа с API» → «Ключи доступа» → «Создать ключ» с правами <b>«Сообщения сообщества»</b> → скопируйте ключ <code>vk1.a…</code> в поле ниже.</>,
+              <>Напишите <b>своему сообществу</b> любое сообщение от личного аккаунта (иначе ВК не даст боту писать вам первым).</>,
+              <>Узнайте свой числовой id ВК (если адрес <code>vk.com/id123</code> — это оно; иначе через сервис «узнать id ВКонтакте») → впишите в «ВК — peer_id».</>,
+            ]}
+          />
 
           <div style={inputStyle}>
             <label className="form-label">ВК — ключ доступа сообщества</label>
@@ -129,6 +164,17 @@ export default function SettingsPage() {
             подтверждение. Данные SMTP вашей почты (например, Яндекс/Mail/Gmail). Без них
             письма не уходят (Telegram/ВК работают и без SMTP).
           </p>
+
+          <HelpBox
+            title="Как получить данные SMTP (на примере Яндекса) →"
+            steps={[
+              <>Заведите/откройте почту магазина на <b>yandex.ru</b>.</>,
+              <>Создайте <b>пароль приложения</b> (обычный пароль не подойдёт): Яндекс ID → «Безопасность» → «Пароли приложений» → «Создать» → «Почта» → получите 16-значный пароль.</>,
+              <>Заполните: сервер <code>smtp.yandex.ru</code>, порт <code>587</code>, логин — ваш адрес, пароль — пароль приложения.</>,
+              <>В поле «Email владельца» (выше) впишите, куда получать заказы — можно тот же адрес.</>,
+            ]}
+            note={<>Mail.ru: <code>smtp.mail.ru:587</code>. Gmail: <code>smtp.gmail.com:587</code> (нужен App Password при включённой 2FA).</>}
+          />
 
           <div style={inputStyle}>
             <label className="form-label">SMTP-сервер (host)</label>

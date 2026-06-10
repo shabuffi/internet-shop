@@ -148,6 +148,10 @@ button, input, textarea, select { font-family: inherit; }
 }
 .photo--portrait { aspect-ratio: 4 / 5; }
 
+/* Инлайн-код в подсказках админки (команды/значения) */
+code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .88em;
+  background: var(--cloud); padding: 1px 5px; border-radius: 4px; }
+
 /* Галерея миниатюр под главным фото товара */
 .gallery-thumbs { display: flex; gap: var(--s-2); margin-top: var(--s-3); flex-wrap: wrap; }
 .gallery-thumb {
