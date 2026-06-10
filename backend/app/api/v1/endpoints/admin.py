@@ -250,7 +250,7 @@ def get_settings(db: Session = Depends(get_db), _=Depends(_get_current_admin)):
         "vk_group_token":     "***" if _get_setting(db, "vk_group_token") else "",
         "vk_peer_id":         _get_setting(db, "vk_peer_id"),
         "notify_email":       _get_setting(db, "notify_email"),
-        # SMTP для писем (уведомление владельцу на почту + подтверждение покупателю): пароль маскируем
+        # SMTP для email-уведомления владельцу: пароль маскируем
         "smtp_host":          _get_setting(db, "smtp_host"),
         "smtp_port":          _get_setting(db, "smtp_port", "587"),
         "smtp_user":          _get_setting(db, "smtp_user"),
@@ -280,7 +280,7 @@ def save_settings(body: dict, db: Session = Depends(get_db), _=Depends(_get_curr
         "telegram_bot_token", "telegram_chat_id",
         "vk_group_token", "vk_peer_id",
         "notify_email",
-        # SMTP — почтовый сервер для отправки писем (владельцу и покупателю)
+        # SMTP — почтовый сервер для email-уведомления владельцу
         "smtp_host", "smtp_port", "smtp_user", "smtp_password", "smtp_from",
     }
     for key, value in body.items():

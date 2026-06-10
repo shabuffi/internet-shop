@@ -1,8 +1,7 @@
-"""Письмо-подтверждение покупателю по SMTP.
+"""Отправка письма по SMTP (используется как email-канал уведомлений владельцу о заказе).
 
 Креды берутся из ``ShopSettings`` (админка → Настройки) с фолбэком на ``.env`` — как у
-уведомлений в Telegram/ВК. Письмо шлётся на ``order.customer_email``, если он указан и
-SMTP настроен. Ошибки не пробрасываются (письмо не должно ронять заказ).
+уведомлений в Telegram/ВК. Ошибки не пробрасываются (письмо не должно ронять заказ).
 """
 
 import smtplib
@@ -47,34 +46,6 @@ def get_smtp_config() -> dict:
     return cfg
 
 
-def build_customer_email(order, shop_name: str = "Магазин") -> tuple[str, str]:
-    """Собирает тему и текст письма-подтверждения для покупателя.
-
-    Args:
-        order: ORM-заказ (с подгруженными ``items``).
-        shop_name: Название магазина (для темы и подписи).
-
-    Returns:
-        Кортеж ``(subject, body)``.
-    """
-    lines = [
-        f"Здравствуйте, {order.customer_name}!",
-        "",
-        f"Спасибо за заказ {order.number} в магазине «{shop_name}». Мы его приняли.",
-        "",
-        "Состав заказа:",
-    ]
-    for it in order.items:
-        lines.append(f"• {it.product_name} — {it.quantity} × {it.price:.0f} ₽")
-    lines += [
-        "",
-        f"Итого: {order.total_amount:.0f} ₽",
-        "",
-        "Мы свяжемся с вами для подтверждения деталей доставки. Спасибо, что выбрали нас!",
-    ]
-    return f"Заказ {order.number} принят — {shop_name}", "\n".join(lines)
-
-
 def send_email(to: str, subject: str, body: str, from_name: str = "Магазин") -> bool:
     """Отправляет письмо по SMTP (STARTTLS).
 
@@ -102,5 +73,5 @@ def send_email(to: str, subject: str, body: str, from_name: str = "Магази�
             server.sendmail(cfg["from_email"], [to], msg.as_string())
         return True
     except Exception as exc:
-        print(f"Письмо покупателю не отправлено: {exc}", flush=True)
+        print(f"Email-уведомление не отправлено: {exc}", flush=True)
         return False

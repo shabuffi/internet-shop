@@ -160,9 +160,9 @@ export default function SettingsPage() {
 
           <p style={{ fontWeight: 600, fontSize: 16, marginBottom: 6 }}>Почтовый сервер (SMTP)</p>
           <p style={{ fontSize: 13, color: "var(--ink-secondary)", marginBottom: 20 }}>
-            Нужен, чтобы отправлять письма — и вам о заказах (email выше), и покупателю
-            подтверждение. Данные SMTP вашей почты (например, Яндекс/Mail/Gmail). Без них
-            письма не уходят (Telegram/ВК работают и без SMTP).
+            Нужен, чтобы письма о заказах приходили вам на «Email владельца» (выше). Данные
+            SMTP вашей почты (например, Яндекс/Mail/Gmail). Без них email-канал не работает
+            (Telegram/ВК работают и без SMTP).
           </p>
 
           <HelpBox

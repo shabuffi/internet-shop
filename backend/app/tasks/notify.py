@@ -3,7 +3,7 @@ from app.tasks.celery_app import celery_app
 
 @celery_app.task(name="app.tasks.notify.notify_new_order")
 def notify_new_order(order_id: str):
-    """Celery-задача: уведомления о новом заказе — владельцу (Telegram/ВК) и покупателю (email).
+    """Celery-задача: уведомление владельцу о новом заказе — Telegram / ВК / Email.
 
     Запускается из ``create_order`` фоном, чтобы покупатель не ждал внешних API.
     Шлёт в каждый настроенный канал; ошибки отправки не пробрасываются (не критично для заказа).
@@ -23,7 +23,7 @@ def notify_new_order(order_id: str):
         send_telegram,
         send_vk,
     )
-    from app.integrations.email import build_customer_email, send_email
+    from app.integrations.email import send_email
 
     db = SessionLocal()
     try:
@@ -51,13 +51,7 @@ def notify_new_order(order_id: str):
         owner_email = owner_row.value if owner_row and owner_row.value else None
         if owner_email:
             if send_email(owner_email, f"Новый заказ {order.number} — {shop_name}", text, from_name=shop_name):
-                sent.append("email-владельцу")
-
-        # ── Покупателю: письмо-подтверждение (если у заказа есть email и настроен SMTP) ──
-        if order.customer_email:
-            subject, body = build_customer_email(order, shop_name)
-            if send_email(order.customer_email, subject, body, from_name=shop_name):
-                sent.append("email-покупателю")
+                sent.append("email")
 
         if sent:
             print(f"notify_new_order: {order.number} → {', '.join(sent)}", flush=True)

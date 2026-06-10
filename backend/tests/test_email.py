@@ -1,26 +1,6 @@
-"""Тесты письма-подтверждения покупателю (текст + отправка по SMTP)."""
-
-from decimal import Decimal
+"""Тесты отправки письма по SMTP (email-канал уведомлений владельцу)."""
 
 import app.integrations.email as email_mod
-from app.db.models.order import Order, OrderItem
-
-
-def _order():
-    return Order(
-        number="ORD-7", customer_name="Иван", customer_phone="+79001234567",
-        customer_email="ivan@mail.ru", total_amount=Decimal("300"),
-        items=[OrderItem(product_name="Крем", price=Decimal("150"), quantity=2)],
-    )
-
-
-def test_build_customer_email():
-    subject, body = email_mod.build_customer_email(_order(), "Контур")
-    assert "ORD-7" in subject
-    assert "Контур" in subject
-    assert "Иван" in body
-    assert "Крем — 2 × 150 ₽" in body
-    assert "Итого: 300 ₽" in body
 
 
 def test_send_email_no_config_returns_false(monkeypatch):
