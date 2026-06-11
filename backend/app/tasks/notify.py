@@ -40,23 +40,31 @@ def notify_new_order(order_id: str):
         shop_name = name_row.value if name_row and name_row.value else "Магазин"
 
         # ── Владельцу: Telegram / ВК / Email ──
+        configured = []   # какие каналы заданы (по ним пытались отправить)
         if cfg["tg_token"] and cfg["tg_chat"]:
+            configured.append("telegram")
             if send_telegram(cfg["tg_token"], cfg["tg_chat"], text):
                 sent.append("telegram")
         if cfg["vk_token"] and cfg["vk_peer"]:
+            configured.append("vk")
             if send_vk(cfg["vk_token"], cfg["vk_peer"], text):
                 sent.append("vk")
         # email владельца — третий канал уведомлений (как ТГ/ВК); шлём то же сообщение
         owner_row = db.get(ShopSettings, "notify_email")
         owner_email = owner_row.value if owner_row and owner_row.value else None
         if owner_email:
+            configured.append("email")
             if send_email(owner_email, f"Новый заказ {order.number} — {shop_name}", text, from_name=shop_name):
                 sent.append("email")
 
         if sent:
-            print(f"notify_new_order: {order.number} → {', '.join(sent)}", flush=True)
+            print(f"notify_new_order: {order.number} → отправлено: {', '.join(sent)}", flush=True)
+        elif configured:
+            # каналы заданы, но ни один не сработал — ищи причину выше (таймаут/ошибка отправки)
+            print(f"notify_new_order: {order.number} — НЕ удалось отправить ни в один канал "
+                  f"({', '.join(configured)}); смотри ошибки '... не отправлено' выше", flush=True)
         else:
-            print(f"notify_new_order: каналы не настроены, заказ {order.number}", flush=True)
+            print(f"notify_new_order: {order.number} — каналы не настроены (заполни в админке)", flush=True)
         return {"sent": sent}
     finally:
         db.close()
