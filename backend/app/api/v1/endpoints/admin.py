@@ -8,7 +8,7 @@ from typing import Literal
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
-from sqlalchemy import select, update
+from sqlalchemy import select
 
 from app.core.config import settings
 from app.db.session import get_db
@@ -385,19 +385,14 @@ def update_order_status(
     db: Session = Depends(get_db),
     _=Depends(_get_current_admin),
 ):
-    """Меняет статус заказа.
+    """Меняет статус заказа (``new`` / ``cancelled``).
 
-    Допустимые статусы валидирует Pydantic (``OrderStatusUpdate``) — недопустимое
-    значение даёт 422 ещё до тела функции.
-
-    При переходе в ``cancelled`` (если заказ ещё не был отменён): возвращаем остаток на
-    сайт (атомарный инкремент по позициям) и ставим фоновую задачу снять резерв в МойСклад.
-    Так отмена освобождает товар и на сайте, и на складе.
+    Допустимые статусы валидирует Pydantic (``OrderStatusUpdate``). Остаток не трогаем —
+    количество товаров на сайте не зависит от заказов.
 
     Args:
         order_id: ID заказа.
-        body: Новый статус (``new`` / ``confirmed`` / ``shipped`` / ``delivered`` /
-            ``cancelled``).
+        body: Новый статус.
         db: Сессия БД.
 
     Returns:
@@ -410,20 +405,8 @@ def update_order_status(
     if not order:
         raise HTTPException(status_code=404, detail="Заказ не найден")
 
-    # Отмена ранее не отменённого заказа — возвращаем зарезервированный товар.
-    cancelling = body.status == "cancelled" and order.status != "cancelled"
-    if cancelling:
-        for item in order.items:
-            db.execute(
-                update(Product)
-                .where(Product.id == item.product_id)
-                .values(stock=Product.stock + item.quantity)
-            )
-
     order.status = body.status
     db.commit()
-    # Локальный остаток уже возвращён выше. Резерв в МойСклад снимется на стороне МойСклад
-    # при обработке заказа (проброс отмены в МойСклад — отдельная доработка статусов).
     return {"id": order.id, "status": order.status}
 
 
@@ -454,6 +437,9 @@ def list_products_admin(
             {
                 "id": p.id, "name": p.name, "article": p.article,
                 "price": str(p.price), "stock": p.stock,
+                "available": p.available,
+                "images": p.images or ([p.image_url] if p.image_url else []),
+                "images_manual": p.images_manual,
                 "is_active": p.is_active, "synced_at": p.synced_at.isoformat() if p.synced_at else None,
             }
             for p in products
@@ -461,6 +447,38 @@ def list_products_admin(
         "total": total,
         "page": page,
     }
+
+
+class AvailabilityUpdate(BaseModel):
+    available: bool
+
+
+@router.patch("/products/{product_id}/availability")
+def set_product_availability(
+    product_id: str,
+    body: AvailabilityUpdate,
+    db: Session = Depends(get_db),
+    _=Depends(_get_current_admin),
+):
+    """Ставит товару флаг наличия (вручную, не зависит от остатка).
+
+    Args:
+        product_id: ID товара.
+        body: ``{"available": true|false}``.
+        db: Сессия БД.
+
+    Returns:
+        ``{"id", "available"}``.
+
+    Raises:
+        HTTPException: 404, если товар не найден.
+    """
+    product = db.get(Product, product_id)
+    if not product:
+        raise HTTPException(status_code=404, detail="Товар не найден")
+    product.available = body.available
+    db.commit()
+    return {"id": product.id, "available": product.available}
 
 
 @router.get("/store-info")

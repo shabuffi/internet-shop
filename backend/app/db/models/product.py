@@ -38,7 +38,7 @@ class Product(Base):
     # Цена в рублях (МойСклад хранит в копейках — делим на 100 при импорте)
     price: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
 
-    # Остатки
+    # Остаток из МойСклад (для справки; на наличие/заказы НЕ влияет — см. available)
     stock: Mapped[int] = mapped_column(Integer, default=0)
 
     category_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("categories.id"), nullable=True)
@@ -47,8 +47,12 @@ class Product(Base):
     image_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     # Все картинки товара (имена файлов в медиа-хранилище). image_url — первая из них.
     images: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
+    # Картинки заданы вручную в админке сайта — обмен МойСклад их не перезаписывает
+    images_manual: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
 
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    # Наличие товара — управляется вручную в админке (НЕ зависит от количества/остатка)
+    available: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
     synced_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)

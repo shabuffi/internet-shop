@@ -89,7 +89,7 @@ export default async function CatalogPage({ searchParams }: Props) {
                 <article className="pcard" key={p.id}>
                   <Link href={`/products/${p.id}`} className="pcard__media" aria-label={p.name}>
                     <span className="pcard__badge">
-                      {p.stock > 0
+                      {p.available
                         ? <span className="badge badge--stock"><span className="badge__dot" />В наличии</span>
                         : <span className="badge badge--out"><span className="badge__dot" />Нет</span>}
                     </span>

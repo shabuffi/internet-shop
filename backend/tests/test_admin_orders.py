@@ -51,9 +51,9 @@ def test_update_status_requires_auth(client, order):
     assert resp.status_code == 401
 
 
-# ─── отмена заказа: возврат остатка на сайт ──────────────────────────────────
+# ─── отмена заказа (остаток не трогаем) ──────────────────────────────────────
 
-def test_cancel_order_restores_stock(client, token, db_session):
+def test_cancel_order_sets_status_without_touching_stock(client, token, db_session):
     from app.db.models.product import Product
     from app.db.models.order import OrderItem
 
@@ -67,26 +67,31 @@ def test_cancel_order_restores_stock(client, token, db_session):
 
     resp = client.patch("/api/v1/admin/orders/oc/status", json={"status": "cancelled"}, headers=_auth(token))
     assert resp.status_code == 200
+    assert resp.json()["status"] == "cancelled"
     db_session.expire_all()
-    assert db_session.get(Product, "pp").stock == 5   # 3 + 2 возвращено
+    assert db_session.get(Product, "pp").stock == 3   # остаток не изменился
 
 
-def test_cancel_already_cancelled_no_double_restore(client, token, db_session):
+# ─── наличие товара (ручной флаг) ────────────────────────────────────────────
+
+def test_set_product_availability(client, token, db_session):
     from app.db.models.product import Product
-    from app.db.models.order import OrderItem
-
-    db_session.add(Product(id="pp2", moysklad_id="ms-pp2", name="Товар", article="ART2",
-                           price=Decimal("100"), stock=5))
-    db_session.add(Order(id="oc2", number="ORD-10", customer_name="И", customer_phone="+79001234567",
-                         total_amount=Decimal("100"), status="cancelled",
-                         items=[OrderItem(product_id="pp2", product_name="Товар", product_article="ART2",
-                                          price=Decimal("100"), quantity=2)]))
+    db_session.add(Product(id="ap", moysklad_id="ms-ap", name="Товар", article="A",
+                           price=Decimal("10"), stock=0, available=True))
     db_session.commit()
 
-    resp = client.patch("/api/v1/admin/orders/oc2/status", json={"status": "cancelled"}, headers=_auth(token))
+    resp = client.patch("/api/v1/admin/products/ap/availability",
+                        json={"available": False}, headers=_auth(token))
     assert resp.status_code == 200
+    assert resp.json()["available"] is False
     db_session.expire_all()
-    assert db_session.get(Product, "pp2").stock == 5   # повторная отмена не возвращает остаток ещё раз
+    assert db_session.get(Product, "ap").available is False
+
+
+def test_set_product_availability_missing(client, token):
+    resp = client.patch("/api/v1/admin/products/nope/availability",
+                        json={"available": True}, headers=_auth(token))
+    assert resp.status_code == 404
 
 
 # ─── список заказов ──────────────────────────────────────────────────────────

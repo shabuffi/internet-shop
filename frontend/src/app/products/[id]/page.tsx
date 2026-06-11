@@ -46,11 +46,11 @@ export default async function ProductPage({ params }: Props) {
     notFound();
   }
 
-  const inStock = product.stock > 0;
+  const inStock = product.available;
   const specs: [string, string][] = [
     ["Артикул", product.article || "—"],
     ["Категория", product.category?.name || "—"],
-    ["Наличие", inStock ? `На складе · ${product.stock} шт` : "Под заказ"],
+    ["Наличие", inStock ? "В наличии" : "Нет в наличии"],
     ["Доставка", "1–3 дня"],
   ];
 

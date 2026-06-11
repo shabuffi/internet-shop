@@ -22,6 +22,7 @@ class ProductOut(BaseModel):
     article: str | None = None
     price: Decimal
     stock: int
+    available: bool = True
     is_active: bool
     category: CategoryOut | None = None
     updated_at: datetime

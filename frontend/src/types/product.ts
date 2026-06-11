@@ -13,6 +13,7 @@ export interface Product {
   article: string | null;
   price: string;
   stock: number;
+  available: boolean;
   is_active: boolean;
   category: Category | null;
   updated_at: string;

@@ -9,7 +9,7 @@ export default function AddToCartButton({ product }: { product: Product }) {
   const { addItem } = useCart();
   const [qty, setQty] = useState(1);
   const [added, setAdded] = useState(false);
-  const outOfStock = !product.is_active || product.stock === 0;
+  const outOfStock = !product.is_active || !product.available;
 
   function handleAdd() {
     for (let i = 0; i < qty; i++) {
@@ -24,7 +24,7 @@ export default function AddToCartButton({ product }: { product: Product }) {
       <div className="qty">
         <button onClick={() => setQty((q) => Math.max(1, q - 1))} disabled={qty <= 1 || outOfStock} aria-label="Меньше">−</button>
         <span>{qty}</span>
-        <button onClick={() => setQty((q) => Math.min(product.stock, q + 1))} disabled={outOfStock || qty >= product.stock} aria-label="Больше">+</button>
+        <button onClick={() => setQty((q) => q + 1)} disabled={outOfStock} aria-label="Больше">+</button>
       </div>
       <button className="btn btn--primary btn--lg" style={{ flex: 1 }} disabled={outOfStock} onClick={handleAdd}>
         {outOfStock ? "Нет в наличии" : added ? "✓ Добавлено" : "В корзину"}

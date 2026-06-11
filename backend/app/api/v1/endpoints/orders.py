@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from sqlalchemy import select, func, update
+from sqlalchemy import select, func
 
 from app.db.session import get_db
 from app.db.models.order import Order, OrderItem
@@ -40,8 +40,6 @@ def create_order(payload: OrderIn, db: Session = Depends(get_db)):
 
     Raises:
         HTTPException: 422, если хотя бы один ``product_id`` не найден в БД.
-        HTTPException: 409, если на складе не хватает остатка хотя бы по одной позиции
-            (тело содержит ``items`` со списком товаров и их доступным количеством).
     """
     # Загружаем товары одним запросом
     product_ids = [i.product_id for i in payload.items]
@@ -55,32 +53,8 @@ def create_order(payload: OrderIn, db: Session = Depends(get_db)):
     if missing:
         raise HTTPException(status_code=422, detail=f"Товары не найдены: {missing}")
 
-    # Резервируем остаток атомарно: UPDATE ... WHERE stock >= qty. Если строк не
-    # обновилось (rowcount == 0) — товара не хватает. Условие в самом UPDATE защищает
-    # от oversell, в т.ч. от гонки двух одновременных заказов за последнюю единицу
-    # (выиграет только один). Всё в одной транзакции с созданием заказа — либо списываем
-    # остаток И создаём заказ, либо ничего (rollback).
-    insufficient = []
-    for item_in in payload.items:
-        result = db.execute(
-            update(Product)
-            .where(Product.id == item_in.product_id, Product.stock >= item_in.quantity)
-            .values(stock=Product.stock - item_in.quantity)
-        )
-        if result.rowcount == 0:
-            insufficient.append(item_in.product_id)
-
-    if insufficient:
-        db.rollback()
-        # после rollback читаем актуальный остаток — для понятного сообщения покупателю
-        rows = db.scalars(select(Product).where(Product.id.in_(insufficient))).all()
-        raise HTTPException(
-            status_code=409,
-            detail={
-                "message": "Недостаточно товара на складе",
-                "items": [{"product_id": p.id, "name": p.name, "available": p.stock} for p in rows],
-            },
-        )
+    # Остаток НЕ списываем и не считаем: количество на сайте не меняется от заказов.
+    # Наличие товара управляется флагом `available` (вручную в админке), а не количеством.
 
     # Считаем сумму и собираем позиции
     order_items = []

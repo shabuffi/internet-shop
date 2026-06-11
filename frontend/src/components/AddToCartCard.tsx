@@ -8,7 +8,7 @@ import type { Product } from "@/types/product";
 export default function AddToCartCard({ product }: { product: Product }) {
   const { addItem } = useCart();
   const [added, setAdded] = useState(false);
-  const outOfStock = !product.is_active || product.stock === 0;
+  const outOfStock = !product.is_active || !product.available;
 
   if (outOfStock) {
     return <button className="btn btn--sm btn--outline btn--block" disabled>Нет в наличии</button>;
