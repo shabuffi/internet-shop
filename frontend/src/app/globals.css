@@ -244,7 +244,8 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .
 /* ---------- карточка товара (PDP) ---------- */
 .pdp { display: grid; grid-template-columns: 1.05fr 1fr; gap: var(--s-12); align-items: start; }
 .pdp__media { position: sticky; top: 92px; }
-.pdp__hero .photo { aspect-ratio: 4/5; }
+/* Квадрат, но не выше экрана — карточка влезает без прокрутки */
+.pdp__hero .photo { aspect-ratio: 1/1; width: 100%; max-height: calc(100vh - 150px); max-width: calc(100vh - 150px); margin-inline: auto; }
 .pdp__info { padding-top: var(--s-2); }
 .pdp__cat { color: var(--graphite); font-size: var(--t-sm); }
 .pdp__title { font-family: var(--font-display); font-size: var(--t-h1); font-weight: 600; letter-spacing: -.01em; margin: var(--s-2) 0; line-height: 1.1; }
