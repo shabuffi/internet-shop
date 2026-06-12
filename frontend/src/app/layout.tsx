@@ -5,18 +5,23 @@ import { CartProvider } from "@/context/CartContext";
 import CartIcon from "@/components/CartIcon";
 import { SITE_URL, SITE_NAME, SITE_DESCRIPTION } from "@/lib/site";
 
-export const metadata: Metadata = {
-  metadataBase: new URL(SITE_URL),
-  title: { default: `${SITE_NAME} — интернет-магазин`, template: `%s — ${SITE_NAME}` },
-  description: SITE_DESCRIPTION,
-  openGraph: {
-    type: "website",
-    siteName: SITE_NAME,
-    title: `${SITE_NAME} — интернет-магазин`,
+// Метаданные (включая <title> вкладки) берут название из настройки магазина —
+// один источник правды с шапкой/футером. SITE_NAME — лишь фолбэк.
+export async function generateMetadata(): Promise<Metadata> {
+  const name = await getShopName();
+  return {
+    metadataBase: new URL(SITE_URL),
+    title: { default: `${name} — интернет-магазин`, template: `%s — ${name}` },
     description: SITE_DESCRIPTION,
-  },
-  robots: { index: true, follow: true },
-};
+    openGraph: {
+      type: "website",
+      siteName: name,
+      title: `${name} — интернет-магазин`,
+      description: SITE_DESCRIPTION,
+    },
+    robots: { index: true, follow: true },
+  };
+}
 
 // Навигация и профиль — задел на будущее, пока скрыты. Включить → true.
 const SHOW_SOON = false;
@@ -46,10 +51,10 @@ async function getShopName(): Promise<string> {
     });
     if (res.ok) {
       const data = await res.json();
-      return data.shop_name || "Контур";
+      return data.shop_name || SITE_NAME;
     }
   } catch {}
-  return "Контур";
+  return SITE_NAME;
 }
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
