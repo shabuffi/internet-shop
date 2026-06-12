@@ -317,7 +317,7 @@ def test_notification(channel: str | None = None, db: Session = Depends(get_db),
     Returns:
         ``{"results": {канал: "sent"|"failed"}}`` — пусто, если запрошенный канал не настроен.
     """
-    from app.integrations.notify import get_notify_config, send_telegram, send_vk
+    from app.integrations.notify import get_notify_config, send_vk
     from app.integrations.email import send_email
 
     def want(ch: str) -> bool:
@@ -329,9 +329,27 @@ def test_notification(channel: str | None = None, db: Session = Depends(get_db),
             f"сюда будут приходить уведомления о новых заказах.")
     cfg = get_notify_config()
     results: dict[str, str] = {}
+    details: dict[str, str] = {}   # человекочитаемая причина неудачи (для UI)
 
+    # Telegram отправляем «вручную», чтобы вернуть точную причину ошибки в админку
     if want("telegram") and cfg["tg_token"] and cfg["tg_chat"]:
-        results["telegram"] = "sent" if send_telegram(cfg["tg_token"], cfg["tg_chat"], text) else "failed"
+        try:
+            r = httpx.post(
+                f"https://api.telegram.org/bot{cfg['tg_token']}/sendMessage",
+                json={"chat_id": cfg["tg_chat"], "text": text, "disable_web_page_preview": True},
+                timeout=15,
+            )
+            body = r.json()
+            if r.status_code == 200 and body.get("ok"):
+                results["telegram"] = "sent"
+            else:
+                results["telegram"] = "failed"
+                details["telegram"] = str(body.get("description") or f"HTTP {r.status_code}")[:200]
+        except Exception as exc:
+            results["telegram"] = "failed"
+            # обычно тут таймаут — сервер не достучался до api.telegram.org
+            details["telegram"] = f"нет связи с Telegram ({type(exc).__name__})"
+
     if want("vk") and cfg["vk_token"] and cfg["vk_peer"]:
         results["vk"] = "sent" if send_vk(cfg["vk_token"], cfg["vk_peer"], text) else "failed"
     owner_email = _get_setting(db, "notify_email")
@@ -339,7 +357,7 @@ def test_notification(channel: str | None = None, db: Session = Depends(get_db),
         ok = send_email(owner_email, f"Проверка уведомлений — {shop_name}", text, from_name=shop_name)
         results["email"] = "sent" if ok else "failed"
 
-    return {"results": results}
+    return {"results": results, "details": details}
 
 
 @router.get("/telegram/status")
@@ -357,12 +375,13 @@ def telegram_status(db: Session = Depends(get_db), _=Depends(_get_current_admin)
     if not token:
         return {"token_present": False, "bot_username": None, "chat_id": ""}
 
-    bot_username = None
+    # username берём из getMe; если Telegram недоступен (часто из РФ) — из настройки .env
+    bot_username = settings.TELEGRAM_BOT_USERNAME.lstrip("@") or None
     try:
         r = httpx.get(f"https://api.telegram.org/bot{token}/getMe", timeout=10)
         data = r.json()
-        if data.get("ok"):
-            bot_username = data["result"].get("username")
+        if data.get("ok") and data["result"].get("username"):
+            bot_username = data["result"]["username"]
     except Exception:
         pass
 

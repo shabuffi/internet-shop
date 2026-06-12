@@ -73,11 +73,12 @@ export default function SettingsPage() {
     setError(""); setTestResults(prev => ({ ...prev, [channel]: undefined })); setTestingChannel(channel);
     try {
       await adminFetch("/settings", { method: "POST", body: JSON.stringify(form) });
-      const r = await adminFetch<{ results: Record<string, string> }>(`/test-notification?channel=${channel}`, { method: "POST" });
+      const r = await adminFetch<{ results: Record<string, string>; details?: Record<string, string> }>(`/test-notification?channel=${channel}`, { method: "POST" });
       const st = r.results[channel];
+      const detail = r.details?.[channel];
       const where = channel === "email" ? "почту" : "чат";
       const res = st === "sent" ? { ok: true, text: `${CH_LABEL[channel]}: отправлено — проверьте ${where}` }
-        : st === "failed" ? { ok: false, text: `${CH_LABEL[channel]}: не удалось (проверьте данные/доступ)` }
+        : st === "failed" ? { ok: false, text: `${CH_LABEL[channel]}: не удалось${detail ? ` — ${detail}` : " (проверьте данные/доступ)"}` }
         : { ok: false, text: `${CH_LABEL[channel]} не настроен — заполните поля выше` };
       setTestResults(prev => ({ ...prev, [channel]: res }));
     } catch (err) {

@@ -146,28 +146,47 @@ def test_test_notification_no_channels(client, token, monkeypatch):
 
 def test_test_notification_telegram_sent(client, token, monkeypatch):
     import app.integrations.notify as notify
+    import app.api.v1.endpoints.admin as admin_mod
     monkeypatch.setattr(notify, "get_notify_config",
                         lambda: {"tg_token": "T", "tg_chat": "123", "vk_token": "", "vk_peer": ""})
-    monkeypatch.setattr(notify, "send_telegram", lambda *a, **k: True)
+    monkeypatch.setattr(admin_mod.httpx, "post", lambda *a, **k: _FakeResp({"ok": True, "result": {}}))
     resp = client.post("/api/v1/admin/test-notification", headers=_auth(token))
     assert resp.json()["results"] == {"telegram": "sent"}
 
 
-def test_test_notification_telegram_failed(client, token, monkeypatch):
+def test_test_notification_telegram_failed_with_reason(client, token, monkeypatch):
     import app.integrations.notify as notify
+    import app.api.v1.endpoints.admin as admin_mod
     monkeypatch.setattr(notify, "get_notify_config",
                         lambda: {"tg_token": "T", "tg_chat": "123", "vk_token": "", "vk_peer": ""})
-    monkeypatch.setattr(notify, "send_telegram", lambda *a, **k: False)
-    resp = client.post("/api/v1/admin/test-notification", headers=_auth(token))
-    assert resp.json()["results"] == {"telegram": "failed"}
+    monkeypatch.setattr(admin_mod.httpx, "post",
+                        lambda *a, **k: _FakeResp({"ok": False, "description": "Forbidden: bot was blocked"}, 403))
+    d = client.post("/api/v1/admin/test-notification", headers=_auth(token)).json()
+    assert d["results"] == {"telegram": "failed"}
+    assert "Forbidden" in d["details"]["telegram"]
+
+
+def test_test_notification_telegram_timeout_reason(client, token, monkeypatch):
+    import httpx
+    import app.integrations.notify as notify
+    import app.api.v1.endpoints.admin as admin_mod
+    monkeypatch.setattr(notify, "get_notify_config",
+                        lambda: {"tg_token": "T", "tg_chat": "123", "vk_token": "", "vk_peer": ""})
+    def _boom(*a, **k):
+        raise httpx.ConnectTimeout("timed out")
+    monkeypatch.setattr(admin_mod.httpx, "post", _boom)
+    d = client.post("/api/v1/admin/test-notification", headers=_auth(token)).json()
+    assert d["results"] == {"telegram": "failed"}
+    assert "Telegram" in d["details"]["telegram"]
 
 
 def test_test_notification_single_channel_only(client, token, monkeypatch):
     """channel=telegram тестирует только Telegram, ВК не трогает (даже если настроен)."""
     import app.integrations.notify as notify
+    import app.api.v1.endpoints.admin as admin_mod
     monkeypatch.setattr(notify, "get_notify_config",
                         lambda: {"tg_token": "T", "tg_chat": "1", "vk_token": "V", "vk_peer": "2"})
-    monkeypatch.setattr(notify, "send_telegram", lambda *a, **k: True)
+    monkeypatch.setattr(admin_mod.httpx, "post", lambda *a, **k: _FakeResp({"ok": True}))
     monkeypatch.setattr(notify, "send_vk", lambda *a, **k: (_ for _ in ()).throw(AssertionError("ВК не должен вызываться")))
     r = client.post("/api/v1/admin/test-notification?channel=telegram", headers=_auth(token)).json()
     assert r["results"] == {"telegram": "sent"}
@@ -176,8 +195,10 @@ def test_test_notification_single_channel_only(client, token, monkeypatch):
 # ─── Telegram: токен из .env + автопривязка chat_id ──────────────────────────
 
 class _FakeResp:
-    def __init__(self, payload): self._p = payload
+    def __init__(self, payload, status_code=200): self._p = payload; self.status_code = status_code
     def json(self): return self._p
+    @property
+    def text(self): return str(self._p)
 
 
 def test_telegram_status_no_token(client, token, monkeypatch):
