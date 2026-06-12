@@ -109,7 +109,8 @@ def upsert_catalog(db: Session, catalog: ParsedCatalog, source: str = "commercem
                 # что-то прислал — чтобы пустое значение не затёрло уже сохранённое.
                 if parsed_product.description:
                     product.description = parsed_product.description
-                if parsed_product.images:
+                # Картинки из обмена применяем, только если их не ведут вручную на сайте
+                if parsed_product.images and not product.images_manual:
                     imgs = [image_name(x) for x in parsed_product.images]
                     product.images = imgs
                     product.image_url = imgs[0] if imgs else None

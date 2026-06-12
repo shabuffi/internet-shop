@@ -5,7 +5,7 @@ import jwt
 from datetime import datetime, timedelta, timezone
 from typing import Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, UploadFile, File, Query
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from sqlalchemy import select
@@ -15,6 +15,7 @@ from app.db.session import get_db
 from app.db.models.admin import AdminUser, ShopSettings
 from app.db.models.product import Product, SyncLog
 from app.db.models.order import Order
+from app.services import media_storage
 
 router = APIRouter(prefix="/admin", tags=["Admin"])
 
@@ -479,6 +480,87 @@ def set_product_availability(
     product.available = body.available
     db.commit()
     return {"id": product.id, "available": product.available}
+
+
+def _current_images(product: Product) -> list[str]:
+    """Текущий список картинок товара (с фолбэком к одиночному image_url)."""
+    return list(product.images or ([product.image_url] if product.image_url else []))
+
+
+@router.post("/products/{product_id}/images")
+async def upload_product_image(
+    product_id: str,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    _=Depends(_get_current_admin),
+):
+    """Загружает картинку товара прямо в админке (без МойСклад).
+
+    Файл кладётся в медиа-хранилище, добавляется в ``Product.images`` (первая становится
+    ``image_url``). Ставит флаг ``images_manual`` — обмен МойСклад больше не перезаписывает
+    картинки этого товара.
+
+    Args:
+        product_id: ID товара.
+        file: Загружаемый файл картинки.
+        db: Сессия БД.
+
+    Returns:
+        ``{"images": [...]}`` — обновлённый список.
+
+    Raises:
+        HTTPException: 404 — товар не найден; 400 — недопустимый файл.
+    """
+    product = db.get(Product, product_id)
+    if not product:
+        raise HTTPException(status_code=404, detail="Товар не найден")
+    data = await file.read()
+    try:
+        name = media_storage.save_upload(file.filename or "image.jpg", data)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Можно загружать только изображения")
+
+    images = _current_images(product)
+    images.append(name)
+    product.images = images
+    product.image_url = images[0]
+    product.images_manual = True
+    db.commit()
+    return {"images": product.images}
+
+
+@router.delete("/products/{product_id}/images")
+def delete_product_image(
+    product_id: str,
+    filename: str = Query(...),
+    db: Session = Depends(get_db),
+    _=Depends(_get_current_admin),
+):
+    """Удаляет картинку товара по имени файла.
+
+    Args:
+        product_id: ID товара.
+        filename: Имя файла картинки (из ``Product.images``).
+        db: Сессия БД.
+
+    Returns:
+        ``{"images": [...]}`` — обновлённый список.
+
+    Raises:
+        HTTPException: 404, если товар не найден.
+    """
+    product = db.get(Product, product_id)
+    if not product:
+        raise HTTPException(status_code=404, detail="Товар не найден")
+    images = [i for i in _current_images(product) if i != filename]
+    product.images = images
+    product.image_url = images[0] if images else None
+    product.images_manual = True
+    db.commit()
+    # Физически удаляем только наши загрузки (файлы обмена могут переиспользоваться)
+    if filename.startswith("upload_"):
+        media_storage.delete_image(filename)
+    return {"images": product.images}
 
 
 @router.get("/store-info")

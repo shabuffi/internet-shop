@@ -108,6 +108,23 @@ def test_upsert_without_offer_preserves_price_stock(db_session):
     assert p.images == ["pic.png", "pic2.png"]  # все картинки сохранены
 
 
+def test_upsert_does_not_overwrite_manual_images(db_session):
+    """Если картинки заданы вручную (images_manual), обмен их не перезаписывает."""
+    upsert_catalog(db_session, _catalog(products=[ParsedProduct(moysklad_id="p1", name="X", images=["a.png"])]))
+    p = db_session.query(Product).filter_by(moysklad_id="p1").first()
+    p.images_manual = True
+    p.images = ["manual.png"]
+    p.image_url = "manual.png"
+    db_session.commit()
+
+    # обмен снова присылает картинки — НЕ должен перезаписать ручные
+    upsert_catalog(db_session, _catalog(products=[ParsedProduct(moysklad_id="p1", name="X2", images=["b.png"])]))
+    p = db_session.query(Product).filter_by(moysklad_id="p1").first()
+    assert p.name == "X2"                 # имя обновилось
+    assert p.images == ["manual.png"]     # ручные картинки сохранены
+    assert p.image_url == "manual.png"
+
+
 def test_upsert_logs_counts(db_session):
     log = upsert_catalog(db_session, _catalog(products=[
         ParsedProduct(moysklad_id="a", name="A"),

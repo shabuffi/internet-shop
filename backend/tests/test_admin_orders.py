@@ -94,6 +94,45 @@ def test_set_product_availability_missing(client, token):
     assert resp.status_code == 404
 
 
+# ─── загрузка/удаление фото товара в админке ─────────────────────────────────
+
+def test_upload_and_delete_product_image(client, token, db_session, monkeypatch, tmp_path):
+    import app.services.media_storage as media
+    from app.db.models.product import Product
+    monkeypatch.setattr(media.settings, "MEDIA_DIR", str(tmp_path))
+    db_session.add(Product(id="up", moysklad_id="ms-up", name="T", article="A",
+                           price=Decimal("10"), stock=0))
+    db_session.commit()
+
+    # загрузка
+    resp = client.post("/api/v1/admin/products/up/images",
+                       files={"file": ("photo.png", b"PNGDATA", "image/png")}, headers=_auth(token))
+    assert resp.status_code == 200
+    imgs = resp.json()["images"]
+    assert len(imgs) == 1 and imgs[0].startswith("upload_") and imgs[0].endswith(".png")
+    db_session.expire_all()
+    p = db_session.get(Product, "up")
+    assert p.image_url == imgs[0]
+    assert p.images_manual is True
+
+    # удаление
+    resp = client.delete(f"/api/v1/admin/products/up/images?filename={imgs[0]}", headers=_auth(token))
+    assert resp.status_code == 200
+    assert resp.json()["images"] == []
+
+
+def test_upload_rejects_non_image(client, token, db_session, monkeypatch, tmp_path):
+    import app.services.media_storage as media
+    from app.db.models.product import Product
+    monkeypatch.setattr(media.settings, "MEDIA_DIR", str(tmp_path))
+    db_session.add(Product(id="up2", moysklad_id="ms-up2", name="T", article="A",
+                           price=Decimal("10"), stock=0))
+    db_session.commit()
+    resp = client.post("/api/v1/admin/products/up2/images",
+                       files={"file": ("doc.txt", b"hello", "text/plain")}, headers=_auth(token))
+    assert resp.status_code == 400
+
+
 # ─── список заказов ──────────────────────────────────────────────────────────
 
 def test_list_orders_returns_orders_with_items(client, token, db_session):

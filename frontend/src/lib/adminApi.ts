@@ -27,6 +27,25 @@ export async function adminFetch<T>(path: string, init?: RequestInit): Promise<T
   return res.json();
 }
 
+// Загрузка файла (multipart). Content-Type НЕ ставим — браузер сам добавит boundary.
+export async function adminUpload<T>(path: string, formData: FormData): Promise<T> {
+  const res = await fetch(`${API}${path}`, {
+    method: "POST",
+    body: formData,
+    credentials: "same-origin",
+    cache: "no-store",
+  });
+  if (res.status === 401) {
+    if (typeof window !== "undefined") window.location.href = "/admin/login";
+    throw new Error("Unauthorized");
+  }
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: res.statusText }));
+    throw new Error(err.detail ?? "Upload failed");
+  }
+  return res.json();
+}
+
 export async function adminLogout(): Promise<void> {
   await fetch(`${API}/logout`, { method: "POST", credentials: "same-origin" }).catch(() => {});
 }

@@ -8,6 +8,7 @@
 
 import mimetypes
 import os
+import uuid
 
 from app.core.config import settings
 
@@ -69,6 +70,39 @@ def save_image(filename: str, data: bytes) -> str:
     with open(os.path.join(settings.MEDIA_DIR, name), "wb") as f:
         f.write(data)
     return name
+
+
+def save_upload(original_filename: str, data: bytes) -> str:
+    """Сохраняет загруженную в админке картинку под уникальным именем.
+
+    Имя генерируется (``upload_<uuid>.<ext>``), чтобы не пересекаться с файлами обмена.
+
+    Args:
+        original_filename: Имя исходного файла (берётся только расширение).
+        data: Байты картинки.
+
+    Returns:
+        Имя сохранённого файла.
+
+    Raises:
+        ValueError: если расширение не похоже на картинку.
+    """
+    ext = os.path.splitext(_safe_name(original_filename))[1].lower()
+    if ext not in IMAGE_EXTENSIONS:
+        raise ValueError("Недопустимый тип файла")
+    name = f"upload_{uuid.uuid4().hex}{ext}"
+    os.makedirs(settings.MEDIA_DIR, exist_ok=True)
+    with open(os.path.join(settings.MEDIA_DIR, name), "wb") as f:
+        f.write(data)
+    return name
+
+
+def delete_image(name: str) -> None:
+    """Удаляет файл картинки из медиа-каталога (молча, если файла нет)."""
+    try:
+        os.remove(os.path.join(settings.MEDIA_DIR, _safe_name(name)))
+    except OSError:
+        pass
 
 
 def read_image(name: str) -> tuple[bytes, str] | None:
