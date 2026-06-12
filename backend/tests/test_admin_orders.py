@@ -171,8 +171,8 @@ def test_test_notification_email_falls_back_to_smtp_user(client, token, db_sessi
     db_session.merge(ShopSettings(key="smtp_user", value="shop@yandex.ru"))
     db_session.commit()
     captured = {}
-    monkeypatch.setattr(email_mod, "send_email",
-                        lambda to, subject, body, from_name="Магазин": captured.update(to=to) or True)
+    monkeypatch.setattr(email_mod, "send_email_detail",
+                        lambda to, subject, body, from_name="Магазин": captured.update(to=to) or (True, None))
     r = client.post("/api/v1/admin/test-notification?channel=email", headers=_auth(token)).json()
     assert r["results"] == {"email": "sent"}
     assert captured["to"] == "shop@yandex.ru"

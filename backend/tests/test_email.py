@@ -35,6 +35,26 @@ def test_send_email_sends(monkeypatch):
     assert captured["login"] == ("u@x", "p")
 
 
+def test_send_email_invalid_from_falls_back_to_login(monkeypatch):
+    """Если «От кого» не email (например «soffia») — конверт-адрес берётся из логина."""
+    monkeypatch.setattr(email_mod, "get_smtp_config",
+                        lambda: {"host": "smtp.x", "user": "u@x", "password": "p", "port": 587, "from_email": "soffia"})
+    captured = {}
+
+    class FakeSMTP:
+        def __init__(self, host, port, timeout=0): pass
+        def __enter__(self): return self
+        def __exit__(self, *a): return False
+        def starttls(self): pass
+        def login(self, u, p): pass
+        def sendmail(self, frm, to, msg): captured["frm"] = frm
+
+    monkeypatch.setattr(email_mod.smtplib, "SMTP", FakeSMTP)
+    ok, detail = email_mod.send_email_detail("buyer@x.ru", "s", "b")
+    assert ok is True and detail is None
+    assert captured["frm"] == "u@x"   # «soffia» заменён на логин
+
+
 def test_send_email_handles_error(monkeypatch):
     monkeypatch.setattr(email_mod, "get_smtp_config",
                         lambda: {"host": "smtp.x", "user": "u", "password": "p", "port": 587, "from_email": "u"})

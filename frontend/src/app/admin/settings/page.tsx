@@ -53,11 +53,12 @@ export default function SettingsPage() {
     setError(""); setTestResults(prev => ({ ...prev, [channel]: undefined })); setTestingChannel(channel);
     try {
       await adminFetch("/settings", { method: "POST", body: JSON.stringify(form) });
-      const r = await adminFetch<{ results: Record<string, string> }>(`/test-notification?channel=${channel}`, { method: "POST" });
+      const r = await adminFetch<{ results: Record<string, string>; details?: Record<string, string> }>(`/test-notification?channel=${channel}`, { method: "POST" });
       const st = r.results[channel];
+      const detail = r.details?.[channel];
       const where = channel === "email" ? "почту" : "сообщения сообщества";
       const res = st === "sent" ? { ok: true, text: `${CH_LABEL[channel]}: отправлено — проверьте ${where}` }
-        : st === "failed" ? { ok: false, text: `${CH_LABEL[channel]}: не удалось (проверьте данные/доступ)` }
+        : st === "failed" ? { ok: false, text: `${CH_LABEL[channel]}: не удалось${detail ? ` — ${detail}` : " (проверьте данные/доступ)"}` }
         : { ok: false, text: `${CH_LABEL[channel]} не настроен — заполните поля выше` };
       setTestResults(prev => ({ ...prev, [channel]: res }));
     } catch (err) {
@@ -229,7 +230,11 @@ export default function SettingsPage() {
             <label className="form-label">Адрес «От кого» (необязательно)</label>
             <input className="form-input" value={form.smtp_from}
               onChange={e => setForm(p => ({...p, smtp_from: e.target.value}))}
-              placeholder="по умолчанию = логин" autoComplete="off" />
+              placeholder="лучше оставить пустым" type="email" autoComplete="off" />
+            <p style={{ fontSize: 12, color: "var(--ink-secondary)" }}>
+              Оставьте пустым. Если заполняете — это должен быть <b>email</b>, совпадающий с логином
+              (Яндекс/Mail/Gmail не дают слать с чужого адреса). Имя/слово сюда писать нельзя.
+            </p>
           </div>
 
           {renderTest("email", "Отправить тест на Email")}

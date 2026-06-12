@@ -46,8 +46,11 @@ def get_smtp_config() -> dict:
     return cfg
 
 
-def send_email(to: str, subject: str, body: str, from_name: str = "Магазин") -> bool:
-    """Отправляет письмо по SMTP (STARTTLS).
+def send_email_detail(to: str, subject: str, body: str, from_name: str = "Магазин") -> tuple[bool, str | None]:
+    """Отправляет письмо по SMTP (STARTTLS) и возвращает причину неудачи.
+
+    Адрес «От кого» используется только если это валидный email (есть ``@``); иначе
+    берём логин — большинство почт (Яндекс/Mail/Gmail) разрешают слать лишь со своего адреса.
 
     Args:
         to: Email получателя.
@@ -56,22 +59,30 @@ def send_email(to: str, subject: str, body: str, from_name: str = "Магази�
         from_name: Отображаемое имя отправителя.
 
     Returns:
-        ``True`` при успехе, иначе ``False`` (нет настроек/ошибка — логируется, не падает).
+        Кортеж ``(успех, причина_ошибки|None)``.
     """
     cfg = get_smtp_config()
     if not (cfg["host"] and cfg["user"] and cfg["password"] and to):
-        return False
+        return False, "не заполнены данные SMTP (сервер / логин / пароль)"
+    # «От кого» должен быть email и (для Яндекса и пр.) совпадать с логином — иначе берём логин
+    from_addr = cfg["from_email"] if "@" in (cfg["from_email"] or "") else cfg["user"]
     try:
         msg = MIMEText(body, "plain", "utf-8")
         msg["Subject"] = subject
-        msg["From"] = formataddr((from_name, cfg["from_email"]))
+        msg["From"] = formataddr((from_name, from_addr))
         msg["To"] = to
         port = int(cfg["port"] or 587)
         with smtplib.SMTP(cfg["host"], port, timeout=15) as server:
             server.starttls()
             server.login(cfg["user"], cfg["password"])
-            server.sendmail(cfg["from_email"], [to], msg.as_string())
-        return True
+            server.sendmail(from_addr, [to], msg.as_string())
+        return True, None
     except Exception as exc:
         print(f"Email-уведомление не отправлено: {exc}", flush=True)
-        return False
+        return False, str(exc)[:200]
+
+
+def send_email(to: str, subject: str, body: str, from_name: str = "Магазин") -> bool:
+    """Отправляет письмо по SMTP. ``True`` при успехе (обёртка над :func:`send_email_detail`)."""
+    ok, _ = send_email_detail(to, subject, body, from_name)
+    return ok

@@ -314,7 +314,7 @@ def test_notification(channel: str | None = None, db: Session = Depends(get_db),
         ``{"results": {канал: "sent"|"failed"}}`` — пусто, если запрошенный канал не настроен.
     """
     from app.integrations.notify import get_notify_config, send_vk
-    from app.integrations.email import send_email
+    from app.integrations.email import send_email_detail
 
     def want(ch: str) -> bool:
         return channel is None or channel == ch
@@ -325,16 +325,19 @@ def test_notification(channel: str | None = None, db: Session = Depends(get_db),
             f"сюда будут приходить уведомления о новых заказах.")
     cfg = get_notify_config()
     results: dict[str, str] = {}
+    details: dict[str, str] = {}   # причина неудачи (для UI)
 
     if want("vk") and cfg["vk_token"] and cfg["vk_peer"]:
         results["vk"] = "sent" if send_vk(cfg["vk_token"], cfg["vk_peer"], text) else "failed"
     # Получатель писем: «Email владельца», а если он пуст — сам SMTP-ящик (логин)
     owner_email = _get_setting(db, "notify_email") or _get_setting(db, "smtp_user")
     if want("email") and owner_email:
-        ok = send_email(owner_email, f"Проверка уведомлений — {shop_name}", text, from_name=shop_name)
+        ok, detail = send_email_detail(owner_email, f"Проверка уведомлений — {shop_name}", text, from_name=shop_name)
         results["email"] = "sent" if ok else "failed"
+        if not ok and detail:
+            details["email"] = detail
 
-    return {"results": results}
+    return {"results": results, "details": details}
 
 
 # ─── Dashboard data ────────────────────────────────────────────────
