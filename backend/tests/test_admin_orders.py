@@ -133,51 +133,33 @@ def test_upload_rejects_non_image(client, token, db_session, monkeypatch, tmp_pa
     assert resp.status_code == 400
 
 
-# ─── пробное уведомление ─────────────────────────────────────────────────────
+# ─── пробное уведомление (ВК / Email) ────────────────────────────────────────
 
 def test_test_notification_no_channels(client, token, monkeypatch):
     import app.integrations.notify as notify
     monkeypatch.setattr(notify, "get_notify_config",
-                        lambda: {"tg_token": "", "tg_chat": "", "vk_token": "", "vk_peer": ""})
+                        lambda: {"vk_token": "", "vk_peer": ""})
     resp = client.post("/api/v1/admin/test-notification", headers=_auth(token))
     assert resp.status_code == 200
     assert resp.json()["results"] == {}
 
 
-def test_test_notification_telegram_sent(client, token, monkeypatch):
+def test_test_notification_vk_sent(client, token, monkeypatch):
     import app.integrations.notify as notify
-    import app.api.v1.endpoints.admin as admin_mod
     monkeypatch.setattr(notify, "get_notify_config",
-                        lambda: {"tg_token": "T", "tg_chat": "123", "vk_token": "", "vk_peer": ""})
-    monkeypatch.setattr(admin_mod.httpx, "post", lambda *a, **k: _FakeResp({"ok": True, "result": {}}))
+                        lambda: {"vk_token": "V", "vk_peer": "42"})
+    monkeypatch.setattr(notify, "send_vk", lambda *a, **k: True)
     resp = client.post("/api/v1/admin/test-notification", headers=_auth(token))
-    assert resp.json()["results"] == {"telegram": "sent"}
+    assert resp.json()["results"] == {"vk": "sent"}
 
 
-def test_test_notification_telegram_failed_with_reason(client, token, monkeypatch):
+def test_test_notification_vk_failed(client, token, monkeypatch):
     import app.integrations.notify as notify
-    import app.api.v1.endpoints.admin as admin_mod
     monkeypatch.setattr(notify, "get_notify_config",
-                        lambda: {"tg_token": "T", "tg_chat": "123", "vk_token": "", "vk_peer": ""})
-    monkeypatch.setattr(admin_mod.httpx, "post",
-                        lambda *a, **k: _FakeResp({"ok": False, "description": "Forbidden: bot was blocked"}, 403))
-    d = client.post("/api/v1/admin/test-notification", headers=_auth(token)).json()
-    assert d["results"] == {"telegram": "failed"}
-    assert "Forbidden" in d["details"]["telegram"]
-
-
-def test_test_notification_telegram_timeout_reason(client, token, monkeypatch):
-    import httpx
-    import app.integrations.notify as notify
-    import app.api.v1.endpoints.admin as admin_mod
-    monkeypatch.setattr(notify, "get_notify_config",
-                        lambda: {"tg_token": "T", "tg_chat": "123", "vk_token": "", "vk_peer": ""})
-    def _boom(*a, **k):
-        raise httpx.ConnectTimeout("timed out")
-    monkeypatch.setattr(admin_mod.httpx, "post", _boom)
-    d = client.post("/api/v1/admin/test-notification", headers=_auth(token)).json()
-    assert d["results"] == {"telegram": "failed"}
-    assert "Telegram" in d["details"]["telegram"]
+                        lambda: {"vk_token": "V", "vk_peer": "42"})
+    monkeypatch.setattr(notify, "send_vk", lambda *a, **k: False)
+    resp = client.post("/api/v1/admin/test-notification", headers=_auth(token))
+    assert resp.json()["results"] == {"vk": "failed"}
 
 
 def test_test_notification_email_falls_back_to_smtp_user(client, token, db_session, monkeypatch):
@@ -185,8 +167,7 @@ def test_test_notification_email_falls_back_to_smtp_user(client, token, db_sessi
     import app.integrations.email as email_mod
     import app.integrations.notify as notify
     from app.db.models.admin import ShopSettings
-    monkeypatch.setattr(notify, "get_notify_config",
-                        lambda: {"tg_token": "", "tg_chat": "", "vk_token": "", "vk_peer": ""})
+    monkeypatch.setattr(notify, "get_notify_config", lambda: {"vk_token": "", "vk_peer": ""})
     db_session.merge(ShopSettings(key="smtp_user", value="shop@yandex.ru"))
     db_session.commit()
     captured = {}
@@ -197,69 +178,19 @@ def test_test_notification_email_falls_back_to_smtp_user(client, token, db_sessi
     assert captured["to"] == "shop@yandex.ru"
 
 
-def test_test_notification_single_channel_only(client, token, monkeypatch):
-    """channel=telegram тестирует только Telegram, ВК не трогает (даже если настроен)."""
+def test_test_notification_single_channel_only(client, token, db_session, monkeypatch):
+    """channel=vk тестирует только ВК, email не трогает (даже если настроен)."""
+    import app.integrations.email as email_mod
     import app.integrations.notify as notify
-    import app.api.v1.endpoints.admin as admin_mod
-    monkeypatch.setattr(notify, "get_notify_config",
-                        lambda: {"tg_token": "T", "tg_chat": "1", "vk_token": "V", "vk_peer": "2"})
-    monkeypatch.setattr(admin_mod.httpx, "post", lambda *a, **k: _FakeResp({"ok": True}))
-    monkeypatch.setattr(notify, "send_vk", lambda *a, **k: (_ for _ in ()).throw(AssertionError("ВК не должен вызываться")))
-    r = client.post("/api/v1/admin/test-notification?channel=telegram", headers=_auth(token)).json()
-    assert r["results"] == {"telegram": "sent"}
-
-
-# ─── Telegram: токен из .env + автопривязка chat_id ──────────────────────────
-
-class _FakeResp:
-    def __init__(self, payload, status_code=200): self._p = payload; self.status_code = status_code
-    def json(self): return self._p
-    @property
-    def text(self): return str(self._p)
-
-
-def test_telegram_status_no_token(client, token, monkeypatch):
-    import app.integrations.notify as notify
-    monkeypatch.setattr(notify, "get_notify_config",
-                        lambda: {"tg_token": "", "tg_chat": "", "vk_token": "", "vk_peer": ""})
-    resp = client.get("/api/v1/admin/telegram/status", headers=_auth(token))
-    assert resp.json()["token_present"] is False
-
-
-def test_telegram_status_with_token(client, token, monkeypatch):
-    import app.integrations.notify as notify
-    import app.api.v1.endpoints.admin as admin_mod
-    monkeypatch.setattr(notify, "get_notify_config",
-                        lambda: {"tg_token": "T", "tg_chat": "", "vk_token": "", "vk_peer": ""})
-    monkeypatch.setattr(admin_mod.httpx, "get",
-                        lambda *a, **k: _FakeResp({"ok": True, "result": {"username": "myshop_bot"}}))
-    d = client.get("/api/v1/admin/telegram/status", headers=_auth(token)).json()
-    assert d["token_present"] is True and d["bot_username"] == "myshop_bot"
-
-
-def test_telegram_connect_detects_chat(client, token, db_session, monkeypatch):
-    import app.integrations.notify as notify
-    import app.api.v1.endpoints.admin as admin_mod
     from app.db.models.admin import ShopSettings
-    monkeypatch.setattr(notify, "get_notify_config",
-                        lambda: {"tg_token": "T", "tg_chat": "", "vk_token": "", "vk_peer": ""})
-    monkeypatch.setattr(admin_mod.httpx, "get",
-                        lambda *a, **k: _FakeResp({"ok": True, "result": [{"message": {"chat": {"id": 555, "first_name": "Оля"}}}]}))
-    d = client.post("/api/v1/admin/telegram/connect", headers=_auth(token)).json()
-    assert d["chat_id"] == "555" and d["chat_title"] == "Оля"
-    db_session.expire_all()
-    assert db_session.get(ShopSettings, "telegram_chat_id").value == "555"
-
-
-def test_telegram_connect_no_messages(client, token, monkeypatch):
-    import app.integrations.notify as notify
-    import app.api.v1.endpoints.admin as admin_mod
-    monkeypatch.setattr(notify, "get_notify_config",
-                        lambda: {"tg_token": "T", "tg_chat": "", "vk_token": "", "vk_peer": ""})
-    monkeypatch.setattr(admin_mod.httpx, "get",
-                        lambda *a, **k: _FakeResp({"ok": True, "result": []}))
-    resp = client.post("/api/v1/admin/telegram/connect", headers=_auth(token))
-    assert resp.status_code == 404
+    monkeypatch.setattr(notify, "get_notify_config", lambda: {"vk_token": "V", "vk_peer": "2"})
+    monkeypatch.setattr(notify, "send_vk", lambda *a, **k: True)
+    db_session.merge(ShopSettings(key="notify_email", value="o@mail.ru"))
+    db_session.commit()
+    monkeypatch.setattr(email_mod, "send_email",
+                        lambda *a, **k: (_ for _ in ()).throw(AssertionError("email не должен вызываться")))
+    r = client.post("/api/v1/admin/test-notification?channel=vk", headers=_auth(token)).json()
+    assert r["results"] == {"vk": "sent"}
 
 
 # ─── список заказов ──────────────────────────────────────────────────────────

@@ -1,4 +1,4 @@
-"""Тесты уведомлений о заказах: формат сообщения + отправка в Telegram/ВК."""
+"""Тесты уведомлений о заказах: формат сообщения + отправка в ВК."""
 
 from decimal import Decimal
 
@@ -51,27 +51,6 @@ class _Resp:
         pass
     def json(self):
         return self._payload
-
-
-def test_send_telegram_success(monkeypatch):
-    captured = {}
-    def fake_post(url, **kw):
-        captured["url"] = url
-        captured["json"] = kw.get("json")
-        return _Resp()
-    monkeypatch.setattr(notify.httpx, "post", fake_post)
-
-    assert notify.send_telegram("TOKEN", "CHAT", "привет") is True
-    assert "botTOKEN/sendMessage" in captured["url"]
-    assert captured["json"]["chat_id"] == "CHAT"
-    assert captured["json"]["text"] == "привет"
-
-
-def test_send_telegram_error_returns_false(monkeypatch):
-    def boom(*a, **k):
-        raise RuntimeError("network down")
-    monkeypatch.setattr(notify.httpx, "post", boom)
-    assert notify.send_telegram("T", "C", "x") is False  # не пробрасывает исключение
 
 
 def test_send_vk_success(monkeypatch):

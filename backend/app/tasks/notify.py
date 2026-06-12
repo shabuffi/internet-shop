@@ -3,7 +3,7 @@ from app.tasks.celery_app import celery_app
 
 @celery_app.task(name="app.tasks.notify.notify_new_order")
 def notify_new_order(order_id: str):
-    """Celery-задача: уведомление владельцу о новом заказе — Telegram / ВК / Email.
+    """Celery-задача: уведомление владельцу о новом заказе — ВК / Email.
 
     Запускается из ``create_order`` фоном, чтобы покупатель не ждал внешних API.
     Шлёт в каждый настроенный канал; ошибки отправки не пробрасываются (не критично для заказа).
@@ -20,7 +20,6 @@ def notify_new_order(order_id: str):
     from app.integrations.notify import (
         get_notify_config,
         build_order_message,
-        send_telegram,
         send_vk,
     )
     from app.integrations.email import send_email
@@ -39,12 +38,8 @@ def notify_new_order(order_id: str):
         name_row = db.get(ShopSettings, "shop_name")
         shop_name = name_row.value if name_row and name_row.value else "Магазин"
 
-        # ── Владельцу: Telegram / ВК / Email ──
+        # ── Владельцу: ВК / Email ──
         configured = []   # какие каналы заданы (по ним пытались отправить)
-        if cfg["tg_token"] and cfg["tg_chat"]:
-            configured.append("telegram")
-            if send_telegram(cfg["tg_token"], cfg["tg_chat"], text):
-                sent.append("telegram")
         if cfg["vk_token"] and cfg["vk_peer"]:
             configured.append("vk")
             if send_vk(cfg["vk_token"], cfg["vk_peer"], text):

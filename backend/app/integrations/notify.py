@@ -1,9 +1,7 @@
-"""Уведомления о новых заказах: Telegram и ВКонтакте.
+"""Уведомления о новых заказах: ВКонтакте.
 
-Каналы независимы — шлём в тот, что настроен (задан токен и адресат). Креды берутся из
-``ShopSettings`` (админка) с фолбэком на ``.env`` — как у REST-клиента МойСклад.
+Креды берутся из ``ShopSettings`` (админка) с фолбэком на ``.env``.
 
-Telegram: бот создаётся у @BotFather (`token`), `chat_id` — id владельца/чата.
 ВКонтакте: бот работает от имени сообщества (`group_token`), писать можно только тем,
 кто сам написал сообществу первым (`peer_id` — id владельца).
 """
@@ -19,11 +17,9 @@ def get_notify_config() -> dict:
     """Возвращает креды уведомлений: ShopSettings (админка) с фолбэком на ``.env``.
 
     Returns:
-        Словарь с ключами ``tg_token``, ``tg_chat``, ``vk_token``, ``vk_peer``.
+        Словарь с ключами ``vk_token``, ``vk_peer``.
     """
     cfg = {
-        "tg_token": settings.TELEGRAM_BOT_TOKEN,
-        "tg_chat": settings.TELEGRAM_CHAT_ID,
         "vk_token": settings.VK_GROUP_TOKEN,
         "vk_peer": settings.VK_PEER_ID,
     }
@@ -33,8 +29,6 @@ def get_notify_config() -> dict:
         db = SessionLocal()
         try:
             mapping = {
-                "tg_token": "telegram_bot_token",
-                "tg_chat": "telegram_chat_id",
                 "vk_token": "vk_group_token",
                 "vk_peer": "vk_peer_id",
             }
@@ -74,31 +68,6 @@ def build_order_message(order) -> str:
     if order.comment:
         lines.append(f"Комментарий: {order.comment}")
     return "\n".join(lines)
-
-
-def send_telegram(token: str, chat_id: str, text: str) -> bool:
-    """Отправляет сообщение в Telegram через Bot API.
-
-    Args:
-        token: Токен бота от @BotFather.
-        chat_id: id чата/пользователя-получателя.
-        text: Текст сообщения.
-
-    Returns:
-        ``True`` при успешной отправке, иначе ``False`` (ошибка только логируется —
-        уведомление не должно ронять оформление заказа).
-    """
-    try:
-        r = httpx.post(
-            f"https://api.telegram.org/bot{token}/sendMessage",
-            json={"chat_id": chat_id, "text": text, "disable_web_page_preview": True},
-            timeout=10,
-        )
-        r.raise_for_status()
-        return True
-    except Exception as exc:
-        print(f"Telegram уведомление не отправлено: {exc}", flush=True)
-        return False
 
 
 def send_vk(token: str, peer_id: str, text: str) -> bool:

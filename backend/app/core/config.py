@@ -31,9 +31,6 @@ class Settings(BaseSettings):
     ALLOWED_ORIGINS: list[str] = ["http://localhost:3000"]
 
     # Уведомления о новых заказах (фолбэк к значениям из админки / ShopSettings)
-    TELEGRAM_BOT_TOKEN: str = ""
-    TELEGRAM_BOT_USERNAME: str = ""   # @username бота для показа ссылки в админке (без getMe)
-    TELEGRAM_CHAT_ID: str = ""
     VK_GROUP_TOKEN: str = ""
     VK_PEER_ID: str = ""
 

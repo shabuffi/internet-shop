@@ -1,7 +1,6 @@
 """Admin panel API."""
 
 import bcrypt
-import httpx
 import jwt
 from datetime import datetime, timedelta, timezone
 from typing import Literal
@@ -251,8 +250,6 @@ def get_settings(db: Session = Depends(get_db), _=Depends(_get_current_admin)):
         "contact_email":      _get_setting(db, "contact_email"),
         "contact_hours":      _get_setting(db, "contact_hours"),
         # Уведомления о заказах: токены маскируем, id адресатов — нет (не секрет)
-        "telegram_bot_token": "***" if _get_setting(db, "telegram_bot_token") else "",
-        "telegram_chat_id":   _get_setting(db, "telegram_chat_id"),
         "vk_group_token":     "***" if _get_setting(db, "vk_group_token") else "",
         "vk_peer_id":         _get_setting(db, "vk_peer_id"),
         "notify_email":       _get_setting(db, "notify_email"),
@@ -284,8 +281,7 @@ def save_settings(body: dict, db: Session = Depends(get_db), _=Depends(_get_curr
         "shop_name",
         # контакты в футере сайта
         "contact_phone", "contact_email", "contact_hours",
-        # уведомления — токены/адресаты владельца (email — третий канал, как ТГ/ВК)
-        "telegram_bot_token", "telegram_chat_id",
+        # уведомления — токены/адресаты владельца (ВК + email)
         "vk_group_token", "vk_peer_id",
         "notify_email",
         # SMTP — почтовый сервер для email-уведомления владельцу
@@ -329,26 +325,6 @@ def test_notification(channel: str | None = None, db: Session = Depends(get_db),
             f"сюда будут приходить уведомления о новых заказах.")
     cfg = get_notify_config()
     results: dict[str, str] = {}
-    details: dict[str, str] = {}   # человекочитаемая причина неудачи (для UI)
-
-    # Telegram отправляем «вручную», чтобы вернуть точную причину ошибки в админку
-    if want("telegram") and cfg["tg_token"] and cfg["tg_chat"]:
-        try:
-            r = httpx.post(
-                f"https://api.telegram.org/bot{cfg['tg_token']}/sendMessage",
-                json={"chat_id": cfg["tg_chat"], "text": text, "disable_web_page_preview": True},
-                timeout=15,
-            )
-            body = r.json()
-            if r.status_code == 200 and body.get("ok"):
-                results["telegram"] = "sent"
-            else:
-                results["telegram"] = "failed"
-                details["telegram"] = str(body.get("description") or f"HTTP {r.status_code}")[:200]
-        except Exception as exc:
-            results["telegram"] = "failed"
-            # обычно тут таймаут — сервер не достучался до api.telegram.org
-            details["telegram"] = f"нет связи с Telegram ({type(exc).__name__})"
 
     if want("vk") and cfg["vk_token"] and cfg["vk_peer"]:
         results["vk"] = "sent" if send_vk(cfg["vk_token"], cfg["vk_peer"], text) else "failed"
@@ -358,87 +334,7 @@ def test_notification(channel: str | None = None, db: Session = Depends(get_db),
         ok = send_email(owner_email, f"Проверка уведомлений — {shop_name}", text, from_name=shop_name)
         results["email"] = "sent" if ok else "failed"
 
-    return {"results": results, "details": details}
-
-
-@router.get("/telegram/status")
-def telegram_status(db: Session = Depends(get_db), _=Depends(_get_current_admin)):
-    """Статус подключения Telegram: задан ли токен (в .env/БД), username бота, привязанный чат.
-
-    Args:
-        db: Сессия БД.
-
-    Returns:
-        ``{"token_present", "bot_username", "chat_id"}``.
-    """
-    from app.integrations.notify import get_notify_config
-    token = get_notify_config()["tg_token"]
-    if not token:
-        return {"token_present": False, "bot_username": None, "chat_id": ""}
-
-    # username берём из getMe; если Telegram недоступен (часто из РФ) — из настройки .env
-    bot_username = settings.TELEGRAM_BOT_USERNAME.lstrip("@") or None
-    try:
-        r = httpx.get(f"https://api.telegram.org/bot{token}/getMe", timeout=10)
-        data = r.json()
-        if data.get("ok") and data["result"].get("username"):
-            bot_username = data["result"]["username"]
-    except Exception:
-        pass
-
-    return {
-        "token_present": True,
-        "bot_username": bot_username,
-        "chat_id": _get_setting(db, "telegram_chat_id"),
-    }
-
-
-@router.post("/telegram/connect")
-def telegram_connect(db: Session = Depends(get_db), _=Depends(_get_current_admin)):
-    """Определяет chat_id владельца автоматически — по последнему сообщению боту.
-
-    Владелец открывает бота и жмёт Start; мы читаем ``getUpdates`` и сохраняем chat
-    из самого свежего сообщения в ``telegram_chat_id``. Так не нужно вручную искать id.
-
-    Args:
-        db: Сессия БД.
-
-    Returns:
-        ``{"chat_id", "chat_title"}`` — куда теперь идут уведомления.
-
-    Raises:
-        HTTPException: 400 — токен не задан; 404 — нет сообщений боту; 502 — ошибка Telegram.
-    """
-    from app.integrations.notify import get_notify_config
-    token = get_notify_config()["tg_token"]
-    if not token:
-        raise HTTPException(status_code=400, detail="Токен бота не задан на сервере (.env.prod)")
-
-    try:
-        r = httpx.get(f"https://api.telegram.org/bot{token}/getUpdates", timeout=10)
-        data = r.json()
-    except Exception:
-        raise HTTPException(status_code=502, detail="Не удалось связаться с Telegram")
-    if not data.get("ok"):
-        raise HTTPException(status_code=502, detail="Telegram вернул ошибку (проверьте токен)")
-
-    chat = None
-    for upd in reversed(data.get("result", [])):
-        msg = upd.get("message") or upd.get("edited_message") or upd.get("my_chat_member")
-        if msg and msg.get("chat"):
-            chat = msg["chat"]
-            break
-    if not chat:
-        raise HTTPException(
-            status_code=404,
-            detail="Не вижу сообщений боту. Откройте бота, нажмите Start и попробуйте снова.",
-        )
-
-    chat_id = str(chat["id"])
-    _set_setting(db, "telegram_chat_id", chat_id)
-    db.commit()
-    title = chat.get("title") or chat.get("first_name") or chat.get("username") or chat_id
-    return {"chat_id": chat_id, "chat_title": title}
+    return {"results": results}
 
 
 # ─── Dashboard data ────────────────────────────────────────────────
