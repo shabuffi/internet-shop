@@ -24,8 +24,8 @@ export default function SettingsPage() {
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [testing, setTesting] = useState(false);
-  const [testResult, setTestResult] = useState<Record<string, string> | null>(null);
+  const [testingChannel, setTestingChannel] = useState<string | null>(null);
+  const [testResults, setTestResults] = useState<Record<string, { ok: boolean; text: string } | undefined>>({});
   const [tg, setTg] = useState<{ token_present: boolean; bot_username: string | null; chat_id: string } | null>(null);
   const [tgMsg, setTgMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [tgBusy, setTgBusy] = useState(false);
@@ -66,16 +66,23 @@ export default function SettingsPage() {
     } finally { setLoading(false); }
   }
 
-  // Сохраняет настройки и сразу шлёт пробное уведомление в настроенные каналы
-  async function handleTestNotification() {
-    setError(""); setSaved(false); setTestResult(null); setTesting(true);
+  const CH_LABEL: Record<string, string> = { telegram: "Telegram", vk: "ВКонтакте", email: "Email" };
+
+  // Сохраняет настройки и шлёт пробное уведомление в ОДИН выбранный канал
+  async function handleTest(channel: string) {
+    setError(""); setTestResults(prev => ({ ...prev, [channel]: undefined })); setTestingChannel(channel);
     try {
       await adminFetch("/settings", { method: "POST", body: JSON.stringify(form) });
-      const r = await adminFetch<{ results: Record<string, string> }>("/test-notification", { method: "POST" });
-      setTestResult(r.results);
+      const r = await adminFetch<{ results: Record<string, string> }>(`/test-notification?channel=${channel}`, { method: "POST" });
+      const st = r.results[channel];
+      const where = channel === "email" ? "почту" : "чат";
+      const res = st === "sent" ? { ok: true, text: `${CH_LABEL[channel]}: отправлено — проверьте ${where}` }
+        : st === "failed" ? { ok: false, text: `${CH_LABEL[channel]}: не удалось (проверьте данные/доступ)` }
+        : { ok: false, text: `${CH_LABEL[channel]} не настроен — заполните поля выше` };
+      setTestResults(prev => ({ ...prev, [channel]: res }));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Ошибка");
-    } finally { setTesting(false); }
+      setTestResults(prev => ({ ...prev, [channel]: { ok: false, text: err instanceof Error ? err.message : "Ошибка" } }));
+    } finally { setTestingChannel(null); }
   }
 
   async function handleChangePassword(e: React.FormEvent) {
@@ -91,6 +98,26 @@ export default function SettingsPage() {
   }
 
   const inputStyle = { display: "flex", flexDirection: "column" as const, gap: 6, marginBottom: 16 };
+
+  // Кнопка «Отправить тест» + результат для одного канала
+  function renderTest(channel: string, label: string) {
+    const r = testResults[channel];
+    return (
+      <div style={{ marginBottom: 18 }}>
+        <button type="button" onClick={() => handleTest(channel)} disabled={testingChannel !== null}
+          style={{ padding: "0 16px", height: 38, borderRadius: "var(--radius-md)", border: "1px solid var(--graphite)",
+            background: "transparent", color: "var(--ink)", fontWeight: 600, fontSize: 14,
+            cursor: testingChannel ? "wait" : "pointer", opacity: testingChannel && testingChannel !== channel ? 0.5 : 1 }}>
+          {testingChannel === channel ? "Отправляем…" : label}
+        </button>
+        {r && (
+          <div style={{ marginTop: 8, fontSize: 13, fontWeight: 600, color: r.ok ? "var(--stock)" : "var(--danger, #c0392b)" }}>
+            {r.ok ? "✓ " : "✕ "}{r.text}
+          </div>
+        )}
+      </div>
+    );
+  }
 
   return (
     <AdminShell>
@@ -196,6 +223,8 @@ export default function SettingsPage() {
             </>
           )}
 
+          {renderTest("telegram", "Отправить тест в Telegram")}
+
           <HelpBox
             title="Как настроить ВКонтакте →"
             steps={[
@@ -220,6 +249,8 @@ export default function SettingsPage() {
               onChange={e => setForm(p => ({...p, vk_peer_id: e.target.value}))}
               placeholder="ваш id ВКонтакте" autoComplete="off" />
           </div>
+
+          {renderTest("vk", "Отправить тест в ВК")}
 
           <div style={inputStyle}>
             <label className="form-label">Email владельца (для писем о заказах)</label>
@@ -283,6 +314,8 @@ export default function SettingsPage() {
               placeholder="по умолчанию = логин" autoComplete="off" />
           </div>
 
+          {renderTest("email", "Отправить тест на Email")}
+
           <div style={{ height: 1, background: "var(--hairline-soft)", margin: "20px 0" }} />
 
           <p style={{ fontWeight: 600, fontSize: 16, marginBottom: 20 }}>Магазин</p>
@@ -330,41 +363,9 @@ export default function SettingsPage() {
             </div>
           )}
 
-          <div style={{ display: "flex", gap: 12, marginTop: 8, flexWrap: "wrap" }}>
-            <button className="btn btn-primary" type="submit" disabled={loading}>
-              {loading ? "Сохраняем..." : "Сохранить настройки"}
-            </button>
-            <button type="button" onClick={handleTestNotification} disabled={testing}
-              style={{ padding: "0 18px", height: 40, borderRadius: "var(--radius-md)", cursor: testing ? "wait" : "pointer",
-                border: "1px solid var(--graphite)", background: "transparent", color: "var(--ink)", fontWeight: 600, fontSize: 14 }}>
-              {testing ? "Отправляем…" : "Отправить тест в Telegram / ВК / Email"}
-            </button>
-          </div>
-
-          {testResult && (
-            <div style={{ marginTop: 14, padding: "12px 16px", borderRadius: "var(--radius-md)",
-              border: "1px solid var(--hairline-soft)", background: "var(--cloud)", fontSize: 14 }}>
-              {Object.keys(testResult).length === 0 ? (
-                <span style={{ color: "var(--ink-secondary)" }}>
-                  Ни один канал не настроен. Заполните Telegram, ВК или Email выше, сохраните и попробуйте снова.
-                </span>
-              ) : (
-                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                  {Object.entries(testResult).map(([ch, st]) => {
-                    const label = ch === "telegram" ? "Telegram" : ch === "vk" ? "ВКонтакте" : "Email";
-                    const ok = st === "sent";
-                    return (
-                      <div key={ch} style={{ display: "flex", alignItems: "center", gap: 8,
-                        color: ok ? "var(--stock)" : "var(--danger, #c0392b)", fontWeight: 600 }}>
-                        <span>{ok ? "✓" : "✕"}</span>
-                        {label}: {ok ? "отправлено — проверьте чат" : "не удалось (проверьте токен/доступ)"}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          )}
+          <button className="btn btn-primary" type="submit" disabled={loading} style={{ marginTop: 8 }}>
+            {loading ? "Сохраняем..." : "Сохранить настройки"}
+          </button>
         </form>
       </div>
 

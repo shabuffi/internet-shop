@@ -162,6 +162,17 @@ def test_test_notification_telegram_failed(client, token, monkeypatch):
     assert resp.json()["results"] == {"telegram": "failed"}
 
 
+def test_test_notification_single_channel_only(client, token, monkeypatch):
+    """channel=telegram тестирует только Telegram, ВК не трогает (даже если настроен)."""
+    import app.integrations.notify as notify
+    monkeypatch.setattr(notify, "get_notify_config",
+                        lambda: {"tg_token": "T", "tg_chat": "1", "vk_token": "V", "vk_peer": "2"})
+    monkeypatch.setattr(notify, "send_telegram", lambda *a, **k: True)
+    monkeypatch.setattr(notify, "send_vk", lambda *a, **k: (_ for _ in ()).throw(AssertionError("ВК не должен вызываться")))
+    r = client.post("/api/v1/admin/test-notification?channel=telegram", headers=_auth(token)).json()
+    assert r["results"] == {"telegram": "sent"}
+
+
 # ─── Telegram: токен из .env + автопривязка chat_id ──────────────────────────
 
 class _FakeResp:

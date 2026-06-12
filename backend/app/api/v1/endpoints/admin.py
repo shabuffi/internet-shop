@@ -304,20 +304,24 @@ def save_settings(body: dict, db: Session = Depends(get_db), _=Depends(_get_curr
 
 
 @router.post("/test-notification")
-def test_notification(db: Session = Depends(get_db), _=Depends(_get_current_admin)):
-    """Шлёт пробное уведомление во все настроенные каналы (Telegram / ВК / Email).
+def test_notification(channel: str | None = None, db: Session = Depends(get_db), _=Depends(_get_current_admin)):
+    """Шлёт пробное уведомление в канал(ы) — Telegram / ВК / Email.
 
     Использует СОХРАНЁННЫЕ настройки (из БД). Помогает проверить, что бот/почта
-    подключены верно, и сразу увидеть, какой канал не сработал.
+    подключены верно.
 
     Args:
+        channel: Конкретный канал (``telegram`` / ``vk`` / ``email``) или ``None`` — во все.
         db: Сессия БД.
 
     Returns:
-        ``{"results": {канал: "sent"|"failed"}}`` — пусто, если ничего не настроено.
+        ``{"results": {канал: "sent"|"failed"}}`` — пусто, если запрошенный канал не настроен.
     """
     from app.integrations.notify import get_notify_config, send_telegram, send_vk
     from app.integrations.email import send_email
+
+    def want(ch: str) -> bool:
+        return channel is None or channel == ch
 
     shop_name = _get_setting(db, "shop_name", "Магазин")
     text = (f"Проверка уведомлений — {shop_name}.\n\n"
@@ -326,12 +330,12 @@ def test_notification(db: Session = Depends(get_db), _=Depends(_get_current_admi
     cfg = get_notify_config()
     results: dict[str, str] = {}
 
-    if cfg["tg_token"] and cfg["tg_chat"]:
+    if want("telegram") and cfg["tg_token"] and cfg["tg_chat"]:
         results["telegram"] = "sent" if send_telegram(cfg["tg_token"], cfg["tg_chat"], text) else "failed"
-    if cfg["vk_token"] and cfg["vk_peer"]:
+    if want("vk") and cfg["vk_token"] and cfg["vk_peer"]:
         results["vk"] = "sent" if send_vk(cfg["vk_token"], cfg["vk_peer"], text) else "failed"
     owner_email = _get_setting(db, "notify_email")
-    if owner_email:
+    if want("email") and owner_email:
         ok = send_email(owner_email, f"Проверка уведомлений — {shop_name}", text, from_name=shop_name)
         results["email"] = "sent" if ok else "failed"
 
