@@ -133,6 +133,35 @@ def test_upload_rejects_non_image(client, token, db_session, monkeypatch, tmp_pa
     assert resp.status_code == 400
 
 
+# ─── пробное уведомление ─────────────────────────────────────────────────────
+
+def test_test_notification_no_channels(client, token, monkeypatch):
+    import app.integrations.notify as notify
+    monkeypatch.setattr(notify, "get_notify_config",
+                        lambda: {"tg_token": "", "tg_chat": "", "vk_token": "", "vk_peer": ""})
+    resp = client.post("/api/v1/admin/test-notification", headers=_auth(token))
+    assert resp.status_code == 200
+    assert resp.json()["results"] == {}
+
+
+def test_test_notification_telegram_sent(client, token, monkeypatch):
+    import app.integrations.notify as notify
+    monkeypatch.setattr(notify, "get_notify_config",
+                        lambda: {"tg_token": "T", "tg_chat": "123", "vk_token": "", "vk_peer": ""})
+    monkeypatch.setattr(notify, "send_telegram", lambda *a, **k: True)
+    resp = client.post("/api/v1/admin/test-notification", headers=_auth(token))
+    assert resp.json()["results"] == {"telegram": "sent"}
+
+
+def test_test_notification_telegram_failed(client, token, monkeypatch):
+    import app.integrations.notify as notify
+    monkeypatch.setattr(notify, "get_notify_config",
+                        lambda: {"tg_token": "T", "tg_chat": "123", "vk_token": "", "vk_peer": ""})
+    monkeypatch.setattr(notify, "send_telegram", lambda *a, **k: False)
+    resp = client.post("/api/v1/admin/test-notification", headers=_auth(token))
+    assert resp.json()["results"] == {"telegram": "failed"}
+
+
 # ─── список заказов ──────────────────────────────────────────────────────────
 
 def test_list_orders_returns_orders_with_items(client, token, db_session):

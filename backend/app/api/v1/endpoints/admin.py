@@ -302,6 +302,41 @@ def save_settings(body: dict, db: Session = Depends(get_db), _=Depends(_get_curr
     return {"message": "Настройки сохранены"}
 
 
+@router.post("/test-notification")
+def test_notification(db: Session = Depends(get_db), _=Depends(_get_current_admin)):
+    """Шлёт пробное уведомление во все настроенные каналы (Telegram / ВК / Email).
+
+    Использует СОХРАНЁННЫЕ настройки (из БД). Помогает проверить, что бот/почта
+    подключены верно, и сразу увидеть, какой канал не сработал.
+
+    Args:
+        db: Сессия БД.
+
+    Returns:
+        ``{"results": {канал: "sent"|"failed"}}`` — пусто, если ничего не настроено.
+    """
+    from app.integrations.notify import get_notify_config, send_telegram, send_vk
+    from app.integrations.email import send_email
+
+    shop_name = _get_setting(db, "shop_name", "Магазин")
+    text = (f"Проверка уведомлений — {shop_name}.\n\n"
+            f"Если вы видите это сообщение, канал подключён правильно — "
+            f"сюда будут приходить уведомления о новых заказах.")
+    cfg = get_notify_config()
+    results: dict[str, str] = {}
+
+    if cfg["tg_token"] and cfg["tg_chat"]:
+        results["telegram"] = "sent" if send_telegram(cfg["tg_token"], cfg["tg_chat"], text) else "failed"
+    if cfg["vk_token"] and cfg["vk_peer"]:
+        results["vk"] = "sent" if send_vk(cfg["vk_token"], cfg["vk_peer"], text) else "failed"
+    owner_email = _get_setting(db, "notify_email")
+    if owner_email:
+        ok = send_email(owner_email, f"Проверка уведомлений — {shop_name}", text, from_name=shop_name)
+        results["email"] = "sent" if ok else "failed"
+
+    return {"results": results}
+
+
 # ─── Dashboard data ────────────────────────────────────────────────
 
 @router.get("/dashboard")

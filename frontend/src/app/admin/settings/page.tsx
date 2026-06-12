@@ -24,6 +24,8 @@ export default function SettingsPage() {
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState<Record<string, string> | null>(null);
   const [pw, setPw] = useState({ current_password: "", new_password: "" });
   const [pwMsg, setPwMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [pwLoading, setPwLoading] = useState(false);
@@ -42,6 +44,18 @@ export default function SettingsPage() {
     } catch (err) {
       setError(err instanceof Error ? err.message : "Ошибка");
     } finally { setLoading(false); }
+  }
+
+  // Сохраняет настройки и сразу шлёт пробное уведомление в настроенные каналы
+  async function handleTestNotification() {
+    setError(""); setSaved(false); setTestResult(null); setTesting(true);
+    try {
+      await adminFetch("/settings", { method: "POST", body: JSON.stringify(form) });
+      const r = await adminFetch<{ results: Record<string, string> }>("/test-notification", { method: "POST" });
+      setTestResult(r.results);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Ошибка");
+    } finally { setTesting(false); }
   }
 
   async function handleChangePassword(e: React.FormEvent) {
@@ -250,11 +264,49 @@ export default function SettingsPage() {
           </div>
 
           {error && <p className="form-error">{error}</p>}
-          {saved && <p style={{ fontSize: 14, color: "var(--success)", marginBottom: 8 }}>✓ Сохранено</p>}
+          {saved && (
+            <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", marginBottom: 12,
+              background: "var(--stock-soft)", border: "1px solid var(--stock)", borderRadius: "var(--radius-md)",
+              color: "var(--stock)", fontSize: 14, fontWeight: 600 }}>
+              <span>✓</span> Настройки сохранены
+            </div>
+          )}
 
-          <button className="btn btn-primary" type="submit" disabled={loading} style={{ marginTop: 8 }}>
-            {loading ? "Сохраняем..." : "Сохранить настройки"}
-          </button>
+          <div style={{ display: "flex", gap: 12, marginTop: 8, flexWrap: "wrap" }}>
+            <button className="btn btn-primary" type="submit" disabled={loading}>
+              {loading ? "Сохраняем..." : "Сохранить настройки"}
+            </button>
+            <button type="button" onClick={handleTestNotification} disabled={testing}
+              style={{ padding: "0 18px", height: 40, borderRadius: "var(--radius-md)", cursor: testing ? "wait" : "pointer",
+                border: "1px solid var(--graphite)", background: "transparent", color: "var(--ink)", fontWeight: 600, fontSize: 14 }}>
+              {testing ? "Отправляем…" : "Отправить тест в Telegram / ВК / Email"}
+            </button>
+          </div>
+
+          {testResult && (
+            <div style={{ marginTop: 14, padding: "12px 16px", borderRadius: "var(--radius-md)",
+              border: "1px solid var(--hairline-soft)", background: "var(--cloud)", fontSize: 14 }}>
+              {Object.keys(testResult).length === 0 ? (
+                <span style={{ color: "var(--ink-secondary)" }}>
+                  Ни один канал не настроен. Заполните Telegram, ВК или Email выше, сохраните и попробуйте снова.
+                </span>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  {Object.entries(testResult).map(([ch, st]) => {
+                    const label = ch === "telegram" ? "Telegram" : ch === "vk" ? "ВКонтакте" : "Email";
+                    const ok = st === "sent";
+                    return (
+                      <div key={ch} style={{ display: "flex", alignItems: "center", gap: 8,
+                        color: ok ? "var(--stock)" : "var(--danger, #c0392b)", fontWeight: 600 }}>
+                        <span>{ok ? "✓" : "✕"}</span>
+                        {label}: {ok ? "отправлено — проверьте чат" : "не удалось (проверьте токен/доступ)"}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
         </form>
       </div>
 
