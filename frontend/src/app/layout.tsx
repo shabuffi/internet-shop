@@ -8,7 +8,7 @@ import { SITE_URL, SITE_NAME, SITE_DESCRIPTION } from "@/lib/site";
 // Метаданные (включая <title> вкладки) берут название из настройки магазина —
 // один источник правды с шапкой/футером. SITE_NAME — лишь фолбэк.
 export async function generateMetadata(): Promise<Metadata> {
-  const name = await getShopName();
+  const { name } = await getStoreInfo();
   return {
     metadataBase: new URL(SITE_URL),
     title: { default: `${name} — интернет-магазин`, template: `%s — ${name}` },
@@ -44,21 +44,30 @@ function UserIcon() {
   );
 }
 
-async function getShopName(): Promise<string> {
+interface StoreInfo { name: string; phone: string; email: string; hours: string; }
+
+async function getStoreInfo(): Promise<StoreInfo> {
   try {
     const res = await fetch("http://backend:8000/api/v1/admin/store-info", {
       next: { revalidate: 60 },
     });
     if (res.ok) {
-      const data = await res.json();
-      return data.shop_name || SITE_NAME;
+      const d = await res.json();
+      return {
+        name: d.shop_name || SITE_NAME,
+        phone: d.contact_phone || "",
+        email: d.contact_email || "",
+        hours: d.contact_hours || "",
+      };
     }
   } catch {}
-  return SITE_NAME;
+  return { name: SITE_NAME, phone: "", email: "", hours: "" };
 }
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
-  const shopName = await getShopName();
+  const store = await getStoreInfo();
+  const shopName = store.name;
+  const hasContacts = Boolean(store.phone || store.email || store.hours);
 
   return (
     <html lang="ru">
@@ -115,19 +124,14 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                   <Link href="/checkout">Оформление заказа</Link>
                 </div>
 
-                <div className="footer__col">
-                  <h4>Покупателю</h4>
-                  <a>Доставка и оплата</a>
-                  <a>Возврат и обмен</a>
-                  <a>Связаться с нами</a>
-                </div>
-
-                <div className="footer__col">
-                  <h4>Контакты</h4>
-                  <a href="tel:+79990000000">+7 (999) 000-00-00</a>
-                  <a href="mailto:info@example.ru">info@example.ru</a>
-                  <span>Пн–Пт · 10:00–19:00</span>
-                </div>
+                {hasContacts && (
+                  <div className="footer__col">
+                    <h4>Контакты</h4>
+                    {store.phone && <a href={`tel:${store.phone.replace(/[^+\d]/g, "")}`}>{store.phone}</a>}
+                    {store.email && <a href={`mailto:${store.email}`}>{store.email}</a>}
+                    {store.hours && <span>{store.hours}</span>}
+                  </div>
+                )}
               </div>
               <div className="footer__bottom">
                 <span>© {new Date().getFullYear()} {shopName}. Все права защищены.</span>

@@ -245,6 +245,10 @@ def get_settings(db: Session = Depends(get_db), _=Depends(_get_current_admin)):
         "exchange_login":     _get_setting(db, "exchange_login"),
         "exchange_password":  "***" if _get_setting(db, "exchange_password") else "",
         "shop_name":          _get_setting(db, "shop_name", "Магазин"),
+        # Контакты в футере сайта (видны покупателям)
+        "contact_phone":      _get_setting(db, "contact_phone"),
+        "contact_email":      _get_setting(db, "contact_email"),
+        "contact_hours":      _get_setting(db, "contact_hours"),
         # Уведомления о заказах: токены маскируем, id адресатов — нет (не секрет)
         "telegram_bot_token": "***" if _get_setting(db, "telegram_bot_token") else "",
         "telegram_chat_id":   _get_setting(db, "telegram_chat_id"),
@@ -277,6 +281,8 @@ def save_settings(body: dict, db: Session = Depends(get_db), _=Depends(_get_curr
     allowed = {
         "exchange_login", "exchange_password",
         "shop_name",
+        # контакты в футере сайта
+        "contact_phone", "contact_email", "contact_hours",
         # уведомления — токены/адресаты владельца (email — третий канал, как ТГ/ВК)
         "telegram_bot_token", "telegram_chat_id",
         "vk_group_token", "vk_peer_id",
@@ -566,7 +572,12 @@ def delete_product_image(
 @router.get("/store-info")
 def store_info_public(db: Session = Depends(get_db)):
     """Публичный эндпойнт — название магазина для фронтенда."""
-    return {"shop_name": _get_setting(db, "shop_name", "Магазин")}
+    return {
+        "shop_name":     _get_setting(db, "shop_name", "Магазин"),
+        "contact_phone": _get_setting(db, "contact_phone"),
+        "contact_email": _get_setting(db, "contact_email"),
+        "contact_hours": _get_setting(db, "contact_hours"),
+    }
 
 
 @router.get("/sync-logs")

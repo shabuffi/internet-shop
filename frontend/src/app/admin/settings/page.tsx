@@ -20,7 +20,7 @@ function HelpBox({ title, steps, note }: { title: string; steps: React.ReactNode
 }
 
 export default function SettingsPage() {
-  const [form, setForm] = useState({ exchange_login: "", exchange_password: "", shop_name: "", telegram_bot_token: "", telegram_chat_id: "", vk_group_token: "", vk_peer_id: "", notify_email: "", smtp_host: "", smtp_port: "587", smtp_user: "", smtp_password: "", smtp_from: "" });
+  const [form, setForm] = useState({ exchange_login: "", exchange_password: "", shop_name: "", contact_phone: "", contact_email: "", contact_hours: "", telegram_bot_token: "", telegram_chat_id: "", vk_group_token: "", vk_peer_id: "", notify_email: "", smtp_host: "", smtp_port: "587", smtp_user: "", smtp_password: "", smtp_from: "" });
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -221,7 +221,31 @@ export default function SettingsPage() {
               onChange={e => setForm(p => ({...p, shop_name: e.target.value}))}
               placeholder="Магазин" />
             <p style={{ fontSize: 12, color: "var(--ink-secondary)" }}>
-              Отображается в шапке сайта
+              Отображается в шапке, футере и на вкладке браузера
+            </p>
+          </div>
+
+          <div style={inputStyle}>
+            <label className="form-label">Телефон (футер сайта)</label>
+            <input className="form-input" value={form.contact_phone}
+              onChange={e => setForm(p => ({...p, contact_phone: e.target.value}))}
+              placeholder="+7 999 123-45-67" />
+          </div>
+
+          <div style={inputStyle}>
+            <label className="form-label">Email для покупателей (футер сайта)</label>
+            <input className="form-input" type="email" value={form.contact_email}
+              onChange={e => setForm(p => ({...p, contact_email: e.target.value}))}
+              placeholder="shop@example.ru" />
+          </div>
+
+          <div style={inputStyle}>
+            <label className="form-label">Часы работы (футер сайта)</label>
+            <input className="form-input" value={form.contact_hours}
+              onChange={e => setForm(p => ({...p, contact_hours: e.target.value}))}
+              placeholder="Пн–Пт · 10:00–19:00" />
+            <p style={{ fontSize: 12, color: "var(--ink-secondary)" }}>
+              Пустые поля контактов в футере не показываются
             </p>
           </div>
 
