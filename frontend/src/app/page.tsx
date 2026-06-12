@@ -93,7 +93,7 @@ export default async function CatalogPage({ searchParams }: Props) {
                         ? <span className="badge badge--stock"><span className="badge__dot" />В наличии</span>
                         : <span className="badge badge--out"><span className="badge__dot" />Нет</span>}
                     </span>
-                    <div className="photo photo--portrait">
+                    <div className="photo photo--square">
                       {p.image_url
                         ? <img src={`/api/v1/products/${p.id}/image`} alt={p.name} />
                         : <span className="photo__ph"><IconImage /></span>}
