@@ -49,9 +49,13 @@ def notify_new_order(order_id: str):
             configured.append("vk")
             if send_vk(cfg["vk_token"], cfg["vk_peer"], text):
                 sent.append("vk")
-        # email владельца — третий канал уведомлений (как ТГ/ВК); шлём то же сообщение
+        # email владельца — третий канал уведомлений (как ТГ/ВК); шлём то же сообщение.
+        # Если адрес получателя не задан — по умолчанию шлём на сам SMTP-ящик (логин).
         owner_row = db.get(ShopSettings, "notify_email")
         owner_email = owner_row.value if owner_row and owner_row.value else None
+        if not owner_email:
+            smtp_row = db.get(ShopSettings, "smtp_user")
+            owner_email = smtp_row.value if smtp_row and smtp_row.value else None
         if owner_email:
             configured.append("email")
             if send_email(owner_email, f"Новый заказ {order.number} — {shop_name}", text, from_name=shop_name):

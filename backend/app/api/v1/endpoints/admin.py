@@ -352,7 +352,8 @@ def test_notification(channel: str | None = None, db: Session = Depends(get_db),
 
     if want("vk") and cfg["vk_token"] and cfg["vk_peer"]:
         results["vk"] = "sent" if send_vk(cfg["vk_token"], cfg["vk_peer"], text) else "failed"
-    owner_email = _get_setting(db, "notify_email")
+    # Получатель писем: «Email владельца», а если он пуст — сам SMTP-ящик (логин)
+    owner_email = _get_setting(db, "notify_email") or _get_setting(db, "smtp_user")
     if want("email") and owner_email:
         ok = send_email(owner_email, f"Проверка уведомлений — {shop_name}", text, from_name=shop_name)
         results["email"] = "sent" if ok else "failed"

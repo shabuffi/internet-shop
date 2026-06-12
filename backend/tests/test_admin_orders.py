@@ -180,6 +180,23 @@ def test_test_notification_telegram_timeout_reason(client, token, monkeypatch):
     assert "Telegram" in d["details"]["telegram"]
 
 
+def test_test_notification_email_falls_back_to_smtp_user(client, token, db_session, monkeypatch):
+    """Если «Email владельца» пуст — письмо идёт на адрес из SMTP-логина."""
+    import app.integrations.email as email_mod
+    import app.integrations.notify as notify
+    from app.db.models.admin import ShopSettings
+    monkeypatch.setattr(notify, "get_notify_config",
+                        lambda: {"tg_token": "", "tg_chat": "", "vk_token": "", "vk_peer": ""})
+    db_session.merge(ShopSettings(key="smtp_user", value="shop@yandex.ru"))
+    db_session.commit()
+    captured = {}
+    monkeypatch.setattr(email_mod, "send_email",
+                        lambda to, subject, body, from_name="Магазин": captured.update(to=to) or True)
+    r = client.post("/api/v1/admin/test-notification?channel=email", headers=_auth(token)).json()
+    assert r["results"] == {"email": "sent"}
+    assert captured["to"] == "shop@yandex.ru"
+
+
 def test_test_notification_single_channel_only(client, token, monkeypatch):
     """channel=telegram тестирует только Telegram, ВК не трогает (даже если настроен)."""
     import app.integrations.notify as notify

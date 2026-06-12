@@ -254,10 +254,13 @@ export default function SettingsPage() {
           {renderTest("vk", "Отправить тест в ВК")}
 
           <div style={inputStyle}>
-            <label className="form-label">Email владельца (для писем о заказах)</label>
+            <label className="form-label">Email владельца (необязательно)</label>
             <input className="form-input" value={form.notify_email}
               onChange={e => setForm(p => ({...p, notify_email: e.target.value}))}
-              placeholder="вы получите письмо на этот адрес" type="email" autoComplete="off" />
+              placeholder="по умолчанию = SMTP-логин ниже" type="email" autoComplete="off" />
+            <p style={{ fontSize: 12, color: "var(--ink-secondary)" }}>
+              Куда присылать письма о заказах. Если оставить пустым — придут на адрес из SMTP-логина.
+            </p>
           </div>
 
           <div style={{ height: 1, background: "var(--hairline-soft)", margin: "20px 0" }} />
