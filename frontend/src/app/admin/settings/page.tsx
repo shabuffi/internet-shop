@@ -26,13 +26,33 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(false);
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<Record<string, string> | null>(null);
+  const [tg, setTg] = useState<{ token_present: boolean; bot_username: string | null; chat_id: string } | null>(null);
+  const [tgMsg, setTgMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [tgBusy, setTgBusy] = useState(false);
   const [pw, setPw] = useState({ current_password: "", new_password: "" });
   const [pwMsg, setPwMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [pwLoading, setPwLoading] = useState(false);
 
+  function loadTg() {
+    adminFetch<{ token_present: boolean; bot_username: string | null; chat_id: string }>("/telegram/status")
+      .then(setTg).catch(() => setTg({ token_present: false, bot_username: null, chat_id: "" }));
+  }
   useEffect(() => {
     adminFetch<typeof form>("/settings").then(data => setForm(data)).catch(() => {});
+    loadTg();
   }, []);
+
+  // Автоматически определить chat_id владельца по последнему сообщению боту
+  async function handleConnectTg() {
+    setTgMsg(null); setTgBusy(true);
+    try {
+      const r = await adminFetch<{ chat_id: string; chat_title: string }>("/telegram/connect", { method: "POST" });
+      setTgMsg({ ok: true, text: `Привязано: ${r.chat_title}. Уведомления пойдут сюда.` });
+      loadTg();
+    } catch (err) {
+      setTgMsg({ ok: false, text: err instanceof Error ? err.message : "Ошибка" });
+    } finally { setTgBusy(false); }
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -113,30 +133,68 @@ export default function SettingsPage() {
             «Как настроить» под нужным каналом.
           </p>
 
-          <HelpBox
-            title="Как настроить Telegram →"
-            steps={[
-              <>В Telegram найдите <b>@BotFather</b>, напишите ему <code>/start</code>.</>,
-              <>Отправьте <code>/newbot</code> → введите имя бота, затем username (должен заканчиваться на <b>bot</b>).</>,
-              <>BotFather пришлёт <b>токен</b> вида <code>7123456789:AAH…</code> — впишите его в поле «Telegram — токен бота».</>,
-              <>Найдите своего бота по username и нажмите <b>Start</b> (обязательно, иначе бот не сможет вам писать).</>,
-              <>Найдите <b>@userinfobot</b>, напишите <code>/start</code> → он пришлёт ваш <b>Id</b> (число) → это «Telegram — chat_id».</>,
-            ]}
-          />
+          {tg === null ? (
+            <p style={{ fontSize: 13, color: "var(--ink-secondary)" }}>Проверяем подключение Telegram…</p>
+          ) : tg.token_present ? (
+            // Бот задан на сервере (.env.prod) — владельцу не нужно вводить токен,
+            // достаточно нажать Start у бота и «Привязать» (chat_id определится сам).
+            <div style={{ padding: "16px 18px", borderRadius: "var(--radius-md)", border: "1px solid var(--hairline-soft)",
+              background: "var(--cloud)", marginBottom: 16 }}>
+              <div style={{ fontWeight: 600, color: "var(--stock)", marginBottom: 10 }}>
+                ✓ Бот подключён{tg.bot_username ? <> — <b>@{tg.bot_username}</b></> : null}
+              </div>
+              <ol style={{ margin: "0 0 12px", paddingLeft: 18, fontSize: 13, color: "var(--ink-secondary)", lineHeight: 1.7 }}>
+                <li>
+                  Откройте бота{" "}
+                  {tg.bot_username
+                    ? <a href={`https://t.me/${tg.bot_username}`} target="_blank" rel="noopener noreferrer" style={{ color: "var(--accent, #2563eb)" }}>@{tg.bot_username}</a>
+                    : "в Telegram"} и нажмите <b>Start</b>.
+                </li>
+                <li>Вернитесь сюда и нажмите <b>«Привязать»</b> — мы сами определим ваш чат.</li>
+              </ol>
+              <div style={{ fontSize: 13, marginBottom: 12, color: tg.chat_id ? "var(--stock)" : "var(--ink-tertiary)" }}>
+                {tg.chat_id ? `Сейчас уведомления идут в привязанный чат (id ${tg.chat_id}).` : "Чат пока не привязан."}
+              </div>
+              <button type="button" onClick={handleConnectTg} disabled={tgBusy}
+                style={{ padding: "0 18px", height: 38, borderRadius: "var(--radius-md)", cursor: tgBusy ? "wait" : "pointer",
+                  border: "1px solid var(--graphite)", background: "transparent", color: "var(--ink)", fontWeight: 600, fontSize: 14 }}>
+                {tgBusy ? "Проверяем…" : tg.chat_id ? "Перепривязать чат" : "Привязать чат"}
+              </button>
+              {tgMsg && (
+                <div style={{ marginTop: 10, fontSize: 13, fontWeight: 600, color: tgMsg.ok ? "var(--stock)" : "var(--danger, #c0392b)" }}>
+                  {tgMsg.ok ? "✓ " : "✕ "}{tgMsg.text}
+                </div>
+              )}
+            </div>
+          ) : (
+            // Токен не задан на сервере — резервный ручной ввод (как раньше)
+            <>
+              <HelpBox
+                title="Как настроить Telegram →"
+                steps={[
+                  <>В Telegram найдите <b>@BotFather</b>, напишите ему <code>/start</code>.</>,
+                  <>Отправьте <code>/newbot</code> → введите имя бота, затем username (должен заканчиваться на <b>bot</b>).</>,
+                  <>BotFather пришлёт <b>токен</b> вида <code>7123456789:AAH…</code> — впишите его в поле «Telegram — токен бота».</>,
+                  <>Найдите своего бота по username и нажмите <b>Start</b> (обязательно, иначе бот не сможет вам писать).</>,
+                  <>Найдите <b>@userinfobot</b>, напишите <code>/start</code> → он пришлёт ваш <b>Id</b> (число) → это «Telegram — chat_id».</>,
+                ]}
+              />
 
-          <div style={inputStyle}>
-            <label className="form-label">Telegram — токен бота</label>
-            <input className="form-input" value={form.telegram_bot_token}
-              onChange={e => setForm(p => ({...p, telegram_bot_token: e.target.value}))}
-              placeholder="123456:ABC-… или оставьте ***" type="password" autoComplete="off" />
-          </div>
+              <div style={inputStyle}>
+                <label className="form-label">Telegram — токен бота</label>
+                <input className="form-input" value={form.telegram_bot_token}
+                  onChange={e => setForm(p => ({...p, telegram_bot_token: e.target.value}))}
+                  placeholder="123456:ABC-… или оставьте ***" type="password" autoComplete="off" />
+              </div>
 
-          <div style={inputStyle}>
-            <label className="form-label">Telegram — chat_id</label>
-            <input className="form-input" value={form.telegram_chat_id}
-              onChange={e => setForm(p => ({...p, telegram_chat_id: e.target.value}))}
-              placeholder="например, 123456789" autoComplete="off" />
-          </div>
+              <div style={inputStyle}>
+                <label className="form-label">Telegram — chat_id</label>
+                <input className="form-input" value={form.telegram_chat_id}
+                  onChange={e => setForm(p => ({...p, telegram_chat_id: e.target.value}))}
+                  placeholder="например, 123456789" autoComplete="off" />
+              </div>
+            </>
+          )}
 
           <HelpBox
             title="Как настроить ВКонтакте →"

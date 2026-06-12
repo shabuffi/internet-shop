@@ -1,6 +1,7 @@
 """Admin panel API."""
 
 import bcrypt
+import httpx
 import jwt
 from datetime import datetime, timedelta, timezone
 from typing import Literal
@@ -335,6 +336,85 @@ def test_notification(db: Session = Depends(get_db), _=Depends(_get_current_admi
         results["email"] = "sent" if ok else "failed"
 
     return {"results": results}
+
+
+@router.get("/telegram/status")
+def telegram_status(db: Session = Depends(get_db), _=Depends(_get_current_admin)):
+    """Статус подключения Telegram: задан ли токен (в .env/БД), username бота, привязанный чат.
+
+    Args:
+        db: Сессия БД.
+
+    Returns:
+        ``{"token_present", "bot_username", "chat_id"}``.
+    """
+    from app.integrations.notify import get_notify_config
+    token = get_notify_config()["tg_token"]
+    if not token:
+        return {"token_present": False, "bot_username": None, "chat_id": ""}
+
+    bot_username = None
+    try:
+        r = httpx.get(f"https://api.telegram.org/bot{token}/getMe", timeout=10)
+        data = r.json()
+        if data.get("ok"):
+            bot_username = data["result"].get("username")
+    except Exception:
+        pass
+
+    return {
+        "token_present": True,
+        "bot_username": bot_username,
+        "chat_id": _get_setting(db, "telegram_chat_id"),
+    }
+
+
+@router.post("/telegram/connect")
+def telegram_connect(db: Session = Depends(get_db), _=Depends(_get_current_admin)):
+    """Определяет chat_id владельца автоматически — по последнему сообщению боту.
+
+    Владелец открывает бота и жмёт Start; мы читаем ``getUpdates`` и сохраняем chat
+    из самого свежего сообщения в ``telegram_chat_id``. Так не нужно вручную искать id.
+
+    Args:
+        db: Сессия БД.
+
+    Returns:
+        ``{"chat_id", "chat_title"}`` — куда теперь идут уведомления.
+
+    Raises:
+        HTTPException: 400 — токен не задан; 404 — нет сообщений боту; 502 — ошибка Telegram.
+    """
+    from app.integrations.notify import get_notify_config
+    token = get_notify_config()["tg_token"]
+    if not token:
+        raise HTTPException(status_code=400, detail="Токен бота не задан на сервере (.env.prod)")
+
+    try:
+        r = httpx.get(f"https://api.telegram.org/bot{token}/getUpdates", timeout=10)
+        data = r.json()
+    except Exception:
+        raise HTTPException(status_code=502, detail="Не удалось связаться с Telegram")
+    if not data.get("ok"):
+        raise HTTPException(status_code=502, detail="Telegram вернул ошибку (проверьте токен)")
+
+    chat = None
+    for upd in reversed(data.get("result", [])):
+        msg = upd.get("message") or upd.get("edited_message") or upd.get("my_chat_member")
+        if msg and msg.get("chat"):
+            chat = msg["chat"]
+            break
+    if not chat:
+        raise HTTPException(
+            status_code=404,
+            detail="Не вижу сообщений боту. Откройте бота, нажмите Start и попробуйте снова.",
+        )
+
+    chat_id = str(chat["id"])
+    _set_setting(db, "telegram_chat_id", chat_id)
+    db.commit()
+    title = chat.get("title") or chat.get("first_name") or chat.get("username") or chat_id
+    return {"chat_id": chat_id, "chat_title": title}
 
 
 # ─── Dashboard data ────────────────────────────────────────────────

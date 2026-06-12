@@ -162,6 +162,57 @@ def test_test_notification_telegram_failed(client, token, monkeypatch):
     assert resp.json()["results"] == {"telegram": "failed"}
 
 
+# ─── Telegram: токен из .env + автопривязка chat_id ──────────────────────────
+
+class _FakeResp:
+    def __init__(self, payload): self._p = payload
+    def json(self): return self._p
+
+
+def test_telegram_status_no_token(client, token, monkeypatch):
+    import app.integrations.notify as notify
+    monkeypatch.setattr(notify, "get_notify_config",
+                        lambda: {"tg_token": "", "tg_chat": "", "vk_token": "", "vk_peer": ""})
+    resp = client.get("/api/v1/admin/telegram/status", headers=_auth(token))
+    assert resp.json()["token_present"] is False
+
+
+def test_telegram_status_with_token(client, token, monkeypatch):
+    import app.integrations.notify as notify
+    import app.api.v1.endpoints.admin as admin_mod
+    monkeypatch.setattr(notify, "get_notify_config",
+                        lambda: {"tg_token": "T", "tg_chat": "", "vk_token": "", "vk_peer": ""})
+    monkeypatch.setattr(admin_mod.httpx, "get",
+                        lambda *a, **k: _FakeResp({"ok": True, "result": {"username": "myshop_bot"}}))
+    d = client.get("/api/v1/admin/telegram/status", headers=_auth(token)).json()
+    assert d["token_present"] is True and d["bot_username"] == "myshop_bot"
+
+
+def test_telegram_connect_detects_chat(client, token, db_session, monkeypatch):
+    import app.integrations.notify as notify
+    import app.api.v1.endpoints.admin as admin_mod
+    from app.db.models.admin import ShopSettings
+    monkeypatch.setattr(notify, "get_notify_config",
+                        lambda: {"tg_token": "T", "tg_chat": "", "vk_token": "", "vk_peer": ""})
+    monkeypatch.setattr(admin_mod.httpx, "get",
+                        lambda *a, **k: _FakeResp({"ok": True, "result": [{"message": {"chat": {"id": 555, "first_name": "Оля"}}}]}))
+    d = client.post("/api/v1/admin/telegram/connect", headers=_auth(token)).json()
+    assert d["chat_id"] == "555" and d["chat_title"] == "Оля"
+    db_session.expire_all()
+    assert db_session.get(ShopSettings, "telegram_chat_id").value == "555"
+
+
+def test_telegram_connect_no_messages(client, token, monkeypatch):
+    import app.integrations.notify as notify
+    import app.api.v1.endpoints.admin as admin_mod
+    monkeypatch.setattr(notify, "get_notify_config",
+                        lambda: {"tg_token": "T", "tg_chat": "", "vk_token": "", "vk_peer": ""})
+    monkeypatch.setattr(admin_mod.httpx, "get",
+                        lambda *a, **k: _FakeResp({"ok": True, "result": []}))
+    resp = client.post("/api/v1/admin/telegram/connect", headers=_auth(token))
+    assert resp.status_code == 404
+
+
 # ─── список заказов ──────────────────────────────────────────────────────────
 
 def test_list_orders_returns_orders_with_items(client, token, db_session):
