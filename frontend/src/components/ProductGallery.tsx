@@ -19,12 +19,26 @@ export default function ProductGallery({ productId, images, name }: {
     );
   }
 
+  const many = images.length > 1;
+  const prev = () => setActive((a) => (a - 1 + images.length) % images.length);
+  const next = () => setActive((a) => (a + 1) % images.length);
+
   return (
     <div>
       <div className="photo">
         <img src={`/api/v1/products/${productId}/image?n=${active}`} alt={name} />
+        {many && (
+          <>
+            <button type="button" className="gallery-arrow gallery-arrow--prev" onClick={prev} aria-label="Предыдущее фото">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6" /></svg>
+            </button>
+            <button type="button" className="gallery-arrow gallery-arrow--next" onClick={next} aria-label="Следующее фото">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6" /></svg>
+            </button>
+          </>
+        )}
       </div>
-      {images.length > 1 && (
+      {many && (
         <div className="gallery-thumbs">
           {images.map((_, i) => (
             <button
