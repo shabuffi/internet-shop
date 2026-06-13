@@ -5,15 +5,13 @@ import { devFetch } from "@/lib/adminApi";
 
 // Техническая форма (обмен / ВК / SMTP). Поля приходят с /dev/settings.
 interface DevForm {
-  exchange_login: string; exchange_password: string;
-  vk_group_token: string; vk_peer_id: string; vk_env: boolean;
-  notify_email: string;
+  vk_group_token: string; vk_env: boolean;
   smtp_host: string; smtp_port: string; smtp_user: string; smtp_password: string; smtp_from: string;
 }
 
 const EMPTY: DevForm = {
-  exchange_login: "", exchange_password: "", vk_group_token: "", vk_peer_id: "", vk_env: false,
-  notify_email: "", smtp_host: "", smtp_port: "587", smtp_user: "", smtp_password: "", smtp_from: "",
+  vk_group_token: "", vk_env: false,
+  smtp_host: "", smtp_port: "587", smtp_user: "", smtp_password: "", smtp_from: "",
 };
 
 const card: React.CSSProperties = {
@@ -123,29 +121,14 @@ export default function DevPage() {
       ) : (
         <div style={card}>
           <form onSubmit={handleSave}>
-            {/* Обмен */}
-            <p style={{ fontWeight: 600, fontSize: 16, marginBottom: 6 }}>Обмен с МойСклад (CommerceML)</p>
+            {/* ВК — ключ сообщества (peer_id владелец вводит у себя в Настройках) */}
+            <p style={{ fontWeight: 600, fontSize: 16, marginBottom: 6 }}>ВКонтакте — ключ сообщества</p>
             <p style={{ fontSize: 13, color: "var(--ink-secondary)", marginBottom: 16 }}>
-              Выдуманная пара логин/пароль обмена — те же значения вписываются в МойСклад (не от аккаунта МойСклад).
+              Ключ доступа сообщества (бот). Свой id (peer_id) владелец вводит сам в Настройках.
             </p>
-            <div style={field}>
-              <label className="form-label">Логин обмена</label>
-              <input className="form-input" value={form.exchange_login} onChange={set("exchange_login")}
-                placeholder="например, myshop_exchange" autoComplete="off" />
-            </div>
-            <div style={field}>
-              <label className="form-label">Пароль обмена</label>
-              <input className="form-input" type="password" value={form.exchange_password} onChange={set("exchange_password")}
-                placeholder="новый пароль или оставьте ***" autoComplete="off" />
-            </div>
-
-            <div style={{ height: 1, background: "var(--hairline-soft)", margin: "20px 0" }} />
-
-            {/* ВК */}
-            <p style={{ fontWeight: 600, fontSize: 16, marginBottom: 16 }}>ВКонтакте</p>
             {form.vk_env && (
               <p style={{ fontSize: 13, color: "var(--stock)", marginBottom: 12 }}>
-                ✓ ВК задан на сервере (.env.prod) — эти поля игнорируются, можно не заполнять.
+                ✓ ВК задан на сервере (.env.prod) — это поле игнорируется, можно не заполнять.
               </p>
             )}
             <div style={field}>
@@ -153,21 +136,14 @@ export default function DevPage() {
               <input className="form-input" type="password" value={form.vk_group_token} onChange={set("vk_group_token")}
                 placeholder="vk1.a.… или оставьте ***" autoComplete="off" />
             </div>
-            <div style={field}>
-              <label className="form-label">peer_id получателя (id ВК владельца)</label>
-              <input className="form-input" value={form.vk_peer_id} onChange={set("vk_peer_id")}
-                placeholder="например, 123456789" autoComplete="off" />
-            </div>
 
             <div style={{ height: 1, background: "var(--hairline-soft)", margin: "20px 0" }} />
 
-            {/* Email / SMTP */}
-            <p style={{ fontWeight: 600, fontSize: 16, marginBottom: 16 }}>Email (SMTP)</p>
-            <div style={field}>
-              <label className="form-label">Email владельца (куда слать заказы)</label>
-              <input className="form-input" type="email" value={form.notify_email} onChange={set("notify_email")}
-                placeholder="по умолчанию = SMTP-логин" autoComplete="off" />
-            </div>
+            {/* Email / SMTP (адрес получателя владелец вводит в Настройках) */}
+            <p style={{ fontWeight: 600, fontSize: 16, marginBottom: 6 }}>Почтовый сервер (SMTP)</p>
+            <p style={{ fontSize: 13, color: "var(--ink-secondary)", marginBottom: 16 }}>
+              Через какой ящик отправлять письма. Адрес получателя (email владельца) задаётся в Настройках.
+            </p>
             <div style={field}>
               <label className="form-label">SMTP-сервер (host)</label>
               <input className="form-input" value={form.smtp_host} onChange={set("smtp_host")}

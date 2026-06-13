@@ -7,16 +7,21 @@ import { adminFetch } from "@/lib/adminApi";
 interface OwnerSettings {
   shop_name: string; contact_phone: string; contact_email: string; contact_hours: string;
   delivery_info: string;
-  vk_configured?: boolean; email_configured?: boolean;
+  exchange_login: string; exchange_password: string;
+  vk_peer_id: string; notify_email: string;
+  vk_ready?: boolean; email_ready?: boolean;
 }
 
-const EMPTY: OwnerSettings = { shop_name: "", contact_phone: "", contact_email: "", contact_hours: "", delivery_info: "" };
+const EMPTY: OwnerSettings = {
+  shop_name: "", contact_phone: "", contact_email: "", contact_hours: "", delivery_info: "",
+  exchange_login: "", exchange_password: "", vk_peer_id: "", notify_email: "",
+};
 const CH_LABEL: Record<string, string> = { vk: "ВКонтакте", email: "Email" };
 
 export default function SettingsPage() {
   const [form, setForm] = useState<OwnerSettings>(EMPTY);
-  const [vkOk, setVkOk] = useState(false);
-  const [emailOk, setEmailOk] = useState(false);
+  const [vkReady, setVkReady] = useState(false);
+  const [emailReady, setEmailReady] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -28,7 +33,7 @@ export default function SettingsPage() {
 
   useEffect(() => {
     adminFetch<OwnerSettings>("/settings")
-      .then(d => { setForm(d); setVkOk(!!d.vk_configured); setEmailOk(!!d.email_configured); })
+      .then(d => { setForm(d); setVkReady(!!d.vk_ready); setEmailReady(!!d.email_ready); })
       .catch(() => {});
   }, []);
 
@@ -43,15 +48,17 @@ export default function SettingsPage() {
     } finally { setLoading(false); }
   }
 
+  // Сохраняет форму (чтобы id ВК / email применились) и шлёт пробное уведомление
   async function handleTest(channel: string) {
     setTestResults(prev => ({ ...prev, [channel]: undefined })); setTestingChannel(channel);
     try {
+      await adminFetch("/settings", { method: "POST", body: JSON.stringify(form) });
       const r = await adminFetch<{ results: Record<string, string>; details?: Record<string, string> }>(`/test-notification?channel=${channel}`, { method: "POST" });
       const st = r.results[channel];
       const detail = r.details?.[channel];
       const where = channel === "email" ? "почту" : "сообщения сообщества";
       const res = st === "sent" ? { ok: true, text: `Отправлено — проверьте ${where}` }
-        : st === "failed" ? { ok: false, text: `Не удалось${detail ? ` — ${detail}` : " (проверьте настройку у разработчика)"}` }
+        : st === "failed" ? { ok: false, text: `Не удалось${detail ? ` — ${detail}` : " (проверьте данные)"}` }
         : { ok: false, text: "Канал не настроен" };
       setTestResults(prev => ({ ...prev, [channel]: res }));
     } catch (err) {
@@ -74,30 +81,30 @@ export default function SettingsPage() {
   const inputStyle = { display: "flex", flexDirection: "column" as const, gap: 6, marginBottom: 16 };
   const set = (k: keyof OwnerSettings) => (e: React.ChangeEvent<HTMLInputElement>) => setForm(p => ({ ...p, [k]: e.target.value }));
 
-  function channelRow(channel: "vk" | "email", configured: boolean) {
+  function testButton(channel: "vk" | "email") {
     const r = testResults[channel];
     return (
-      <div style={{ marginBottom: 14 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-          <span style={{ fontWeight: 600, minWidth: 90 }}>{CH_LABEL[channel]}</span>
-          <span style={{ fontSize: 13, fontWeight: 600, color: configured ? "var(--stock)" : "var(--ink-tertiary)" }}>
-            {configured ? "✓ подключено" : "не настроено"}
-          </span>
-          {configured && (
-            <button type="button" onClick={() => handleTest(channel)} disabled={testingChannel !== null}
-              style={{ padding: "0 14px", height: 34, borderRadius: "var(--radius-md)", border: "1px solid var(--graphite)",
-                background: "transparent", color: "var(--ink)", fontWeight: 600, fontSize: 13,
-                cursor: testingChannel ? "wait" : "pointer", opacity: testingChannel && testingChannel !== channel ? 0.5 : 1 }}>
-              {testingChannel === channel ? "Отправляем…" : "Отправить тест"}
-            </button>
-          )}
-        </div>
+      <>
+        <button type="button" onClick={() => handleTest(channel)} disabled={testingChannel !== null}
+          style={{ padding: "0 14px", height: 36, borderRadius: "var(--radius-md)", border: "1px solid var(--graphite)",
+            background: "transparent", color: "var(--ink)", fontWeight: 600, fontSize: 13,
+            cursor: testingChannel ? "wait" : "pointer", opacity: testingChannel && testingChannel !== channel ? 0.5 : 1 }}>
+          {testingChannel === channel ? "Отправляем…" : `Отправить тест (${CH_LABEL[channel]})`}
+        </button>
         {r && (
           <div style={{ marginTop: 6, fontSize: 13, fontWeight: 600, color: r.ok ? "var(--stock)" : "var(--danger, #c0392b)" }}>
             {r.ok ? "✓ " : "✕ "}{r.text}
           </div>
         )}
-      </div>
+      </>
+    );
+  }
+
+  function readyNote(ready: boolean, what: string) {
+    return (
+      <p style={{ fontSize: 12, color: ready ? "var(--stock)" : "var(--ink-tertiary)", marginTop: -8, marginBottom: 12 }}>
+        {ready ? `✓ ${what} подключено разработчиком` : `${what} ещё не настроено — обратитесь к разработчику`}
+      </p>
     );
   }
 
@@ -105,8 +112,7 @@ export default function SettingsPage() {
     <AdminShell>
       <h1 style={{ fontSize: 24, fontWeight: 700, marginBottom: 8, letterSpacing: -0.3 }}>Настройки</h1>
       <p style={{ fontSize: 14, color: "var(--ink-secondary)", marginBottom: 32 }}>
-        Название магазина, контакты и проверка уведомлений. Техническая настройка интеграции —
-        на отдельной странице разработчика.
+        Магазин, обмен с МойСклад и уведомления о заказах.
       </p>
 
       <div style={{ background: "var(--canvas)", borderRadius: "var(--radius-lg)", border: "1px solid var(--hairline-soft)", padding: "28px 32px", maxWidth: 520 }}>
@@ -118,7 +124,6 @@ export default function SettingsPage() {
             <input className="form-input" value={form.shop_name} onChange={set("shop_name")} placeholder="Магазин" />
             <p style={{ fontSize: 12, color: "var(--ink-secondary)" }}>Отображается в шапке, футере и на вкладке браузера</p>
           </div>
-
           <div style={inputStyle}>
             <label className="form-label">Телефон (футер сайта)</label>
             <input className="form-input" value={form.contact_phone} onChange={set("contact_phone")} placeholder="+7 999 123-45-67" />
@@ -130,44 +135,64 @@ export default function SettingsPage() {
           <div style={inputStyle}>
             <label className="form-label">Часы работы (футер сайта)</label>
             <input className="form-input" value={form.contact_hours} onChange={set("contact_hours")} placeholder="Пн–Пт · 10:00–19:00" />
-            <p style={{ fontSize: 12, color: "var(--ink-secondary)" }}>Пустые поля контактов в футере не показываются</p>
           </div>
-
           <div style={inputStyle}>
             <label className="form-label">Доставка (на странице товара)</label>
             <input className="form-input" value={form.delivery_info} onChange={set("delivery_info")} placeholder="например, 1–3 дня по России" />
-            <p style={{ fontSize: 12, color: "var(--ink-secondary)" }}>
-              Один текст для всех товаров. Пусто — строка «Доставка» на карточке не показывается.
-            </p>
+            <p style={{ fontSize: 12, color: "var(--ink-secondary)" }}>Один текст для всех товаров. Пусто — строка не показывается.</p>
           </div>
 
-          {error && <p className="form-error">{error}</p>}
+          <div style={{ height: 1, background: "var(--hairline-soft)", margin: "20px 0" }} />
+
+          {/* МойСклад — обмен */}
+          <p style={{ fontWeight: 600, fontSize: 16, marginBottom: 6 }}>Обмен с МойСклад</p>
+          <p style={{ fontSize: 13, color: "var(--ink-secondary)", marginBottom: 16 }}>
+            Придумайте пару логин/пароль и впишите её сюда <b>и</b> в МойСклад (Адрес магазина).
+            Это пароль обмена, а не от аккаунта МойСклад.
+          </p>
+          <div style={inputStyle}>
+            <label className="form-label">Логин обмена</label>
+            <input className="form-input" value={form.exchange_login} onChange={set("exchange_login")} placeholder="например, myshop_exchange" autoComplete="off" />
+          </div>
+          <div style={inputStyle}>
+            <label className="form-label">Пароль обмена</label>
+            <input className="form-input" type="password" value={form.exchange_password} onChange={set("exchange_password")} placeholder="новый пароль или оставьте ***" autoComplete="off" />
+          </div>
+
+          <div style={{ height: 1, background: "var(--hairline-soft)", margin: "20px 0" }} />
+
+          {/* Уведомления */}
+          <p style={{ fontWeight: 600, fontSize: 16, marginBottom: 6 }}>Уведомления о заказах</p>
+          <p style={{ fontSize: 13, color: "var(--ink-secondary)", marginBottom: 16 }}>
+            Куда вам приходят оповещения о новых заказах. Заполните ВК и/или Email.
+          </p>
+
+          <div style={inputStyle}>
+            <label className="form-label">ВКонтакте — ваш id (peer_id)</label>
+            <input className="form-input" value={form.vk_peer_id} onChange={set("vk_peer_id")} placeholder="например, 123456789" autoComplete="off" />
+          </div>
+          {readyNote(vkReady, "Сообщество")}
+          <div style={{ marginBottom: 18 }}>{testButton("vk")}</div>
+
+          <div style={inputStyle}>
+            <label className="form-label">Email владельца (куда слать заказы)</label>
+            <input className="form-input" type="email" value={form.notify_email} onChange={set("notify_email")} placeholder="вы получите письмо на этот адрес" autoComplete="off" />
+          </div>
+          {readyNote(emailReady, "Почтовый сервер")}
+          <div style={{ marginBottom: 4 }}>{testButton("email")}</div>
+
+          {error && <p className="form-error" style={{ marginTop: 16 }}>{error}</p>}
           {saved && (
-            <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", marginBottom: 12,
+            <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", margin: "16px 0 12px",
               background: "var(--stock-soft)", border: "1px solid var(--stock)", borderRadius: "var(--radius-md)",
               color: "var(--stock)", fontSize: 14, fontWeight: 600 }}>
               <span>✓</span> Настройки сохранены
             </div>
           )}
-          <button className="btn btn-primary" type="submit" disabled={loading} style={{ marginTop: 4 }}>
+          <button className="btn btn-primary" type="submit" disabled={loading} style={{ marginTop: 16 }}>
             {loading ? "Сохраняем..." : "Сохранить настройки"}
           </button>
         </form>
-      </div>
-
-      {/* Уведомления о заказах — статус + тест (настраивает разработчик) */}
-      <div style={{ background: "var(--canvas)", borderRadius: "var(--radius-lg)", border: "1px solid var(--hairline-soft)", padding: "28px 32px", maxWidth: 520, marginTop: 24 }}>
-        <p style={{ fontWeight: 600, fontSize: 16, marginBottom: 6 }}>Уведомления о заказах</p>
-        <p style={{ fontSize: 13, color: "var(--ink-secondary)", marginBottom: 20 }}>
-          Куда приходят оповещения о новых заказах. Каналы подключает разработчик; здесь можно проверить отправку.
-        </p>
-        {channelRow("vk", vkOk)}
-        {channelRow("email", emailOk)}
-        {!vkOk && !emailOk && (
-          <p style={{ fontSize: 13, color: "var(--ink-tertiary)", marginTop: 6 }}>
-            Каналы ещё не настроены — обратитесь к разработчику.
-          </p>
-        )}
       </div>
 
       {/* Смена пароля админа */}
@@ -197,7 +222,7 @@ export default function SettingsPage() {
       </div>
 
       <p style={{ fontSize: 12, color: "var(--ink-tertiary)", maxWidth: 520, marginTop: 20 }}>
-        Для разработчика: техническая настройка (обмен, ВК-ключ, SMTP) — на странице{" "}
+        Для разработчика: ключ сообщества ВК и SMTP-сервер — на странице{" "}
         <a href="/admin/dev" style={{ color: "var(--ink-secondary)", textDecoration: "underline" }}>/admin/dev</a>.
       </p>
     </AdminShell>

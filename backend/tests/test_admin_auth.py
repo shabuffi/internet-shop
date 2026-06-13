@@ -79,10 +79,11 @@ def test_dev_settings_requires_auth(client):
     assert client.get("/api/v1/admin/dev/settings").status_code == 401
 
 
-def test_dev_settings_hashes_exchange_password(client, db_session, monkeypatch):
-    """exchange_password сохраняется как bcrypt-хеш (через страницу разработчика)."""
-    assert _dev_login(client, monkeypatch).status_code == 200
-    client.post("/api/v1/admin/dev/settings", json={"exchange_password": "secret123"})
+def test_owner_settings_hashes_exchange_password(client, db_session):
+    """exchange_password (обмен МойСклад) задаётся владельцем и хранится как bcrypt-хеш."""
+    _make_admin(db_session)
+    client.post("/api/v1/admin/login", json={"username": "admin", "password": "password123"})
+    client.post("/api/v1/admin/settings", json={"exchange_password": "secret123"})
 
     row = db_session.get(ShopSettings, "exchange_password")
     assert row is not None
@@ -90,11 +91,20 @@ def test_dev_settings_hashes_exchange_password(client, db_session, monkeypatch):
     assert row.value.startswith("$2")      # признак bcrypt-хеша
 
 
-def test_dev_settings_saves_vk(client, db_session, monkeypatch):
-    _dev_login(client, monkeypatch)
-    client.post("/api/v1/admin/dev/settings", json={"vk_group_token": "vk1.a.X", "vk_peer_id": "555"})
-    assert db_session.get(ShopSettings, "vk_group_token").value == "vk1.a.X"
+def test_owner_settings_saves_vk_peer_and_email(client, db_session):
+    """Владелец вводит свой id ВК и email; они сохраняются."""
+    _make_admin(db_session)
+    client.post("/api/v1/admin/login", json={"username": "admin", "password": "password123"})
+    client.post("/api/v1/admin/settings", json={"vk_peer_id": "555", "notify_email": "o@mail.ru"})
     assert db_session.get(ShopSettings, "vk_peer_id").value == "555"
+    assert db_session.get(ShopSettings, "notify_email").value == "o@mail.ru"
+
+
+def test_dev_settings_saves_vk_token(client, db_session, monkeypatch):
+    """Разработчик задаёт ключ сообщества ВК (peer_id — у владельца)."""
+    _dev_login(client, monkeypatch)
+    client.post("/api/v1/admin/dev/settings", json={"vk_group_token": "vk1.a.X"})
+    assert db_session.get(ShopSettings, "vk_group_token").value == "vk1.a.X"
 
 
 def test_dev_wipe_catalog_requires_auth(client):

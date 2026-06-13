@@ -256,14 +256,10 @@ def dev_logout(response: Response):
 
 @router.get("/dev/settings")
 def get_dev_settings(db: Session = Depends(get_db), _=Depends(_get_current_dev)):
-    """Технические настройки (обмен / ВК / SMTP) для страницы разработчика. Секреты маскируем."""
+    """Технические настройки: ключ сообщества ВК + SMTP-сервер. Секреты маскируем."""
     return {
-        "exchange_login":     _get_setting(db, "exchange_login"),
-        "exchange_password":  "***" if _get_setting(db, "exchange_password") else "",
         "vk_group_token":     "***" if _get_setting(db, "vk_group_token") else "",
-        "vk_peer_id":         _get_setting(db, "vk_peer_id"),
         "vk_env":             bool(settings.VK_GROUP_TOKEN and settings.VK_PEER_ID),
-        "notify_email":       _get_setting(db, "notify_email"),
         "smtp_host":          _get_setting(db, "smtp_host"),
         "smtp_port":          _get_setting(db, "smtp_port", "587"),
         "smtp_user":          _get_setting(db, "smtp_user"),
@@ -333,19 +329,15 @@ def wipe_catalog(db: Session = Depends(get_db), _=Depends(_get_current_dev)):
 
 @router.post("/dev/settings")
 def save_dev_settings(body: dict, db: Session = Depends(get_db), _=Depends(_get_current_dev)):
-    """Сохраняет технические настройки. Поля ``***`` пропускаются; пароль обмена хешируется."""
+    """Сохраняет технические настройки (ключ ВК + SMTP). Поля ``***`` пропускаются."""
     allowed = {
-        "exchange_login", "exchange_password",
-        "vk_group_token", "vk_peer_id", "notify_email",
+        "vk_group_token",
         "smtp_host", "smtp_port", "smtp_user", "smtp_password", "smtp_from",
     }
     for key, value in body.items():
         if key not in allowed or value == "***":
             continue
-        if key == "exchange_password":
-            _set_setting(db, key, _hash_password(str(value)))
-        else:
-            _set_setting(db, key, str(value))
+        _set_setting(db, key, str(value))
     db.commit()
     return {"message": "Настройки сохранены"}
 
@@ -405,9 +397,15 @@ def get_settings(db: Session = Depends(get_db), _=Depends(_get_current_admin)):
         "contact_hours":      _get_setting(db, "contact_hours"),
         # Условия доставки — единый текст для всех товаров (показывается на карточке товара)
         "delivery_info":      _get_setting(db, "delivery_info"),
-        # Статусы каналов — настраиваются на странице «Разработчик», тут только «подключено?»
-        "vk_configured":      bool(vk["vk_token"] and vk["vk_peer"]),
-        "email_configured":   bool(smtp["host"] and smtp["user"] and smtp["password"]),
+        # Обмен с МойСклад — выдуманная пара логин/пароль (не от аккаунта МойСклад)
+        "exchange_login":     _get_setting(db, "exchange_login"),
+        "exchange_password":  "***" if _get_setting(db, "exchange_password") else "",
+        # Владелец вводит свой id ВК и email; ключ сообщества/SMTP — на странице разработчика
+        "vk_peer_id":         _get_setting(db, "vk_peer_id"),
+        "notify_email":       _get_setting(db, "notify_email"),
+        # «Техническую часть» канала (ключ ВК / SMTP) задал разработчик?
+        "vk_ready":           bool(vk["vk_token"]),
+        "email_ready":        bool(smtp["host"] and smtp["user"] and smtp["password"]),
     }
 
 
@@ -429,11 +427,18 @@ def save_settings(body: dict, db: Session = Depends(get_db), _=Depends(_get_curr
         "shop_name",
         "contact_phone", "contact_email", "contact_hours",
         "delivery_info",
+        # обмен с МойСклад + личные идентификаторы получателя (id ВК, email)
+        "exchange_login", "exchange_password",
+        "vk_peer_id", "notify_email",
     }
     for key, value in body.items():
         if key not in allowed or value == "***":
             continue
-        _set_setting(db, key, str(value))
+        # exchange_password — входящий секрет обмена: храним bcrypt-хеш, не открытый текст
+        if key == "exchange_password":
+            _set_setting(db, key, _hash_password(str(value)))
+        else:
+            _set_setting(db, key, str(value))
     db.commit()
     return {"message": "Настройки сохранены"}
 
