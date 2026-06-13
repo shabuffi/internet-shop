@@ -66,6 +66,17 @@ export default function DevPage() {
     setAuthed(false); setForm(EMPTY);
   }
 
+  const [diag, setDiag] = useState<string>("");
+  async function handleDiagnose() {
+    setDiag("Загрузка…");
+    try {
+      const d = await devFetch<unknown>("/dev/diagnose-import");
+      setDiag(JSON.stringify(d, null, 2));
+    } catch (err) {
+      setDiag(err instanceof Error ? err.message : "Ошибка");
+    }
+  }
+
   const [wipeMsg, setWipeMsg] = useState("");
   async function handleWipe() {
     if (!confirm("Удалить ВСЕ товары и категории? Заказы сохранятся. Нужно при смене склада — потом запустите обмен заново.")) return;
@@ -204,6 +215,25 @@ export default function DevPage() {
               Проверить отправку (ВК / Email) можно у владельца в Настройках — кнопками «Отправить тест».
             </p>
           </form>
+
+          {/* Диагностика обмена — что прислал склад в последнем import.xml */}
+          <div style={{ marginTop: 28, paddingTop: 20, borderTop: "1px solid var(--hairline-soft)" }}>
+            <p style={{ fontWeight: 600, fontSize: 14, marginBottom: 4 }}>Диагностика обмена</p>
+            <p style={{ fontSize: 13, color: "var(--ink-secondary)", marginBottom: 12 }}>
+              Показывает, что прислал склад в последнем обмене (есть ли описание/артикул/картинки и в каких тегах).
+              Сначала запустите обмен в МойСклад, потом нажмите.
+            </p>
+            <button type="button" onClick={handleDiagnose}
+              style={{ padding: "0 16px", height: 38, borderRadius: "var(--radius-md)", cursor: "pointer",
+                border: "1px solid var(--graphite)", background: "transparent", color: "var(--ink)", fontWeight: 600, fontSize: 14 }}>
+              Показать диагностику
+            </button>
+            {diag && (
+              <pre style={{ marginTop: 12, padding: 14, background: "var(--cloud)", borderRadius: "var(--radius-md)",
+                border: "1px solid var(--hairline-soft)", fontSize: 12, lineHeight: 1.5, overflow: "auto", maxHeight: 360,
+                whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{diag}</pre>
+            )}
+          </div>
 
           {/* Опасная зона — очистка каталога (при смене склада) */}
           <div style={{ marginTop: 28, paddingTop: 20, borderTop: "1px solid var(--hairline-soft)" }}>

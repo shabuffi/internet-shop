@@ -272,6 +272,49 @@ def get_dev_settings(db: Session = Depends(get_db), _=Depends(_get_current_dev))
     }
 
 
+@router.get("/dev/diagnose-import")
+def diagnose_import(_=Depends(_get_current_dev)):
+    """Диагностика последнего import.xml: что и в каких тегах прислал склад.
+
+    Помогает понять, почему не подтянулись описание/артикул/картинки конкретного склада.
+    Сохранённую копию кладёт сам обмен (exchange.py) при приёме файла.
+
+    Returns:
+        Кол-во товаров, разбор первых трёх и сырой XML первого <Товар>.
+    """
+    from app.core.redis_client import redis_client
+    from app.integrations.moysklad.commerceml_parser import parse_import_xml
+    from lxml import etree
+
+    raw = redis_client.get("exchange:diag:import.xml")
+    if not raw:
+        return {"error": "Нет сохранённого import.xml — сначала запустите обмен в МойСклад, потом откройте эту страницу."}
+
+    catalog = parse_import_xml(raw)
+    sample = [
+        {
+            "name": p.name,
+            "article": p.article,
+            "has_description": bool(p.description),
+            "description_preview": (p.description or "")[:160],
+            "images": p.images,
+        }
+        for p in catalog.products[:3]
+    ]
+
+    first_xml = None
+    try:
+        root = etree.fromstring(raw)
+        for el in root.iter():
+            if el.tag.endswith("Товар"):
+                first_xml = etree.tostring(el, encoding="unicode")[:4000]
+                break
+    except Exception:
+        pass
+
+    return {"products": len(catalog.products), "sample": sample, "first_product_xml": first_xml}
+
+
 @router.delete("/dev/catalog")
 def wipe_catalog(db: Session = Depends(get_db), _=Depends(_get_current_dev)):
     """Полностью очищает каталог (товары + категории) — для пере-подключения склада.

@@ -332,6 +332,8 @@ async def exchange_post(
         # XML каталога/предложений — складываем сырьё в Redis (парсится на шаге import)
         if filename in ("import.xml", "offers.xml"):
             redis_client.set(_file_key(filename), body, ex=_TTL)
+            # Копия для диагностики на /admin/dev (не удаляется шагом import), сутки
+            redis_client.set(f"exchange:diag:{filename}", body, ex=86400)
             logger.info("Received file: %s (%d bytes)", filename, len(body))
             return "success"
         # Картинка товара (опция «Выгружать изображения») — сохраняем в медиа-хранилище
