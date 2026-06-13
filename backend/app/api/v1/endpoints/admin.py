@@ -1,6 +1,7 @@
 """Admin panel API."""
 
 import bcrypt
+import hmac
 import jwt
 from datetime import datetime, timedelta, timezone
 from typing import Literal
@@ -200,7 +201,97 @@ def setup_admin(body: dict, db: Session = Depends(get_db)):
     return {"message": f"Администратор {username} создан"}
 
 
-# ─── Settings ──────────────────────────────────────────────────────
+# ─── Страница «Разработчик» (отдельный пароль) ─────────────────────
+
+DEV_COOKIE_NAME = "dev_token"
+
+
+def _create_dev_token() -> str:
+    """JWT для dev-страницы (claim ``scope=dev``), срок жизни 24 часа."""
+    payload = {"scope": "dev", "exp": datetime.now(timezone.utc) + timedelta(hours=24)}
+    return jwt.encode(payload, settings.SECRET_KEY, algorithm="HS256")
+
+
+def _get_current_dev(request: Request) -> bool:
+    """Зависимость: пускает только при валидном dev-токене (страница «Разработчик»)."""
+    token = request.cookies.get(DEV_COOKIE_NAME)
+    if not token:
+        auth = request.headers.get("Authorization", "")
+        token = auth[7:] if auth.startswith("Bearer ") else None
+    if not token:
+        raise HTTPException(status_code=401, detail="Не авторизовано (разработчик)")
+    try:
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=["HS256"])
+    except jwt.InvalidTokenError:
+        raise HTTPException(status_code=401, detail="Неверный токен")
+    if payload.get("scope") != "dev":
+        raise HTTPException(status_code=401, detail="Неверный токен")
+    return True
+
+
+@router.get("/dev/status")
+def dev_status():
+    """Доступна ли страница «Разработчик» (задан ли DEV_PASSWORD на сервере)."""
+    return {"enabled": bool(settings.DEV_PASSWORD)}
+
+
+@router.post("/dev/login")
+def dev_login(body: dict, response: Response):
+    """Вход на страницу «Разработчик» по отдельному паролю (``DEV_PASSWORD`` из .env.prod)."""
+    if not settings.DEV_PASSWORD:
+        raise HTTPException(status_code=403, detail="Страница разработчика отключена (нет DEV_PASSWORD)")
+    if not hmac.compare_digest(str(body.get("password", "")), settings.DEV_PASSWORD):
+        raise HTTPException(status_code=401, detail="Неверный пароль")
+    response.set_cookie(DEV_COOKIE_NAME, _create_dev_token(), httponly=True,
+                        samesite="lax", secure=False, max_age=COOKIE_MAX_AGE, path="/")
+    return {"ok": True}
+
+
+@router.post("/dev/logout")
+def dev_logout(response: Response):
+    """Выход со страницы «Разработчик»."""
+    response.delete_cookie(DEV_COOKIE_NAME, path="/")
+    return {"ok": True}
+
+
+@router.get("/dev/settings")
+def get_dev_settings(db: Session = Depends(get_db), _=Depends(_get_current_dev)):
+    """Технические настройки (обмен / ВК / SMTP) для страницы разработчика. Секреты маскируем."""
+    return {
+        "exchange_login":     _get_setting(db, "exchange_login"),
+        "exchange_password":  "***" if _get_setting(db, "exchange_password") else "",
+        "vk_group_token":     "***" if _get_setting(db, "vk_group_token") else "",
+        "vk_peer_id":         _get_setting(db, "vk_peer_id"),
+        "vk_env":             bool(settings.VK_GROUP_TOKEN and settings.VK_PEER_ID),
+        "notify_email":       _get_setting(db, "notify_email"),
+        "smtp_host":          _get_setting(db, "smtp_host"),
+        "smtp_port":          _get_setting(db, "smtp_port", "587"),
+        "smtp_user":          _get_setting(db, "smtp_user"),
+        "smtp_password":      "***" if _get_setting(db, "smtp_password") else "",
+        "smtp_from":          _get_setting(db, "smtp_from"),
+    }
+
+
+@router.post("/dev/settings")
+def save_dev_settings(body: dict, db: Session = Depends(get_db), _=Depends(_get_current_dev)):
+    """Сохраняет технические настройки. Поля ``***`` пропускаются; пароль обмена хешируется."""
+    allowed = {
+        "exchange_login", "exchange_password",
+        "vk_group_token", "vk_peer_id", "notify_email",
+        "smtp_host", "smtp_port", "smtp_user", "smtp_password", "smtp_from",
+    }
+    for key, value in body.items():
+        if key not in allowed or value == "***":
+            continue
+        if key == "exchange_password":
+            _set_setting(db, key, _hash_password(str(value)))
+        else:
+            _set_setting(db, key, str(value))
+    db.commit()
+    return {"message": "Настройки сохранены"}
+
+
+# ─── Settings (для владельца) ──────────────────────────────────────
 
 def _get_setting(db: Session, key: str, default: str = "") -> str:
     """Читает значение настройки магазина по ключу.
@@ -233,43 +324,38 @@ def _set_setting(db: Session, key: str, value: str):
 
 @router.get("/settings")
 def get_settings(db: Session = Depends(get_db), _=Depends(_get_current_admin)):
-    """Отдаёт настройки магазина для админки (пароли замаскированы как ``***``).
+    """Настройки для владельца: название, контакты + статусы каналов уведомлений.
+
+    Технические настройки (обмен / ВК-ключ / SMTP) живут на странице «Разработчик».
 
     Args:
         db: Сессия БД.
 
     Returns:
-        Словарь настроек: логин/пароль обмена, название магазина, креды уведомлений.
+        Название, контакты футера и флаги ``vk_configured`` / ``email_configured``.
     """
+    from app.integrations.notify import get_notify_config
+    from app.integrations.email import get_smtp_config
+    vk = get_notify_config()
+    smtp = get_smtp_config()
     return {
-        "exchange_login":     _get_setting(db, "exchange_login"),
-        "exchange_password":  "***" if _get_setting(db, "exchange_password") else "",
         "shop_name":          _get_setting(db, "shop_name", "Магазин"),
         # Контакты в футере сайта (видны покупателям)
         "contact_phone":      _get_setting(db, "contact_phone"),
         "contact_email":      _get_setting(db, "contact_email"),
         "contact_hours":      _get_setting(db, "contact_hours"),
-        # Уведомления о заказах: токены маскируем, id адресатов — нет (не секрет)
-        "vk_group_token":     "***" if _get_setting(db, "vk_group_token") else "",
-        "vk_peer_id":         _get_setting(db, "vk_peer_id"),
-        # ВК настроен на сервере (.env.prod) — тогда поля токена/peer_id в админке прячем
-        "vk_builtin":         bool(settings.VK_GROUP_TOKEN and settings.VK_PEER_ID),
-        "notify_email":       _get_setting(db, "notify_email"),
-        # SMTP для email-уведомления владельцу: пароль маскируем
-        "smtp_host":          _get_setting(db, "smtp_host"),
-        "smtp_port":          _get_setting(db, "smtp_port", "587"),
-        "smtp_user":          _get_setting(db, "smtp_user"),
-        "smtp_password":      "***" if _get_setting(db, "smtp_password") else "",
-        "smtp_from":          _get_setting(db, "smtp_from"),
+        # Статусы каналов — настраиваются на странице «Разработчик», тут только «подключено?»
+        "vk_configured":      bool(vk["vk_token"] and vk["vk_peer"]),
+        "email_configured":   bool(smtp["host"] and smtp["user"] and smtp["password"]),
     }
 
 
 @router.post("/settings")
 def save_settings(body: dict, db: Session = Depends(get_db), _=Depends(_get_current_admin)):
-    """Сохраняет настройки магазина.
+    """Сохраняет настройки владельца (название + контакты футера).
 
-    Поля со значением ``***`` пропускаются (оставить как было). ``exchange_password``
-    сохраняется как bcrypt-хеш. Неизвестные ключи игнорируются.
+    Технические поля сюда не входят — они на странице «Разработчик». Неизвестные ключи
+    игнорируются.
 
     Args:
         body: Словарь ``{ключ: значение}`` из формы настроек.
@@ -279,24 +365,13 @@ def save_settings(body: dict, db: Session = Depends(get_db), _=Depends(_get_curr
         Сообщение об успешном сохранении.
     """
     allowed = {
-        "exchange_login", "exchange_password",
         "shop_name",
-        # контакты в футере сайта
         "contact_phone", "contact_email", "contact_hours",
-        # уведомления — токены/адресаты владельца (ВК + email)
-        "vk_group_token", "vk_peer_id",
-        "notify_email",
-        # SMTP — почтовый сервер для email-уведомления владельцу
-        "smtp_host", "smtp_port", "smtp_user", "smtp_password", "smtp_from",
     }
     for key, value in body.items():
         if key not in allowed or value == "***":
             continue
-        # exchange_password — входящий секрет обмена: храним bcrypt-хеш, не открытый текст.
-        if key == "exchange_password":
-            _set_setting(db, key, _hash_password(str(value)))
-        else:
-            _set_setting(db, key, str(value))
+        _set_setting(db, key, str(value))
     db.commit()
     return {"message": "Настройки сохранены"}
 

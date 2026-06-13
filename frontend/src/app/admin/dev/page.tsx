@@ -1,0 +1,199 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { devFetch } from "@/lib/adminApi";
+
+// Техническая форма (обмен / ВК / SMTP). Поля приходят с /dev/settings.
+interface DevForm {
+  exchange_login: string; exchange_password: string;
+  vk_group_token: string; vk_peer_id: string; vk_env: boolean;
+  notify_email: string;
+  smtp_host: string; smtp_port: string; smtp_user: string; smtp_password: string; smtp_from: string;
+}
+
+const EMPTY: DevForm = {
+  exchange_login: "", exchange_password: "", vk_group_token: "", vk_peer_id: "", vk_env: false,
+  notify_email: "", smtp_host: "", smtp_port: "587", smtp_user: "", smtp_password: "", smtp_from: "",
+};
+
+const card: React.CSSProperties = {
+  background: "var(--canvas)", borderRadius: "var(--radius-lg)", border: "1px solid var(--hairline-soft)",
+  padding: "28px 32px", maxWidth: 520, margin: "0 auto",
+};
+const field: React.CSSProperties = { display: "flex", flexDirection: "column", gap: 6, marginBottom: 16 };
+
+export default function DevPage() {
+  const [enabled, setEnabled] = useState<boolean | null>(null);
+  const [authed, setAuthed] = useState(false);
+  const [password, setPassword] = useState("");
+  const [loginErr, setLoginErr] = useState("");
+  const [form, setForm] = useState<DevForm>(EMPTY);
+  const [saved, setSaved] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  async function loadSettings(): Promise<boolean> {
+    try {
+      const d = await devFetch<DevForm>("/dev/settings");
+      setForm(d); setAuthed(true); return true;
+    } catch { return false; }
+  }
+
+  useEffect(() => {
+    devFetch<{ enabled: boolean }>("/dev/status").then(d => setEnabled(d.enabled)).catch(() => setEnabled(false));
+    loadSettings();
+  }, []);
+
+  async function handleLogin(e: React.FormEvent) {
+    e.preventDefault(); setLoginErr("");
+    try {
+      await devFetch("/dev/login", { method: "POST", body: JSON.stringify({ password }) });
+      setPassword(""); await loadSettings();
+    } catch (err) {
+      setLoginErr(err instanceof Error ? err.message : "Ошибка входа");
+    }
+  }
+
+  async function handleSave(e: React.FormEvent) {
+    e.preventDefault(); setSaved(false); setLoading(true);
+    try {
+      await devFetch("/dev/settings", { method: "POST", body: JSON.stringify(form) });
+      setSaved(true); setTimeout(() => setSaved(false), 3000);
+    } catch { /* ignore */ } finally { setLoading(false); }
+  }
+
+  async function handleLogout() {
+    await devFetch("/dev/logout", { method: "POST" }).catch(() => {});
+    setAuthed(false); setForm(EMPTY);
+  }
+
+  const set = (k: keyof DevForm) => (e: React.ChangeEvent<HTMLInputElement>) =>
+    setForm(p => ({ ...p, [k]: e.target.value }));
+
+  return (
+    <div style={{ minHeight: "100vh", background: "var(--cloud)", padding: "48px 20px" }}>
+      <div style={{ maxWidth: 520, margin: "0 auto 20px" }}>
+        <div style={{ fontSize: 12, color: "var(--ink-tertiary)", letterSpacing: ".06em", textTransform: "uppercase" }}>Служебное</div>
+        <h1 style={{ fontSize: 24, fontWeight: 700, letterSpacing: -0.3 }}>Разработчик</h1>
+        <p style={{ fontSize: 13, color: "var(--ink-secondary)", marginTop: 4 }}>
+          Техническая настройка интеграции. Эта страница защищена отдельным паролем — владельцу магазина сюда не нужно.
+        </p>
+      </div>
+
+      {enabled === false && !authed ? (
+        <div style={card}>
+          <p style={{ fontSize: 14, color: "var(--ink-secondary)" }}>
+            Страница отключена. Задайте <code>DEV_PASSWORD</code> в <code>.env.prod</code> на сервере и перезапустите.
+          </p>
+        </div>
+      ) : !authed ? (
+        <div style={card}>
+          <form onSubmit={handleLogin}>
+            <div style={field}>
+              <label className="form-label">Пароль разработчика</label>
+              <input className="form-input" type="password" value={password}
+                onChange={e => setPassword(e.target.value)} placeholder="DEV_PASSWORD" autoFocus />
+            </div>
+            {loginErr && <p className="form-error">{loginErr}</p>}
+            <button className="btn btn-primary" type="submit" style={{ marginTop: 4 }}>Войти</button>
+          </form>
+        </div>
+      ) : (
+        <div style={card}>
+          <form onSubmit={handleSave}>
+            {/* Обмен */}
+            <p style={{ fontWeight: 600, fontSize: 16, marginBottom: 6 }}>Обмен с МойСклад (CommerceML)</p>
+            <p style={{ fontSize: 13, color: "var(--ink-secondary)", marginBottom: 16 }}>
+              Выдуманная пара логин/пароль обмена — те же значения вписываются в МойСклад (не от аккаунта МойСклад).
+            </p>
+            <div style={field}>
+              <label className="form-label">Логин обмена</label>
+              <input className="form-input" value={form.exchange_login} onChange={set("exchange_login")}
+                placeholder="например, myshop_exchange" autoComplete="off" />
+            </div>
+            <div style={field}>
+              <label className="form-label">Пароль обмена</label>
+              <input className="form-input" type="password" value={form.exchange_password} onChange={set("exchange_password")}
+                placeholder="новый пароль или оставьте ***" autoComplete="off" />
+            </div>
+
+            <div style={{ height: 1, background: "var(--hairline-soft)", margin: "20px 0" }} />
+
+            {/* ВК */}
+            <p style={{ fontWeight: 600, fontSize: 16, marginBottom: 16 }}>ВКонтакте</p>
+            {form.vk_env && (
+              <p style={{ fontSize: 13, color: "var(--stock)", marginBottom: 12 }}>
+                ✓ ВК задан на сервере (.env.prod) — эти поля игнорируются, можно не заполнять.
+              </p>
+            )}
+            <div style={field}>
+              <label className="form-label">Ключ доступа сообщества</label>
+              <input className="form-input" type="password" value={form.vk_group_token} onChange={set("vk_group_token")}
+                placeholder="vk1.a.… или оставьте ***" autoComplete="off" />
+            </div>
+            <div style={field}>
+              <label className="form-label">peer_id получателя (id ВК владельца)</label>
+              <input className="form-input" value={form.vk_peer_id} onChange={set("vk_peer_id")}
+                placeholder="например, 123456789" autoComplete="off" />
+            </div>
+
+            <div style={{ height: 1, background: "var(--hairline-soft)", margin: "20px 0" }} />
+
+            {/* Email / SMTP */}
+            <p style={{ fontWeight: 600, fontSize: 16, marginBottom: 16 }}>Email (SMTP)</p>
+            <div style={field}>
+              <label className="form-label">Email владельца (куда слать заказы)</label>
+              <input className="form-input" type="email" value={form.notify_email} onChange={set("notify_email")}
+                placeholder="по умолчанию = SMTP-логин" autoComplete="off" />
+            </div>
+            <div style={field}>
+              <label className="form-label">SMTP-сервер (host)</label>
+              <input className="form-input" value={form.smtp_host} onChange={set("smtp_host")}
+                placeholder="smtp.yandex.ru" autoComplete="off" />
+            </div>
+            <div style={field}>
+              <label className="form-label">Порт</label>
+              <input className="form-input" value={form.smtp_port} onChange={set("smtp_port")}
+                placeholder="587" autoComplete="off" />
+            </div>
+            <div style={field}>
+              <label className="form-label">Логин (email отправителя)</label>
+              <input className="form-input" value={form.smtp_user} onChange={set("smtp_user")}
+                placeholder="shop@yandex.ru" autoComplete="off" />
+            </div>
+            <div style={field}>
+              <label className="form-label">Пароль SMTP (пароль приложения)</label>
+              <input className="form-input" type="password" value={form.smtp_password} onChange={set("smtp_password")}
+                placeholder="пароль приложения или оставьте ***" autoComplete="off" />
+            </div>
+            <div style={field}>
+              <label className="form-label">Адрес «От кого» (необязательно)</label>
+              <input className="form-input" type="email" value={form.smtp_from} onChange={set("smtp_from")}
+                placeholder="оставьте пустым (= логин)" autoComplete="off" />
+            </div>
+
+            {saved && (
+              <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", marginBottom: 12,
+                background: "var(--stock-soft)", border: "1px solid var(--stock)", borderRadius: "var(--radius-md)",
+                color: "var(--stock)", fontSize: 14, fontWeight: 600 }}>
+                <span>✓</span> Сохранено
+              </div>
+            )}
+            <div style={{ display: "flex", gap: 12, marginTop: 8 }}>
+              <button className="btn btn-primary" type="submit" disabled={loading}>
+                {loading ? "Сохраняем…" : "Сохранить"}
+              </button>
+              <button type="button" onClick={handleLogout}
+                style={{ padding: "0 18px", height: 40, borderRadius: "var(--radius-md)", cursor: "pointer",
+                  border: "1px solid var(--graphite)", background: "transparent", color: "var(--ink)", fontWeight: 600, fontSize: 14 }}>
+                Выйти
+              </button>
+            </div>
+            <p style={{ fontSize: 12, color: "var(--ink-secondary)", marginTop: 14 }}>
+              Проверить отправку (ВК / Email) можно у владельца в Настройках — кнопками «Отправить тест».
+            </p>
+          </form>
+        </div>
+      )}
+    </div>
+  );
+}

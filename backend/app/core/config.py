@@ -30,6 +30,10 @@ class Settings(BaseSettings):
     DEBUG: bool = False
     ALLOWED_ORIGINS: list[str] = ["http://localhost:3000"]
 
+    # Пароль страницы «Разработчик» (техническая настройка: обмен, ВК, SMTP).
+    # Задаётся в .env.prod. Пустой — страница недоступна.
+    DEV_PASSWORD: str = ""
+
     # Уведомления о новых заказах (фолбэк к значениям из админки / ShopSettings)
     VK_GROUP_TOKEN: str = ""
     VK_PEER_ID: str = ""

@@ -47,16 +47,54 @@ def test_logout_clears_cookie(client, db_session):
     assert client.get("/api/v1/admin/me").status_code == 401
 
 
-def test_settings_hashes_exchange_password(client, db_session):
-    """exchange_password сохраняется в БД как bcrypt-хеш, не открытым текстом."""
-    _make_admin(db_session)
-    client.post("/api/v1/admin/login", json={"username": "admin", "password": "password123"})
-    client.post("/api/v1/admin/settings", json={"exchange_password": "secret123"})
+# ─── Страница «Разработчик» (отдельный пароль) ───────────────────────────────
+
+def _dev_login(client, monkeypatch, password="devpass"):
+    from app.api.v1.endpoints import admin as admin_mod
+    monkeypatch.setattr(admin_mod.settings, "DEV_PASSWORD", password)
+    return client.post("/api/v1/admin/dev/login", json={"password": password})
+
+
+def test_dev_status_reflects_password(client, monkeypatch):
+    from app.api.v1.endpoints import admin as admin_mod
+    monkeypatch.setattr(admin_mod.settings, "DEV_PASSWORD", "")
+    assert client.get("/api/v1/admin/dev/status").json()["enabled"] is False
+    monkeypatch.setattr(admin_mod.settings, "DEV_PASSWORD", "devpass")
+    assert client.get("/api/v1/admin/dev/status").json()["enabled"] is True
+
+
+def test_dev_login_wrong_password_401(client, monkeypatch):
+    from app.api.v1.endpoints import admin as admin_mod
+    monkeypatch.setattr(admin_mod.settings, "DEV_PASSWORD", "devpass")
+    assert client.post("/api/v1/admin/dev/login", json={"password": "WRONG"}).status_code == 401
+
+
+def test_dev_login_disabled_when_no_password(client, monkeypatch):
+    from app.api.v1.endpoints import admin as admin_mod
+    monkeypatch.setattr(admin_mod.settings, "DEV_PASSWORD", "")
+    assert client.post("/api/v1/admin/dev/login", json={"password": "x"}).status_code == 403
+
+
+def test_dev_settings_requires_auth(client):
+    assert client.get("/api/v1/admin/dev/settings").status_code == 401
+
+
+def test_dev_settings_hashes_exchange_password(client, db_session, monkeypatch):
+    """exchange_password сохраняется как bcrypt-хеш (через страницу разработчика)."""
+    assert _dev_login(client, monkeypatch).status_code == 200
+    client.post("/api/v1/admin/dev/settings", json={"exchange_password": "secret123"})
 
     row = db_session.get(ShopSettings, "exchange_password")
     assert row is not None
     assert row.value != "secret123"        # не открытый текст
     assert row.value.startswith("$2")      # признак bcrypt-хеша
+
+
+def test_dev_settings_saves_vk(client, db_session, monkeypatch):
+    _dev_login(client, monkeypatch)
+    client.post("/api/v1/admin/dev/settings", json={"vk_group_token": "vk1.a.X", "vk_peer_id": "555"})
+    assert db_session.get(ShopSettings, "vk_group_token").value == "vk1.a.X"
+    assert db_session.get(ShopSettings, "vk_peer_id").value == "555"
 
 
 def test_change_password_success(client, db_session):

@@ -49,3 +49,19 @@ export async function adminUpload<T>(path: string, formData: FormData): Promise<
 export async function adminLogout(): Promise<void> {
   await fetch(`${API}/logout`, { method: "POST", credentials: "same-origin" }).catch(() => {});
 }
+
+// Запрос к API без редиректа на /admin/login при 401 (для страницы «Разработчик»,
+// у которой свой пароль). Бросает Error с текстом detail при не-2xx.
+export async function devFetch<T>(path: string, init?: RequestInit): Promise<T> {
+  const res = await fetch(`${API}${path}`, {
+    ...init,
+    headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) },
+    credentials: "same-origin",
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: res.statusText }));
+    throw Object.assign(new Error(err.detail ?? "Ошибка"), { status: res.status });
+  }
+  return res.json();
+}
