@@ -318,7 +318,23 @@ def diagnose_import(db: Session = Depends(get_db), _=Depends(_get_current_dev)):
     except Exception:
         pass
 
+    # Был ли ХОТЬ ОДИН заход обмена с <Картинка> (его храним отдельно, чтобы не перезатёрся)
+    raw_img = redis_client.get("exchange:diag:import_with_kartinka.xml")
+    ever_sent_images = bool(raw_img)
+    img_xml_sample = None
+    if raw_img:
+        try:
+            ic = parse_import_xml(raw_img)
+            wi = next((p for p in ic.products if p.images), None)
+            if wi:
+                img_xml_sample = {"name": wi.name, "images": wi.images}
+        except Exception:
+            pass
+
     return {
+        "current_import_xml_has_kartinka": "Картинка".encode() in raw,
+        "ever_received_import_with_kartinka": ever_sent_images,
+        "image_in_kartinka_round_sample": img_xml_sample,
         "products": len(catalog.products),
         "products_with_images_in_xml": len(with_imgs),
         "image_files_on_disk": len(media_files),
