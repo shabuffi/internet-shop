@@ -343,7 +343,18 @@ def wipe_catalog(db: Session = Depends(get_db), _=Depends(_get_current_dev)):
     n_products = db.query(Product).delete(synchronize_session=False)
     n_categories = db.query(Category).delete(synchronize_session=False)
     db.commit()
-    return {"products": n_products, "categories": n_categories}
+    # Чистим файлы картинок на диске — иначе «осиротевшие» от удалённых товаров копятся
+    removed_files = 0
+    try:
+        for f in os.listdir(settings.MEDIA_DIR):
+            try:
+                os.remove(os.path.join(settings.MEDIA_DIR, f))
+                removed_files += 1
+            except OSError:
+                pass
+    except OSError:
+        pass
+    return {"products": n_products, "categories": n_categories, "files": removed_files}
 
 
 @router.post("/dev/settings")

@@ -80,8 +80,8 @@ export default function DevPage() {
     if (!confirm("Удалить ВСЕ товары и категории? Заказы сохранятся. Нужно при смене склада — потом запустите обмен заново.")) return;
     setWipeMsg("");
     try {
-      const r = await devFetch<{ products: number; categories: number }>("/dev/catalog", { method: "DELETE" });
-      setWipeMsg(`Удалено товаров: ${r.products}, категорий: ${r.categories}. Запустите обмен в МойСклад заново.`);
+      const r = await devFetch<{ products: number; categories: number; files: number }>("/dev/catalog", { method: "DELETE" });
+      setWipeMsg(`Удалено товаров: ${r.products}, категорий: ${r.categories}, файлов фото: ${r.files}. Запустите обмен в МойСклад заново.`);
     } catch (err) {
       setWipeMsg(err instanceof Error ? err.message : "Ошибка");
     }
