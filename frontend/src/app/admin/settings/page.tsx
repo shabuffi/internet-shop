@@ -6,10 +6,11 @@ import { adminFetch } from "@/lib/adminApi";
 
 interface OwnerSettings {
   shop_name: string; contact_phone: string; contact_email: string; contact_hours: string;
+  delivery_info: string;
   vk_configured?: boolean; email_configured?: boolean;
 }
 
-const EMPTY: OwnerSettings = { shop_name: "", contact_phone: "", contact_email: "", contact_hours: "" };
+const EMPTY: OwnerSettings = { shop_name: "", contact_phone: "", contact_email: "", contact_hours: "", delivery_info: "" };
 const CH_LABEL: Record<string, string> = { vk: "ВКонтакте", email: "Email" };
 
 export default function SettingsPage() {
@@ -130,6 +131,14 @@ export default function SettingsPage() {
             <label className="form-label">Часы работы (футер сайта)</label>
             <input className="form-input" value={form.contact_hours} onChange={set("contact_hours")} placeholder="Пн–Пт · 10:00–19:00" />
             <p style={{ fontSize: 12, color: "var(--ink-secondary)" }}>Пустые поля контактов в футере не показываются</p>
+          </div>
+
+          <div style={inputStyle}>
+            <label className="form-label">Доставка (на странице товара)</label>
+            <input className="form-input" value={form.delivery_info} onChange={set("delivery_info")} placeholder="например, 1–3 дня по России" />
+            <p style={{ fontSize: 12, color: "var(--ink-secondary)" }}>
+              Один текст для всех товаров. Пусто — строка «Доставка» на карточке не показывается.
+            </p>
           </div>
 
           {error && <p className="form-error">{error}</p>}

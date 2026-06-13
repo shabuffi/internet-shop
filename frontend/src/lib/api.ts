@@ -37,3 +37,12 @@ export async function getProduct(id: string): Promise<Product> {
 export async function getCategories(): Promise<Category[]> {
   return apiFetch<Category[]>("/products/categories");
 }
+
+export interface StoreInfo {
+  shop_name: string; contact_phone: string; contact_email: string; contact_hours: string;
+  delivery_info: string;
+}
+
+export async function getStoreInfo(): Promise<StoreInfo> {
+  return apiFetch<StoreInfo>("/admin/store-info");
+}

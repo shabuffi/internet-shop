@@ -2,7 +2,7 @@ export const dynamic = 'force-dynamic';
 
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getProduct } from "@/lib/api";
+import { getProduct, getStoreInfo } from "@/lib/api";
 import { formatPrice } from "@/lib/format";
 import AddToCartButton from "@/components/AddToCartButton";
 import ProductGallery from "@/components/ProductGallery";
@@ -46,12 +46,14 @@ export default async function ProductPage({ params }: Props) {
     notFound();
   }
 
+  const store = await getStoreInfo().catch(() => null);
   const inStock = product.available;
   const specs: [string, string][] = [
     ["Артикул", product.article || "—"],
     ["Категория", product.category?.name || "—"],
     ["Наличие", inStock ? "В наличии" : "Нет в наличии"],
-    ["Доставка", "1–3 дня"],
+    // Доставка — единый текст из настроек; пусто → строку не показываем
+    ...(store?.delivery_info ? [["Доставка", store.delivery_info] as [string, string]] : []),
   ];
 
   return (

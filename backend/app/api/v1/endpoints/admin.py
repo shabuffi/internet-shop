@@ -360,6 +360,8 @@ def get_settings(db: Session = Depends(get_db), _=Depends(_get_current_admin)):
         "contact_phone":      _get_setting(db, "contact_phone"),
         "contact_email":      _get_setting(db, "contact_email"),
         "contact_hours":      _get_setting(db, "contact_hours"),
+        # Условия доставки — единый текст для всех товаров (показывается на карточке товара)
+        "delivery_info":      _get_setting(db, "delivery_info"),
         # Статусы каналов — настраиваются на странице «Разработчик», тут только «подключено?»
         "vk_configured":      bool(vk["vk_token"] and vk["vk_peer"]),
         "email_configured":   bool(smtp["host"] and smtp["user"] and smtp["password"]),
@@ -383,6 +385,7 @@ def save_settings(body: dict, db: Session = Depends(get_db), _=Depends(_get_curr
     allowed = {
         "shop_name",
         "contact_phone", "contact_email", "contact_hours",
+        "delivery_info",
     }
     for key, value in body.items():
         if key not in allowed or value == "***":
@@ -708,6 +711,7 @@ def store_info_public(db: Session = Depends(get_db)):
         "contact_phone": _get_setting(db, "contact_phone"),
         "contact_email": _get_setting(db, "contact_email"),
         "contact_hours": _get_setting(db, "contact_hours"),
+        "delivery_info": _get_setting(db, "delivery_info"),
     }
 
 
