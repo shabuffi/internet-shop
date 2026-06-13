@@ -224,9 +224,10 @@ def _requisites(товар, ns: str = "") -> dict[str, str]:
     например ``<ЗначениеРеквизита><Наименование>Описание</Наименование>…``.
     """
     out: dict[str, str] = {}
-    reqs = товар.findall(_tag("ЗначениеРеквизита", ns))
+    # Реквизиты обычно вложены в <ЗначенияРеквизитов> — ищем на любой глубине (.//)
+    reqs = товар.findall(f".//{_tag('ЗначениеРеквизита', ns)}")
     if not reqs and ns:
-        reqs = товар.findall("ЗначениеРеквизита")
+        reqs = товар.findall(".//ЗначениеРеквизита")
     for req in reqs:
         name = _text(req, "Наименование", ns=ns)
         value = _text(req, "Значение", ns=ns)
@@ -245,7 +246,8 @@ def _parse_product(товар, ns: str = "") -> ParsedProduct | None:
     # Описание/артикул могут приходить как реквизиты, а не отдельными тегами — берём фолбэком
     reqs = _requisites(товар, ns=ns)
     description = (_text(товар, "Описание", ns=ns)
-                  or reqs.get("Описание") or reqs.get("ОписаниеВФорматеHTML"))
+                  or reqs.get("Описание") or reqs.get("ОписаниеВФорматеHTML")
+                  or reqs.get("Полное наименование"))
     article = _text(товар, "Артикул", ns=ns) or reqs.get("Артикул")
 
     category_id = None
