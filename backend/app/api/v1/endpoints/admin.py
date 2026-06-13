@@ -3,6 +3,7 @@
 import bcrypt
 import hmac
 import jwt
+import os
 from datetime import datetime, timedelta, timezone
 from typing import Literal
 
@@ -287,28 +288,44 @@ def diagnose_import(_=Depends(_get_current_dev)):
         return {"error": "Нет сохранённого import.xml — сначала запустите обмен в МойСклад, потом откройте эту страницу."}
 
     catalog = parse_import_xml(raw)
+    # Берём в пример товары С картинками, если такие есть (иначе первые три)
+    with_imgs = [p for p in catalog.products if p.images]
+    sample_src = (with_imgs or catalog.products)[:3]
     sample = [
         {
             "name": p.name,
             "article": p.article,
             "has_description": bool(p.description),
-            "description_preview": (p.description or "")[:160],
             "images": p.images,
         }
-        for p in catalog.products[:3]
+        for p in sample_src
     ]
 
+    # Сколько файлов картинок реально лежит на диске (приходят отдельными POST'ами обмена)
+    try:
+        media_files = os.listdir(settings.MEDIA_DIR)
+    except OSError:
+        media_files = []
+
+    # Сырой XML товара, у которого есть <Картинка> (или первого)
     first_xml = None
     try:
         root = etree.fromstring(raw)
-        for el in root.iter():
-            if el.tag.endswith("Товар"):
-                first_xml = etree.tostring(el, encoding="unicode")[:4000]
-                break
+        tovars = [el for el in root.iter() if el.tag.endswith("Товар")]
+        pick = next((t for t in tovars if any(c.tag.endswith("Картинка") for c in t.iter())), tovars[0] if tovars else None)
+        if pick is not None:
+            first_xml = etree.tostring(pick, encoding="unicode")[:4000]
     except Exception:
         pass
 
-    return {"products": len(catalog.products), "sample": sample, "first_product_xml": first_xml}
+    return {
+        "products": len(catalog.products),
+        "products_with_images_in_xml": len(with_imgs),
+        "image_files_on_disk": len(media_files),
+        "image_files_sample": media_files[:5],
+        "sample": sample,
+        "first_product_xml": first_xml,
+    }
 
 
 @router.delete("/dev/catalog")
