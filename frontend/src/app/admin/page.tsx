@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import AdminShell from "@/components/AdminShell";
 import { adminFetch } from "@/lib/adminApi";
+import { formatMsk } from "@/lib/format";
 import { IconBox, IconOrders, IconSync } from "@/components/icons";
 import type { ComponentType, SVGProps } from "react";
 
@@ -49,7 +50,7 @@ export default function AdminDashboard() {
           </div>
           {data.last_sync.finished_at && (
             <p style={{ fontSize: 12, color: "var(--ink-tertiary)", marginTop: 12 }}>
-              {new Date(data.last_sync.finished_at).toLocaleString("ru")}
+              {formatMsk(data.last_sync.finished_at)}
             </p>
           )}
         </div>

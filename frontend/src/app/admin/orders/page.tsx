@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import AdminShell from "@/components/AdminShell";
 import { adminFetch } from "@/lib/adminApi";
+import { formatMsk } from "@/lib/format";
 
 interface AdminOrder { id: string; number: string; status: string; customer_name: string; customer_phone: string; total_amount: string; exported_at: string | null; created_at: string; items_count: number; }
 
@@ -92,7 +93,7 @@ export default function AdminOrdersPage() {
                     )}
                   </td>
                   <td style={{ padding: "14px 16px", color: "var(--ink-secondary)" }}>
-                    {new Date(o.created_at).toLocaleString("ru")}
+                    {formatMsk(o.created_at)}
                   </td>
                 </tr>
               ))}

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import AdminShell from "@/components/AdminShell";
 import { adminFetch } from "@/lib/adminApi";
+import { formatMsk } from "@/lib/format";
 
 interface SyncLog { id: number; source: string; status: string; products_created: number; products_updated: number; error_message: string | null; started_at: string; finished_at: string | null; }
 
@@ -46,7 +47,7 @@ export default function SyncPage() {
                   <td style={{ padding: "14px 16px" }}>{log.products_created}</td>
                   <td style={{ padding: "14px 16px" }}>{log.products_updated}</td>
                   <td style={{ padding: "14px 16px", color: "var(--ink-secondary)" }}>
-                    {log.finished_at ? new Date(log.finished_at).toLocaleString("ru") : "—"}
+                    {formatMsk(log.finished_at)}
                   </td>
                 </tr>
               ))}

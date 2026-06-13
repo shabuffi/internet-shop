@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import AdminShell from "@/components/AdminShell";
 import { adminFetch, adminUpload } from "@/lib/adminApi";
+import { formatMsk } from "@/lib/format";
 
 interface AdminProduct { id: string; name: string; article: string | null; price: string; stock: number; available: boolean; images: string[]; images_manual: boolean; is_active: boolean; synced_at: string | null; }
 
@@ -115,7 +116,7 @@ export default function AdminProductsPage() {
                     </span>
                   </td>
                   <td style={{ padding: "14px 16px", fontSize: 12, color: "var(--ink-secondary)" }}>
-                    {p.synced_at ? new Date(p.synced_at).toLocaleString("ru") : "—"}
+                    {formatMsk(p.synced_at)}
                   </td>
                 </tr>
               ))}
