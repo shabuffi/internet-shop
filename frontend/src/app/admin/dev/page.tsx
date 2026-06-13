@@ -66,6 +66,18 @@ export default function DevPage() {
     setAuthed(false); setForm(EMPTY);
   }
 
+  const [wipeMsg, setWipeMsg] = useState("");
+  async function handleWipe() {
+    if (!confirm("Удалить ВСЕ товары и категории? Заказы сохранятся. Нужно при смене склада — потом запустите обмен заново.")) return;
+    setWipeMsg("");
+    try {
+      const r = await devFetch<{ products: number; categories: number }>("/dev/catalog", { method: "DELETE" });
+      setWipeMsg(`Удалено товаров: ${r.products}, категорий: ${r.categories}. Запустите обмен в МойСклад заново.`);
+    } catch (err) {
+      setWipeMsg(err instanceof Error ? err.message : "Ошибка");
+    }
+  }
+
   const set = (k: keyof DevForm) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setForm(p => ({ ...p, [k]: e.target.value }));
 
@@ -192,6 +204,22 @@ export default function DevPage() {
               Проверить отправку (ВК / Email) можно у владельца в Настройках — кнопками «Отправить тест».
             </p>
           </form>
+
+          {/* Опасная зона — очистка каталога (при смене склада) */}
+          <div style={{ marginTop: 28, paddingTop: 20, borderTop: "1px solid var(--hairline-soft)" }}>
+            <p style={{ fontWeight: 600, fontSize: 14, marginBottom: 4 }}>Очистить каталог</p>
+            <p style={{ fontSize: 13, color: "var(--ink-secondary)", marginBottom: 12 }}>
+              Удаляет все товары и категории (заказы сохраняются). Нужно при подключении другого
+              склада — старые товары исчезнут, затем запустите обмен заново.
+            </p>
+            <button type="button" onClick={handleWipe}
+              style={{ padding: "0 16px", height: 38, borderRadius: "var(--radius-md)", cursor: "pointer",
+                border: "1px solid var(--danger, #c0392b)", background: "transparent",
+                color: "var(--danger, #c0392b)", fontWeight: 600, fontSize: 14 }}>
+              Очистить каталог
+            </button>
+            {wipeMsg && <p style={{ marginTop: 10, fontSize: 13, color: "var(--ink-secondary)" }}>{wipeMsg}</p>}
+          </div>
         </div>
       )}
     </div>

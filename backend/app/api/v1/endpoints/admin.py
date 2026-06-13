@@ -14,7 +14,7 @@ from sqlalchemy import select
 from app.core.config import settings
 from app.db.session import get_db
 from app.db.models.admin import AdminUser, ShopSettings
-from app.db.models.product import Product, SyncLog
+from app.db.models.product import Product, Category, SyncLog
 from app.db.models.order import Order
 from app.services import media_storage
 
@@ -270,6 +270,22 @@ def get_dev_settings(db: Session = Depends(get_db), _=Depends(_get_current_dev))
         "smtp_password":      "***" if _get_setting(db, "smtp_password") else "",
         "smtp_from":          _get_setting(db, "smtp_from"),
     }
+
+
+@router.delete("/dev/catalog")
+def wipe_catalog(db: Session = Depends(get_db), _=Depends(_get_current_dev)):
+    """Полностью очищает каталог (товары + категории) — для пере-подключения склада.
+
+    Заказы сохраняются: ссылка ``order_items.product_id`` обнуляется (ON DELETE SET NULL),
+    а снимок названия/артикула в позициях остаётся. Картинки на диске не трогаются.
+
+    Returns:
+        ``{"products": N, "categories": M}`` — сколько удалено.
+    """
+    n_products = db.query(Product).delete(synchronize_session=False)
+    n_categories = db.query(Category).delete(synchronize_session=False)
+    db.commit()
+    return {"products": n_products, "categories": n_categories}
 
 
 @router.post("/dev/settings")

@@ -97,6 +97,43 @@ def test_dev_settings_saves_vk(client, db_session, monkeypatch):
     assert db_session.get(ShopSettings, "vk_peer_id").value == "555"
 
 
+def test_dev_wipe_catalog_requires_auth(client):
+    assert client.delete("/api/v1/admin/dev/catalog").status_code == 401
+
+
+def test_dev_wipe_catalog(client, db_session, monkeypatch):
+    from decimal import Decimal
+    from app.db.models.product import Product, Category
+    _dev_login(client, monkeypatch)
+    db_session.add(Category(id="c1", moysklad_id="mc1", name="Кат"))
+    db_session.add(Product(id="w1", moysklad_id="mw1", name="Т", price=Decimal("1"), stock=0, category_id="c1"))
+    db_session.commit()
+
+    r = client.delete("/api/v1/admin/dev/catalog")
+    assert r.status_code == 200 and r.json()["products"] == 1
+    db_session.expire_all()
+    assert db_session.query(Product).count() == 0
+    assert db_session.query(Category).count() == 0
+
+
+def test_dev_wipe_catalog_keeps_orders(client, db_session, monkeypatch):
+    """Очистка каталога не удаляет заказы (снимок имени/артикула в позиции остаётся)."""
+    from decimal import Decimal
+    from app.db.models.product import Product
+    from app.db.models.order import Order, OrderItem
+    _dev_login(client, monkeypatch)
+    db_session.add(Product(id="w2", moysklad_id="mw2", name="Т", price=Decimal("10"), stock=0))
+    db_session.add(Order(id="ow", number="ORD-W", customer_name="И", customer_phone="+79001234567",
+                         total_amount=Decimal("10"), status="new",
+                         items=[OrderItem(product_id="w2", product_name="Т", price=Decimal("10"), quantity=1)]))
+    db_session.commit()
+
+    client.delete("/api/v1/admin/dev/catalog")
+    db_session.expire_all()
+    assert db_session.query(Product).count() == 0
+    assert db_session.get(Order, "ow") is not None   # заказ сохранился
+
+
 def test_change_password_success(client, db_session):
     _make_admin(db_session, password="oldpass123")
     client.post("/api/v1/admin/login", json={"username": "admin", "password": "oldpass123"})
