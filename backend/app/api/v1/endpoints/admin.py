@@ -270,7 +270,7 @@ def get_dev_settings(db: Session = Depends(get_db), _=Depends(_get_current_dev))
 
 
 @router.get("/dev/diagnose-import")
-def diagnose_import(_=Depends(_get_current_dev)):
+def diagnose_import(db: Session = Depends(get_db), _=Depends(_get_current_dev)):
     """Диагностика последнего import.xml: что и в каких тегах прислал склад.
 
     Помогает понять, почему не подтянулись описание/артикул/картинки конкретного склада.
@@ -323,6 +323,8 @@ def diagnose_import(_=Depends(_get_current_dev)):
         "products_with_images_in_xml": len(with_imgs),
         "image_files_on_disk": len(media_files),
         "image_files_sample": media_files[:5],
+        "db_products": db.query(Product).count(),
+        "db_products_with_image": db.query(Product).filter(Product.image_url.isnot(None)).count(),
         "sample": sample,
         "first_product_xml": first_xml,
     }
