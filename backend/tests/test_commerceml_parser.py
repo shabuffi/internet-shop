@@ -40,6 +40,32 @@ def test_parse_import_basic():
     assert p.price == Decimal("0")   # цена приходит отдельно, в offers.xml
 
 
+def test_parse_import_description_article_from_requisites():
+    """Описание/артикул, заданные реквизитами (не своими тегами), всё равно читаются."""
+    xml = _import_xml(products=(
+        "<Товар><Ид>p9</Ид><Наименование>Крем</Наименование>"
+        "<ЗначениеРеквизита><Наименование>Описание</Наименование><Значение>Из реквизита</Значение></ЗначениеРеквизита>"
+        "<ЗначениеРеквизита><Наименование>Артикул</Наименование><Значение>REQ-1</Значение></ЗначениеРеквизита>"
+        "</Товар>"
+    ))
+    p = parse_import_xml(xml).products[0]
+    assert p.description == "Из реквизита"
+    assert p.article == "REQ-1"
+
+
+def test_parse_import_own_tags_win_over_requisites():
+    """Если есть и тег, и реквизит — берём явный тег <Описание>/<Артикул>."""
+    xml = _import_xml(products=(
+        "<Товар><Ид>p10</Ид><Наименование>Крем</Наименование>"
+        "<Описание>Из тега</Описание><Артикул>TAG-1</Артикул>"
+        "<ЗначениеРеквизита><Наименование>Описание</Наименование><Значение>Из реквизита</Значение></ЗначениеРеквизита>"
+        "</Товар>"
+    ))
+    p = parse_import_xml(xml).products[0]
+    assert p.description == "Из тега"
+    assert p.article == "TAG-1"
+
+
 def test_parse_import_multiple_images():
     """Несколько <Картинка> у товара собираются в images, первая — image_url."""
     xml = _import_xml(products=(

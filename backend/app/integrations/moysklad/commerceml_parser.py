@@ -217,12 +217,36 @@ def _parse_groups(groups_el, parent_id: str | None, ns: str = "") -> list[Parsed
     return result
 
 
+def _requisites(товар, ns: str = "") -> dict[str, str]:
+    """Собирает <ЗначениеРеквизита> товара в словарь {Наименование: Значение}.
+
+    МойСклад часто кладёт описание/артикул не в свои теги, а в реквизиты —
+    например ``<ЗначениеРеквизита><Наименование>Описание</Наименование>…``.
+    """
+    out: dict[str, str] = {}
+    reqs = товар.findall(_tag("ЗначениеРеквизита", ns))
+    if not reqs and ns:
+        reqs = товар.findall("ЗначениеРеквизита")
+    for req in reqs:
+        name = _text(req, "Наименование", ns=ns)
+        value = _text(req, "Значение", ns=ns)
+        if name and value:
+            out[name] = value
+    return out
+
+
 def _parse_product(товар, ns: str = "") -> ParsedProduct | None:
     """Парсит один элемент <Товар>."""
     product_id = _text(товар, "Ид", ns=ns)
     name = _text(товар, "Наименование", ns=ns)
     if not product_id or not name:
         return None
+
+    # Описание/артикул могут приходить как реквизиты, а не отдельными тегами — берём фолбэком
+    reqs = _requisites(товар, ns=ns)
+    description = (_text(товар, "Описание", ns=ns)
+                  or reqs.get("Описание") or reqs.get("ОписаниеВФорматеHTML"))
+    article = _text(товар, "Артикул", ns=ns) or reqs.get("Артикул")
 
     category_id = None
     groups_el = товар.find(_tag("Группы", ns))
@@ -238,8 +262,8 @@ def _parse_product(товар, ns: str = "") -> ParsedProduct | None:
     return ParsedProduct(
         moysklad_id=product_id,
         name=name,
-        description=_text(товар, "Описание", ns=ns),
-        article=_text(товар, "Артикул", ns=ns),
+        description=description,
+        article=article,
         code=_text(товар, "БазоваяЕдиница", ns=ns),
         category_id=category_id,
         image_url=images[0] if images else None,

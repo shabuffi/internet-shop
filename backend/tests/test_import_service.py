@@ -108,6 +108,21 @@ def test_upsert_without_offer_preserves_price_stock(db_session):
     assert p.images == ["pic.png", "pic2.png"]  # все картинки сохранены
 
 
+def test_upsert_preserves_article_on_image_round(db_session):
+    """Второй import.xml без артикула (дозаливка картинок) не должен затирать артикул/код."""
+    upsert_catalog(db_session, _catalog(
+        products=[ParsedProduct(moysklad_id="p1", name="Крем", article="ART-1", code="EA", has_offer=True)]
+    ))
+    # Заход только с картинкой: артикул/код = None
+    upsert_catalog(db_session, _catalog(
+        products=[ParsedProduct(moysklad_id="p1", name="Крем", images=["pic.png"])]
+    ))
+    p = db_session.query(Product).filter_by(moysklad_id="p1").first()
+    assert p.article == "ART-1"   # артикул сохранился
+    assert p.code == "EA"
+    assert p.image_url == "pic.png"
+
+
 def test_upsert_does_not_overwrite_manual_images(db_session):
     """Если картинки заданы вручную (images_manual), обмен их не перезаписывает."""
     upsert_catalog(db_session, _catalog(products=[ParsedProduct(moysklad_id="p1", name="X", images=["a.png"])]))

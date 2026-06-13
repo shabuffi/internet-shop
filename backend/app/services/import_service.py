@@ -94,8 +94,12 @@ def upsert_catalog(db: Session, catalog: ParsedCatalog, source: str = "commercem
                 created += 1
             else:
                 product.name = parsed_product.name
-                product.article = parsed_product.article
-                product.code = parsed_product.code
+                # Артикул/код обновляем только если пришли — иначе «дозаливка картинок»
+                # вторым import.xml (без артикула) затёрла бы их в None.
+                if parsed_product.article:
+                    product.article = parsed_product.article
+                if parsed_product.code:
+                    product.code = parsed_product.code
                 product.category_id = cat_id
                 product.synced_at = _utcnow()
                 # Цену/остаток перезаписываем ТОЛЬКО если они пришли в offers.xml этого
