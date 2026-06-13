@@ -252,6 +252,8 @@ def get_settings(db: Session = Depends(get_db), _=Depends(_get_current_admin)):
         # Уведомления о заказах: токены маскируем, id адресатов — нет (не секрет)
         "vk_group_token":     "***" if _get_setting(db, "vk_group_token") else "",
         "vk_peer_id":         _get_setting(db, "vk_peer_id"),
+        # ВК настроен на сервере (.env.prod) — тогда поля токена/peer_id в админке прячем
+        "vk_builtin":         bool(settings.VK_GROUP_TOKEN and settings.VK_PEER_ID),
         "notify_email":       _get_setting(db, "notify_email"),
         # SMTP для email-уведомления владельцу: пароль маскируем
         "smtp_host":          _get_setting(db, "smtp_host"),

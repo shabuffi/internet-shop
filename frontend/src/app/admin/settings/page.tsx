@@ -26,12 +26,15 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(false);
   const [testingChannel, setTestingChannel] = useState<string | null>(null);
   const [testResults, setTestResults] = useState<Record<string, { ok: boolean; text: string } | undefined>>({});
+  const [vkBuiltin, setVkBuiltin] = useState(false);
   const [pw, setPw] = useState({ current_password: "", new_password: "" });
   const [pwMsg, setPwMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [pwLoading, setPwLoading] = useState(false);
 
   useEffect(() => {
-    adminFetch<typeof form>("/settings").then(data => setForm(data)).catch(() => {});
+    adminFetch<typeof form & { vk_builtin?: boolean }>("/settings")
+      .then(data => { setForm(data); setVkBuiltin(!!data.vk_builtin); })
+      .catch(() => {});
   }, []);
 
   async function handleSubmit(e: React.FormEvent) {
@@ -141,30 +144,43 @@ export default function SettingsPage() {
             Не знаете, где взять ключ? Откройте «Как настроить» под каналом.
           </p>
 
-          <HelpBox
-            title="Как настроить ВКонтакте →"
-            steps={[
-              <>ВК → «Сообщества» → «Создать сообщество» (если ещё нет).</>,
-              <>В сообществе: «Управление» → «Сообщения» → включить сообщения сообщества.</>,
-              <>«Управление» → «Настройки» → «Работа с API» → «Ключи доступа» → «Создать ключ» с правами <b>«Сообщения сообщества»</b> → скопируйте ключ <code>vk1.a…</code> в поле ниже.</>,
-              <>Напишите <b>своему сообществу</b> любое сообщение от личного аккаунта (иначе ВК не даст боту писать вам первым).</>,
-              <>Узнайте свой числовой id ВК (если адрес <code>vk.com/id123</code> — это оно; иначе через сервис «узнать id ВКонтакте») → впишите в «ВК — peer_id».</>,
-            ]}
-          />
+          {vkBuiltin ? (
+            // ВК настроен на сервере (.env.prod) — владельцу ничего вводить не нужно
+            <div style={{ padding: "14px 18px", borderRadius: "var(--radius-md)", border: "1px solid var(--hairline-soft)",
+              background: "var(--cloud)", marginBottom: 16 }}>
+              <div style={{ fontWeight: 600, color: "var(--stock)" }}>✓ ВКонтакте подключён</div>
+              <p style={{ fontSize: 13, color: "var(--ink-secondary)", margin: "6px 0 0" }}>
+                Сообщество и получатель заданы на сервере. Нажмите «Отправить тест в ВК» для проверки.
+              </p>
+            </div>
+          ) : (
+            <>
+              <HelpBox
+                title="Как настроить ВКонтакте →"
+                steps={[
+                  <>ВК → «Сообщества» → «Создать сообщество» (если ещё нет).</>,
+                  <>В сообществе: «Управление» → «Сообщения» → включить сообщения сообщества.</>,
+                  <>«Управление» → «Настройки» → «Работа с API» → «Ключи доступа» → «Создать ключ» с правами <b>«Сообщения сообщества»</b> → скопируйте ключ <code>vk1.a…</code> в поле ниже.</>,
+                  <>Напишите <b>своему сообществу</b> любое сообщение от личного аккаунта (иначе ВК не даст боту писать вам первым).</>,
+                  <>Узнайте свой числовой id ВК (если адрес <code>vk.com/id123</code> — это оно; иначе через сервис «узнать id ВКонтакте») → впишите в «ВК — peer_id».</>,
+                ]}
+              />
 
-          <div style={inputStyle}>
-            <label className="form-label">ВК — ключ доступа сообщества</label>
-            <input className="form-input" value={form.vk_group_token}
-              onChange={e => setForm(p => ({...p, vk_group_token: e.target.value}))}
-              placeholder="vk1.a.… или оставьте ***" type="password" autoComplete="off" />
-          </div>
+              <div style={inputStyle}>
+                <label className="form-label">ВК — ключ доступа сообщества</label>
+                <input className="form-input" value={form.vk_group_token}
+                  onChange={e => setForm(p => ({...p, vk_group_token: e.target.value}))}
+                  placeholder="vk1.a.… или оставьте ***" type="password" autoComplete="off" />
+              </div>
 
-          <div style={inputStyle}>
-            <label className="form-label">ВК — peer_id получателя</label>
-            <input className="form-input" value={form.vk_peer_id}
-              onChange={e => setForm(p => ({...p, vk_peer_id: e.target.value}))}
-              placeholder="ваш id ВКонтакте" autoComplete="off" />
-          </div>
+              <div style={inputStyle}>
+                <label className="form-label">ВК — peer_id получателя</label>
+                <input className="form-input" value={form.vk_peer_id}
+                  onChange={e => setForm(p => ({...p, vk_peer_id: e.target.value}))}
+                  placeholder="ваш id ВКонтакте" autoComplete="off" />
+              </div>
+            </>
+          )}
 
           {renderTest("vk", "Отправить тест в ВК")}
 
