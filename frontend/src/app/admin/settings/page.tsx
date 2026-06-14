@@ -18,13 +18,19 @@ const EMPTY: OwnerSettings = {
 };
 const CH_LABEL: Record<string, string> = { vk: "ВКонтакте", email: "Email" };
 
+const cardStyle: React.CSSProperties = {
+  background: "var(--canvas)", borderRadius: "var(--radius-lg)", border: "1px solid var(--hairline-soft)",
+  padding: "28px 32px", maxWidth: 520, marginBottom: 24,
+};
+const inputStyle = { display: "flex", flexDirection: "column" as const, gap: 6, marginBottom: 16 };
+
 export default function SettingsPage() {
   const [form, setForm] = useState<OwnerSettings>(EMPTY);
   const [vkReady, setVkReady] = useState(false);
   const [emailReady, setEmailReady] = useState(false);
-  const [saved, setSaved] = useState(false);
   const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [savedSection, setSavedSection] = useState<string | null>(null);
+  const [savingSection, setSavingSection] = useState<string | null>(null);
   const [testingChannel, setTestingChannel] = useState<string | null>(null);
   const [testResults, setTestResults] = useState<Record<string, { ok: boolean; text: string } | undefined>>({});
   const [pw, setPw] = useState({ current_password: "", new_password: "" });
@@ -37,22 +43,27 @@ export default function SettingsPage() {
       .catch(() => {});
   }, []);
 
-  async function handleSubmit(e: React.FormEvent) {
+  // Сохраняет только поля одного блока
+  async function saveSection(e: React.FormEvent, id: string, keys: (keyof OwnerSettings)[]) {
     e.preventDefault();
-    setError(""); setSaved(false); setLoading(true);
+    setError(""); setSavedSection(null); setSavingSection(id);
+    const body: Record<string, string> = {};
+    for (const k of keys) body[k] = String(form[k] ?? "");
     try {
-      await adminFetch("/settings", { method: "POST", body: JSON.stringify(form) });
-      setSaved(true); setTimeout(() => setSaved(false), 3000);
+      await adminFetch("/settings", { method: "POST", body: JSON.stringify(body) });
+      setSavedSection(id);
+      setTimeout(() => setSavedSection(s => (s === id ? null : s)), 3000);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Ошибка");
-    } finally { setLoading(false); }
+    } finally { setSavingSection(null); }
   }
 
-  // Сохраняет форму (чтобы id ВК / email применились) и шлёт пробное уведомление
-  async function handleTest(channel: string) {
+  // Сохраняет поле канала и шлёт пробное уведомление
+  async function handleTest(channel: "vk" | "email") {
     setTestResults(prev => ({ ...prev, [channel]: undefined })); setTestingChannel(channel);
     try {
-      await adminFetch("/settings", { method: "POST", body: JSON.stringify(form) });
+      const key = channel === "vk" ? "vk_peer_id" : "notify_email";
+      await adminFetch("/settings", { method: "POST", body: JSON.stringify({ [key]: form[key] }) });
       const r = await adminFetch<{ results: Record<string, string>; details?: Record<string, string> }>(`/test-notification?channel=${channel}`, { method: "POST" });
       const st = r.results[channel];
       const detail = r.details?.[channel];
@@ -78,13 +89,23 @@ export default function SettingsPage() {
     } finally { setPwLoading(false); }
   }
 
-  const inputStyle = { display: "flex", flexDirection: "column" as const, gap: 6, marginBottom: 16 };
   const set = (k: keyof OwnerSettings) => (e: React.ChangeEvent<HTMLInputElement>) => setForm(p => ({ ...p, [k]: e.target.value }));
+
+  function saveRow(id: string) {
+    return (
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 8 }}>
+        <button className="btn btn-primary" type="submit" disabled={savingSection === id}>
+          {savingSection === id ? "Сохраняем…" : "Сохранить"}
+        </button>
+        {savedSection === id && <span style={{ color: "var(--stock)", fontWeight: 600, fontSize: 13 }}>✓ Сохранено</span>}
+      </div>
+    );
+  }
 
   function testButton(channel: "vk" | "email") {
     const r = testResults[channel];
     return (
-      <>
+      <div style={{ marginTop: 14 }}>
         <button type="button" onClick={() => handleTest(channel)} disabled={testingChannel !== null}
           style={{ padding: "0 14px", height: 36, borderRadius: "var(--radius-md)", border: "1px solid var(--graphite)",
             background: "transparent", color: "var(--ink)", fontWeight: 600, fontSize: 13,
@@ -96,13 +117,13 @@ export default function SettingsPage() {
             {r.ok ? "✓ " : "✕ "}{r.text}
           </div>
         )}
-      </>
+      </div>
     );
   }
 
   function readyNote(ready: boolean, what: string) {
     return (
-      <p style={{ fontSize: 12, color: ready ? "var(--stock)" : "var(--ink-tertiary)", marginTop: -8, marginBottom: 12 }}>
+      <p style={{ fontSize: 12, color: ready ? "var(--stock)" : "var(--ink-tertiary)", marginBottom: 4 }}>
         {ready ? `✓ ${what} подключено разработчиком` : `${what} ещё не настроено — обратитесь к разработчику`}
       </p>
     );
@@ -111,117 +132,113 @@ export default function SettingsPage() {
   return (
     <AdminShell>
       <h1 style={{ fontSize: 24, fontWeight: 700, marginBottom: 8, letterSpacing: -0.3 }}>Настройки</h1>
-      <p style={{ fontSize: 14, color: "var(--ink-secondary)", marginBottom: 32 }}>
-        Магазин, обмен с МойСклад и уведомления о заказах.
+      <p style={{ fontSize: 14, color: "var(--ink-secondary)", marginBottom: 28 }}>
+        Каждый блок сохраняется отдельной кнопкой.
       </p>
 
-      <div style={{ background: "var(--canvas)", borderRadius: "var(--radius-lg)", border: "1px solid var(--hairline-soft)", padding: "28px 32px", maxWidth: 520 }}>
-        <form onSubmit={handleSubmit}>
-          <p style={{ fontWeight: 600, fontSize: 16, marginBottom: 16 }}>Магазин</p>
+      {error && <p className="form-error" style={{ maxWidth: 520, marginBottom: 16 }}>{error}</p>}
 
-          <div style={inputStyle}>
-            <label className="form-label">Название магазина</label>
-            <input className="form-input" value={form.shop_name} onChange={set("shop_name")} placeholder="Магазин" />
-            <p style={{ fontSize: 12, color: "var(--ink-secondary)" }}>Отображается в шапке, футере и на вкладке браузера</p>
-          </div>
-          <div style={inputStyle}>
-            <label className="form-label">Телефон (футер сайта)</label>
-            <input className="form-input" value={form.contact_phone} onChange={set("contact_phone")} placeholder="+7 999 123-45-67" />
-          </div>
-          <div style={inputStyle}>
-            <label className="form-label">Email для покупателей (футер сайта)</label>
-            <input className="form-input" type="email" value={form.contact_email} onChange={set("contact_email")} placeholder="shop@example.ru" />
-          </div>
-          <div style={inputStyle}>
-            <label className="form-label">Часы работы (футер сайта)</label>
-            <input className="form-input" value={form.contact_hours} onChange={set("contact_hours")} placeholder="Пн–Пт · 10:00–19:00" />
-          </div>
-          <div style={inputStyle}>
-            <label className="form-label">Доставка (на странице товара)</label>
-            <input className="form-input" value={form.delivery_info} onChange={set("delivery_info")} placeholder="например, 1–3 дня по России" />
-            <p style={{ fontSize: 12, color: "var(--ink-secondary)" }}>Один текст для всех товаров. Пусто — строка не показывается.</p>
-          </div>
+      {/* Магазин */}
+      <form style={cardStyle} onSubmit={e => saveSection(e, "shop", ["shop_name", "contact_phone", "contact_email", "contact_hours", "delivery_info"])}>
+        <p style={{ fontWeight: 600, fontSize: 16, marginBottom: 16 }}>Магазин</p>
+        <div style={inputStyle}>
+          <label className="form-label">Название магазина</label>
+          <input className="form-input" value={form.shop_name} onChange={set("shop_name")} placeholder="Магазин" />
+          <p style={{ fontSize: 12, color: "var(--ink-secondary)" }}>Отображается в шапке, футере и на вкладке браузера</p>
+        </div>
+        <div style={inputStyle}>
+          <label className="form-label">Телефон (футер сайта)</label>
+          <input className="form-input" value={form.contact_phone} onChange={set("contact_phone")} placeholder="+7 999 123-45-67" />
+        </div>
+        <div style={inputStyle}>
+          <label className="form-label">Email для покупателей (футер сайта)</label>
+          <input className="form-input" type="email" value={form.contact_email} onChange={set("contact_email")} placeholder="shop@example.ru" />
+        </div>
+        <div style={inputStyle}>
+          <label className="form-label">Часы работы (футер сайта)</label>
+          <input className="form-input" value={form.contact_hours} onChange={set("contact_hours")} placeholder="Пн–Пт · 10:00–19:00" />
+        </div>
+        <div style={inputStyle}>
+          <label className="form-label">Доставка (на странице товара)</label>
+          <input className="form-input" value={form.delivery_info} onChange={set("delivery_info")} placeholder="например, 1–3 дня по России" />
+          <p style={{ fontSize: 12, color: "var(--ink-secondary)" }}>Один текст для всех товаров. Пусто — строка не показывается.</p>
+        </div>
+        {saveRow("shop")}
+      </form>
 
-          <div style={{ height: 1, background: "var(--hairline-soft)", margin: "20px 0" }} />
+      {/* Обмен с МойСклад */}
+      <form style={cardStyle} onSubmit={e => saveSection(e, "exchange", ["exchange_login", "exchange_password"])}>
+        <p style={{ fontWeight: 600, fontSize: 16, marginBottom: 6 }}>Обмен с МойСклад</p>
+        <p style={{ fontSize: 13, color: "var(--ink-secondary)", marginBottom: 16 }}>
+          Придумайте пару логин/пароль и впишите её сюда <b>и</b> в МойСклад (Адрес магазина).
+          Это пароль обмена, а не от аккаунта МойСклад.
+        </p>
+        <div style={inputStyle}>
+          <label className="form-label">Логин обмена</label>
+          <input className="form-input" value={form.exchange_login} onChange={set("exchange_login")} placeholder="например, myshop_exchange" autoComplete="off" />
+        </div>
+        <div style={inputStyle}>
+          <label className="form-label">Пароль обмена</label>
+          <input className="form-input" type="password" value={form.exchange_password} onChange={set("exchange_password")} placeholder="новый пароль или оставьте ***" autoComplete="off" />
+        </div>
+        {saveRow("exchange")}
+      </form>
 
-          {/* МойСклад — обмен */}
-          <p style={{ fontWeight: 600, fontSize: 16, marginBottom: 6 }}>Обмен с МойСклад</p>
-          <p style={{ fontSize: 13, color: "var(--ink-secondary)", marginBottom: 16 }}>
-            Придумайте пару логин/пароль и впишите её сюда <b>и</b> в МойСклад (Адрес магазина).
-            Это пароль обмена, а не от аккаунта МойСклад.
-          </p>
-          <div style={inputStyle}>
-            <label className="form-label">Логин обмена</label>
-            <input className="form-input" value={form.exchange_login} onChange={set("exchange_login")} placeholder="например, myshop_exchange" autoComplete="off" />
-          </div>
-          <div style={inputStyle}>
-            <label className="form-label">Пароль обмена</label>
-            <input className="form-input" type="password" value={form.exchange_password} onChange={set("exchange_password")} placeholder="новый пароль или оставьте ***" autoComplete="off" />
-          </div>
+      {/* ВКонтакте */}
+      <form style={cardStyle} onSubmit={e => saveSection(e, "vk", ["vk_peer_id"])}>
+        <p style={{ fontWeight: 600, fontSize: 16, marginBottom: 6 }}>ВКонтакте</p>
+        <p style={{ fontSize: 13, color: "var(--ink-secondary)", marginBottom: 12 }}>
+          Куда вам приходят оповещения о новых заказах в ВК.
+        </p>
+        <div style={inputStyle}>
+          <label className="form-label">Ваш id ВКонтакте (peer_id)</label>
+          <input className="form-input" value={form.vk_peer_id} onChange={set("vk_peer_id")} placeholder="например, 123456789" autoComplete="off" />
+        </div>
+        {readyNote(vkReady, "Сообщество")}
+        {saveRow("vk")}
+        {testButton("vk")}
+      </form>
 
-          <div style={{ height: 1, background: "var(--hairline-soft)", margin: "20px 0" }} />
-
-          {/* Уведомления */}
-          <p style={{ fontWeight: 600, fontSize: 16, marginBottom: 6 }}>Уведомления о заказах</p>
-          <p style={{ fontSize: 13, color: "var(--ink-secondary)", marginBottom: 16 }}>
-            Куда вам приходят оповещения о новых заказах. Заполните ВК и/или Email.
-          </p>
-
-          <div style={inputStyle}>
-            <label className="form-label">ВКонтакте — ваш id (peer_id)</label>
-            <input className="form-input" value={form.vk_peer_id} onChange={set("vk_peer_id")} placeholder="например, 123456789" autoComplete="off" />
-          </div>
-          {readyNote(vkReady, "Сообщество")}
-          <div style={{ marginBottom: 18 }}>{testButton("vk")}</div>
-
-          <div style={inputStyle}>
-            <label className="form-label">Email владельца (куда слать заказы)</label>
-            <input className="form-input" type="email" value={form.notify_email} onChange={set("notify_email")} placeholder="вы получите письмо на этот адрес" autoComplete="off" />
-          </div>
-          {readyNote(emailReady, "Почтовый сервер")}
-          <div style={{ marginBottom: 4 }}>{testButton("email")}</div>
-
-          {error && <p className="form-error" style={{ marginTop: 16 }}>{error}</p>}
-          {saved && (
-            <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", margin: "16px 0 12px",
-              background: "var(--stock-soft)", border: "1px solid var(--stock)", borderRadius: "var(--radius-md)",
-              color: "var(--stock)", fontSize: 14, fontWeight: 600 }}>
-              <span>✓</span> Настройки сохранены
-            </div>
-          )}
-          <button className="btn btn-primary" type="submit" disabled={loading} style={{ marginTop: 16 }}>
-            {loading ? "Сохраняем..." : "Сохранить настройки"}
-          </button>
-        </form>
-      </div>
+      {/* Email */}
+      <form style={cardStyle} onSubmit={e => saveSection(e, "email", ["notify_email"])}>
+        <p style={{ fontWeight: 600, fontSize: 16, marginBottom: 6 }}>Email</p>
+        <p style={{ fontSize: 13, color: "var(--ink-secondary)", marginBottom: 12 }}>
+          Куда слать письма о новых заказах.
+        </p>
+        <div style={inputStyle}>
+          <label className="form-label">Email владельца</label>
+          <input className="form-input" type="email" value={form.notify_email} onChange={set("notify_email")} placeholder="вы получите письмо на этот адрес" autoComplete="off" />
+        </div>
+        {readyNote(emailReady, "Почтовый сервер")}
+        {saveRow("email")}
+        {testButton("email")}
+      </form>
 
       {/* Смена пароля админа */}
-      <div style={{ background: "var(--canvas)", borderRadius: "var(--radius-lg)", border: "1px solid var(--hairline-soft)", padding: "28px 32px", maxWidth: 520, marginTop: 24 }}>
+      <form style={cardStyle} onSubmit={handleChangePassword}>
         <p style={{ fontWeight: 600, fontSize: 16, marginBottom: 20 }}>Смена пароля админа</p>
-        <form onSubmit={handleChangePassword}>
-          <div style={inputStyle}>
-            <label className="form-label">Текущий пароль</label>
-            <input className="form-input" type="password" value={pw.current_password}
-              onChange={e => setPw(p => ({ ...p, current_password: e.target.value }))} autoComplete="current-password" required />
-          </div>
-          <div style={inputStyle}>
-            <label className="form-label">Новый пароль</label>
-            <input className="form-input" type="password" value={pw.new_password}
-              onChange={e => setPw(p => ({ ...p, new_password: e.target.value }))} autoComplete="new-password" required minLength={8} />
-            <p style={{ fontSize: 12, color: "var(--ink-secondary)" }}>Минимум 8 символов</p>
-          </div>
-          {pwMsg && (
-            <p style={{ fontSize: 14, marginBottom: 8, color: pwMsg.ok ? "var(--success)" : "var(--critical)" }}>
-              {pwMsg.ok ? "✓ " : "✕ "}{pwMsg.text}
-            </p>
-          )}
-          <button className="btn btn-primary" type="submit" disabled={pwLoading} style={{ marginTop: 8 }}>
-            {pwLoading ? "Меняем..." : "Сменить пароль"}
-          </button>
-        </form>
-      </div>
+        <div style={inputStyle}>
+          <label className="form-label">Текущий пароль</label>
+          <input className="form-input" type="password" value={pw.current_password}
+            onChange={e => setPw(p => ({ ...p, current_password: e.target.value }))} autoComplete="current-password" required />
+        </div>
+        <div style={inputStyle}>
+          <label className="form-label">Новый пароль</label>
+          <input className="form-input" type="password" value={pw.new_password}
+            onChange={e => setPw(p => ({ ...p, new_password: e.target.value }))} autoComplete="new-password" required minLength={8} />
+          <p style={{ fontSize: 12, color: "var(--ink-secondary)" }}>Минимум 8 символов</p>
+        </div>
+        {pwMsg && (
+          <p style={{ fontSize: 14, marginBottom: 8, color: pwMsg.ok ? "var(--success)" : "var(--critical)" }}>
+            {pwMsg.ok ? "✓ " : "✕ "}{pwMsg.text}
+          </p>
+        )}
+        <button className="btn btn-primary" type="submit" disabled={pwLoading} style={{ marginTop: 8 }}>
+          {pwLoading ? "Меняем..." : "Сменить пароль"}
+        </button>
+      </form>
 
-      <p style={{ fontSize: 12, color: "var(--ink-tertiary)", maxWidth: 520, marginTop: 20 }}>
+      <p style={{ fontSize: 12, color: "var(--ink-tertiary)", maxWidth: 520 }}>
         Для разработчика: ключ сообщества ВК и SMTP-сервер — на странице{" "}
         <a href="/admin/dev" style={{ color: "var(--ink-secondary)", textDecoration: "underline" }}>/admin/dev</a>.
       </p>
