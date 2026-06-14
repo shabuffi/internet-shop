@@ -126,6 +126,26 @@ def test_dev_wipe_catalog(client, db_session, monkeypatch):
     assert db_session.query(Category).count() == 0
 
 
+def test_dev_wipe_orders_requires_auth(client):
+    assert client.delete("/api/v1/admin/dev/orders").status_code == 401
+
+
+def test_dev_wipe_orders(client, db_session, monkeypatch):
+    from decimal import Decimal
+    from app.db.models.order import Order, OrderItem
+    _dev_login(client, monkeypatch)
+    db_session.add(Order(id="o1", number="ORD-1", customer_name="И", customer_phone="+79001234567",
+                         total_amount=Decimal("10"), status="new",
+                         items=[OrderItem(product_name="Т", price=Decimal("10"), quantity=1)]))
+    db_session.commit()
+
+    r = client.delete("/api/v1/admin/dev/orders")
+    assert r.status_code == 200 and r.json()["orders"] == 1
+    db_session.expire_all()
+    assert db_session.query(Order).count() == 0
+    assert db_session.query(OrderItem).count() == 0
+
+
 def test_dev_wipe_catalog_keeps_orders(client, db_session, monkeypatch):
     """Очистка каталога не удаляет заказы (снимок имени/артикула в позиции остаётся)."""
     from decimal import Decimal

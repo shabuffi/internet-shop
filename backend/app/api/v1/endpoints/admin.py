@@ -16,7 +16,7 @@ from app.core.config import settings
 from app.db.session import get_db
 from app.db.models.admin import AdminUser, ShopSettings
 from app.db.models.product import Product, Category, SyncLog
-from app.db.models.order import Order
+from app.db.models.order import Order, OrderItem
 from app.services import media_storage
 
 router = APIRouter(prefix="/admin", tags=["Admin"])
@@ -371,6 +371,19 @@ def wipe_catalog(db: Session = Depends(get_db), _=Depends(_get_current_dev)):
     except OSError:
         pass
     return {"products": n_products, "categories": n_categories, "files": removed_files}
+
+
+@router.delete("/dev/orders")
+def wipe_orders(db: Session = Depends(get_db), _=Depends(_get_current_dev)):
+    """Удаляет ВСЕ заказы (и их позиции) — для очистки тестовых данных.
+
+    Returns:
+        ``{"orders": N}`` — сколько заказов удалено.
+    """
+    db.query(OrderItem).delete(synchronize_session=False)
+    n = db.query(Order).delete(synchronize_session=False)
+    db.commit()
+    return {"orders": n}
 
 
 @router.post("/dev/settings")

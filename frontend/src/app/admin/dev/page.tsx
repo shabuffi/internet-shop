@@ -75,6 +75,18 @@ export default function DevPage() {
     }
   }
 
+  const [ordersMsg, setOrdersMsg] = useState("");
+  async function handleWipeOrders() {
+    if (!confirm("Удалить ВСЕ заказы? Действие необратимо. Обычно нужно только для очистки тестовых данных.")) return;
+    setOrdersMsg("");
+    try {
+      const r = await devFetch<{ orders: number }>("/dev/orders", { method: "DELETE" });
+      setOrdersMsg(`Удалено заказов: ${r.orders}.`);
+    } catch (err) {
+      setOrdersMsg(err instanceof Error ? err.message : "Ошибка");
+    }
+  }
+
   const [wipeMsg, setWipeMsg] = useState("");
   async function handleWipe() {
     if (!confirm("Удалить ВСЕ товары и категории? Заказы сохранятся. Нужно при смене склада — потом запустите обмен заново.")) return;
@@ -225,6 +237,18 @@ export default function DevPage() {
               Очистить каталог
             </button>
             {wipeMsg && <p style={{ marginTop: 10, fontSize: 13, color: "var(--ink-secondary)" }}>{wipeMsg}</p>}
+
+            <p style={{ fontWeight: 600, fontSize: 14, margin: "20px 0 4px" }}>Удалить все заказы</p>
+            <p style={{ fontSize: 13, color: "var(--ink-secondary)", marginBottom: 12 }}>
+              Полностью удаляет все заказы и их позиции. Для очистки тестовых данных.
+            </p>
+            <button type="button" onClick={handleWipeOrders}
+              style={{ padding: "0 16px", height: 38, borderRadius: "var(--radius-md)", cursor: "pointer",
+                border: "1px solid var(--danger, #c0392b)", background: "transparent",
+                color: "var(--danger, #c0392b)", fontWeight: 600, fontSize: 14 }}>
+              Удалить все заказы
+            </button>
+            {ordersMsg && <p style={{ marginTop: 10, fontSize: 13, color: "var(--ink-secondary)" }}>{ordersMsg}</p>}
           </div>
         </div>
       )}
