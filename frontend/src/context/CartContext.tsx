@@ -17,6 +17,7 @@ interface CartContextValue {
   addItem: (item: Omit<CartItem, "quantity">) => void;
   removeItem: (id: string) => void;
   updateQuantity: (id: string, quantity: number) => void;
+  setItemQuantity: (item: Omit<CartItem, "quantity">, quantity: number) => void;
   clearCart: () => void;
 }
 
@@ -64,6 +65,17 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  // Задать точное количество товара (для «бланка заказа»): добавит, если ещё нет в корзине;
+  // 0 или меньше — убирает позицию.
+  const setItemQuantity = useCallback((item: Omit<CartItem, "quantity">, quantity: number) => {
+    setItems((prev) => {
+      if (quantity <= 0) return prev.filter((i) => i.id !== item.id);
+      const existing = prev.find((i) => i.id === item.id);
+      if (existing) return prev.map((i) => (i.id === item.id ? { ...i, quantity } : i));
+      return [...prev, { ...item, quantity }];
+    });
+  }, []);
+
   const clearCart = useCallback(() => setItems([]), []);
 
   const totalItems = items.reduce((sum, i) => sum + i.quantity, 0);
@@ -74,7 +86,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <CartContext.Provider
-      value={{ items, totalItems, totalAmount, addItem, removeItem, updateQuantity, clearCart }}
+      value={{ items, totalItems, totalAmount, addItem, removeItem, updateQuantity, setItemQuantity, clearCart }}
     >
       {children}
     </CartContext.Provider>

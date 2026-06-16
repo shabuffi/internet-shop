@@ -4,17 +4,19 @@ import Link from "next/link";
 import { getProducts, getCategories } from "@/lib/api";
 import { formatPrice } from "@/lib/format";
 import AddToCartCard from "@/components/AddToCartCard";
+import CatalogList from "@/components/CatalogList";
 import { IconImage, IconSearch } from "@/components/icons";
 
 interface Props {
-  searchParams: Promise<{ category_id?: string; search?: string; page?: string }>;
+  searchParams: Promise<{ category_id?: string; search?: string; page?: string; view?: string }>;
 }
 
-// Собирает URL каталога, сохраняя выбранные фильтры. page>1 добавляем только при необходимости.
-function buildHref(params: { category_id?: string; search?: string; page?: number }) {
+// Собирает URL каталога, сохраняя фильтры и режим (плитка/список). page>1 — только при необходимости.
+function buildHref(params: { category_id?: string; search?: string; page?: number; view?: string }) {
   const q = new URLSearchParams();
   if (params.category_id) q.set("category_id", params.category_id);
   if (params.search) q.set("search", params.search);
+  if (params.view) q.set("view", params.view);
   if (params.page && params.page > 1) q.set("page", String(params.page));
   const s = q.toString();
   return s ? `/?${s}` : "/";
@@ -36,11 +38,31 @@ export default async function CatalogPage({ searchParams }: Props) {
   const categoryId = params.category_id;
   const search = params.search;
   const page = Math.max(1, parseInt(params.page ?? "1", 10) || 1);
+  const view = params.view === "list" ? "list" : "grid";
+  const listView = view === "list";
 
   const [data, categories] = await Promise.all([
-    getProducts({ category_id: categoryId, search, page }),
+    // В списке («бланк заказа») показываем больше товаров на странице
+    getProducts({ category_id: categoryId, search, page, page_size: listView ? 100 : undefined }),
     getCategories(),
   ]);
+
+  const toggle = (active: boolean): React.CSSProperties => ({
+    display: "flex", alignItems: "center", justifyContent: "center", padding: "7px 12px", textDecoration: "none",
+    background: active ? "var(--ink)" : "transparent", color: active ? "#fff" : "var(--ink-secondary)",
+  });
+  const IconGrid = (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="3" width="7" height="7" rx="1.5" /><rect x="14" y="3" width="7" height="7" rx="1.5" />
+      <rect x="3" y="14" width="7" height="7" rx="1.5" /><rect x="14" y="14" width="7" height="7" rx="1.5" />
+    </svg>
+  );
+  const IconRows = (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="8" y1="6" x2="21" y2="6" /><line x1="8" y1="12" x2="21" y2="12" /><line x1="8" y1="18" x2="21" y2="18" />
+      <line x1="3.5" y1="6" x2="3.5" y2="6" /><line x1="3.5" y1="12" x2="3.5" y2="12" /><line x1="3.5" y1="18" x2="3.5" y2="18" />
+    </svg>
+  );
 
   return (
     <div className="page">
@@ -57,22 +79,29 @@ export default async function CatalogPage({ searchParams }: Props) {
         {/* Поиск — на мобильных (в шапке он скрыт) */}
         <form action="/" method="get" className="search only-mobile" style={{ width: "100%", marginBottom: "var(--s-5)" }}>
           {categoryId && <input type="hidden" name="category_id" value={categoryId} />}
+          {listView && <input type="hidden" name="view" value="list" />}
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="7" /><line x1="21" y1="21" x2="16.5" y2="16.5" /></svg>
           <input name="search" defaultValue={search ?? ""} placeholder="Поиск товаров" aria-label="Поиск товаров" />
         </form>
 
-        {/* Тулбар: фильтры + счётчик */}
+        {/* Тулбар: фильтры + переключатель режима + счётчик */}
         <div className="toolbar">
           <div className="filters">
-            <Link href={buildHref({ search })} className={"chip " + (!categoryId ? "chip--active" : "")}>Все</Link>
+            <Link href={buildHref({ search, view: listView ? "list" : undefined })} className={"chip " + (!categoryId ? "chip--active" : "")}>Все</Link>
             {categories.map((c) => (
-              <Link key={c.id} href={buildHref({ category_id: c.id, search })}
+              <Link key={c.id} href={buildHref({ category_id: c.id, search, view: listView ? "list" : undefined })}
                 className={"chip " + (categoryId === c.id ? "chip--active" : "")}>
                 {c.name}
               </Link>
             ))}
           </div>
-          <span className="result-count">{data.total} товаров</span>
+          <div style={{ display: "flex", alignItems: "center", gap: "var(--s-4)" }}>
+            <div style={{ display: "inline-flex", border: "1px solid var(--hairline)", borderRadius: 8, overflow: "hidden" }}>
+              <Link href={buildHref({ category_id: categoryId, search })} style={toggle(!listView)} title="Плиткой" aria-label="Плиткой">{IconGrid}</Link>
+              <Link href={buildHref({ category_id: categoryId, search, view: "list" })} style={toggle(listView)} title="Списком (бланк заказа)" aria-label="Списком (бланк заказа)">{IconRows}</Link>
+            </div>
+            <span className="result-count">{data.total} товаров</span>
+          </div>
         </div>
 
         {data.items.length === 0 ? (
@@ -84,45 +113,49 @@ export default async function CatalogPage({ searchParams }: Props) {
           </div>
         ) : (
           <>
-            <div className="catalog-grid">
-              {data.items.map((p) => (
-                <article className="pcard" key={p.id}>
-                  <Link href={`/products/${p.id}`} className="pcard__media" aria-label={p.name}>
-                    <span className="pcard__badge">
-                      {p.available
-                        ? <span className="badge badge--stock"><span className="badge__dot" />В наличии</span>
-                        : <span className="badge badge--out"><span className="badge__dot" />Нет</span>}
-                    </span>
-                    <div className="photo photo--square">
-                      {p.image_url
-                        ? <img src={`/api/v1/products/${p.id}/image`} alt={p.name} />
-                        : <span className="photo__ph"><IconImage /></span>}
+            {listView ? (
+              <CatalogList products={data.items} />
+            ) : (
+              <div className="catalog-grid">
+                {data.items.map((p) => (
+                  <article className="pcard" key={p.id}>
+                    <Link href={`/products/${p.id}`} className="pcard__media" aria-label={p.name}>
+                      <span className="pcard__badge">
+                        {p.available
+                          ? <span className="badge badge--stock"><span className="badge__dot" />В наличии</span>
+                          : <span className="badge badge--out"><span className="badge__dot" />Нет</span>}
+                      </span>
+                      <div className="photo photo--square">
+                        {p.image_url
+                          ? <img src={`/api/v1/products/${p.id}/image`} alt={p.name} />
+                          : <span className="photo__ph"><IconImage /></span>}
+                      </div>
+                    </Link>
+                    <div className="pcard__body">
+                      <div className="pcard__cat">{p.category?.name ?? " "}</div>
+                      <Link href={`/products/${p.id}`} className="pcard__name">{p.name}</Link>
+                      <div className="pcard__sku">{p.article ? `Арт. ${p.article}` : " "}</div>
+                      <div className="pcard__foot">
+                        <span className="price">{formatPrice(p.price)}</span>
+                        <AddToCartCard product={p} />
+                      </div>
                     </div>
-                  </Link>
-                  <div className="pcard__body">
-                    <div className="pcard__cat">{p.category?.name ?? " "}</div>
-                    <Link href={`/products/${p.id}`} className="pcard__name">{p.name}</Link>
-                    <div className="pcard__sku">{p.article ? `Арт. ${p.article}` : " "}</div>
-                    <div className="pcard__foot">
-                      <span className="price">{formatPrice(p.price)}</span>
-                      <AddToCartCard product={p} />
-                    </div>
-                  </div>
-                </article>
-              ))}
-            </div>
+                  </article>
+                ))}
+              </div>
+            )}
 
             {data.pages > 1 && (
               <div className="pagination">
                 {page > 1
-                  ? <Link href={buildHref({ category_id: categoryId, search, page: page - 1 })} className="page-dot" aria-label="Назад">‹</Link>
+                  ? <Link href={buildHref({ category_id: categoryId, search, page: page - 1, view: listView ? "list" : undefined })} className="page-dot" aria-label="Назад">‹</Link>
                   : <span className="page-dot page-dot--disabled">‹</span>}
                 {pageNumbers(page, data.pages).map((n) => (
-                  <Link key={n} href={buildHref({ category_id: categoryId, search, page: n })}
+                  <Link key={n} href={buildHref({ category_id: categoryId, search, page: n, view: listView ? "list" : undefined })}
                     className={"page-dot " + (n === page ? "page-dot--active" : "")}>{n}</Link>
                 ))}
                 {page < data.pages
-                  ? <Link href={buildHref({ category_id: categoryId, search, page: page + 1 })} className="page-dot" aria-label="Вперёд">›</Link>
+                  ? <Link href={buildHref({ category_id: categoryId, search, page: page + 1, view: listView ? "list" : undefined })} className="page-dot" aria-label="Вперёд">›</Link>
                   : <span className="page-dot page-dot--disabled">›</span>}
               </div>
             )}

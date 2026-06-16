@@ -19,11 +19,13 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
 
 export async function getProducts(params?: {
   page?: number;
+  page_size?: number;
   search?: string;
   category_id?: string;
 }): Promise<ProductListResponse> {
   const query = new URLSearchParams();
   if (params?.page) query.set("page", String(params.page));
+  if (params?.page_size) query.set("page_size", String(params.page_size));
   if (params?.search) query.set("search", params.search);
   if (params?.category_id) query.set("category_id", params.category_id);
   const qs = query.toString();
