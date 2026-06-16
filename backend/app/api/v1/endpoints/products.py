@@ -52,7 +52,8 @@ def list_products(
     query = (
         select(Product)
         .options(joinedload(Product.category))
-        .where(Product.is_active == True)
+        # Товары с остатком 0 на витрине не показываем (в админке они остаются)
+        .where(Product.is_active == True, Product.stock > 0)
     )
 
     if category_id:

@@ -5,6 +5,7 @@ import { getProducts, getCategories } from "@/lib/api";
 import { formatPrice } from "@/lib/format";
 import AddToCartCard from "@/components/AddToCartCard";
 import CatalogList from "@/components/CatalogList";
+import CategorySelect from "@/components/CategorySelect";
 import { IconImage, IconSearch } from "@/components/icons";
 
 interface Props {
@@ -86,15 +87,7 @@ export default async function CatalogPage({ searchParams }: Props) {
 
         {/* Тулбар: фильтры + переключатель режима + счётчик */}
         <div className="toolbar">
-          <div className="filters">
-            <Link href={buildHref({ search, view: listView ? "list" : undefined })} className={"chip " + (!categoryId ? "chip--active" : "")}>Все</Link>
-            {categories.map((c) => (
-              <Link key={c.id} href={buildHref({ category_id: c.id, search, view: listView ? "list" : undefined })}
-                className={"chip " + (categoryId === c.id ? "chip--active" : "")}>
-                {c.name}
-              </Link>
-            ))}
-          </div>
+          <CategorySelect categories={categories} current={categoryId} search={search} view={listView ? "list" : undefined} />
           <div style={{ display: "flex", alignItems: "center", gap: "var(--s-4)" }}>
             <div style={{ display: "inline-flex", border: "1px solid var(--hairline)", borderRadius: 8, overflow: "hidden" }}>
               <Link href={buildHref({ category_id: categoryId, search })} style={toggle(!listView)} title="Плиткой" aria-label="Плиткой">{IconGrid}</Link>
