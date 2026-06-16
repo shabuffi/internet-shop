@@ -8,11 +8,13 @@ import { SITE_URL, SITE_NAME, SITE_DESCRIPTION } from "@/lib/site";
 // Метаданные (включая <title> вкладки) берут название из настройки магазина —
 // один источник правды с шапкой/футером. SITE_NAME — лишь фолбэк.
 export async function generateMetadata(): Promise<Metadata> {
-  const { name } = await getStoreInfo();
+  const { name, logo } = await getStoreInfo();
   return {
     metadataBase: new URL(SITE_URL),
     title: { default: `${name} — интернет-магазин`, template: `%s — ${name}` },
     description: SITE_DESCRIPTION,
+    // Если в админке загружен логотип — он же становится иконкой вкладки (favicon)
+    ...(logo ? { icons: { icon: "/api/v1/admin/logo" } } : {}),
     openGraph: {
       type: "website",
       siteName: name,
