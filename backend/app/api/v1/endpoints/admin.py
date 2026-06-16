@@ -456,6 +456,8 @@ def get_settings(db: Session = Depends(get_db), _=Depends(_get_current_admin)):
         "contact_hours":      _get_setting(db, "contact_hours"),
         # Условия доставки — единый текст для всех товаров (показывается на карточке товара)
         "delivery_info":      _get_setting(db, "delivery_info"),
+        # Логотип в шапке (загружается отдельной кнопкой)
+        "has_logo":           bool(_get_setting(db, "logo_file")),
         # Обмен с МойСклад — выдуманная пара логин/пароль (не от аккаунта МойСклад)
         "exchange_login":     _get_setting(db, "exchange_login"),
         "exchange_password":  "***" if _get_setting(db, "exchange_password") else "",
@@ -819,7 +821,53 @@ def store_info_public(db: Session = Depends(get_db)):
         "contact_email": _get_setting(db, "contact_email"),
         "contact_hours": _get_setting(db, "contact_hours"),
         "delivery_info": _get_setting(db, "delivery_info"),
+        "has_logo":      bool(_get_setting(db, "logo_file")),
     }
+
+
+# ─── Логотип магазина ──────────────────────────────────────────────
+
+@router.post("/logo")
+async def upload_logo(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    _=Depends(_get_current_admin),
+):
+    """Загружает логотип магазина (показывается в шапке вместо названия)."""
+    data = await file.read()
+    try:
+        name = media_storage.save_upload(file.filename or "logo.png", data)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Можно загружать только изображения")
+    old = _get_setting(db, "logo_file")
+    if old and old.startswith("upload_"):
+        media_storage.delete_image(old)
+    _set_setting(db, "logo_file", name)
+    db.commit()
+    return {"ok": True}
+
+
+@router.delete("/logo")
+def delete_logo(db: Session = Depends(get_db), _=Depends(_get_current_admin)):
+    """Убирает логотип (в шапке снова показывается название)."""
+    old = _get_setting(db, "logo_file")
+    if old and old.startswith("upload_"):
+        media_storage.delete_image(old)
+    _set_setting(db, "logo_file", "")
+    db.commit()
+    return {"ok": True}
+
+
+@router.get("/logo")
+def get_logo(db: Session = Depends(get_db)):
+    """Публичная отдача логотипа магазина (для шапки сайта)."""
+    name = _get_setting(db, "logo_file")
+    result = media_storage.read_image(name) if name else None
+    if result is None:
+        raise HTTPException(status_code=404, detail="Логотип не задан")
+    data, content_type = result
+    return Response(content=data, media_type=content_type,
+                    headers={"Cache-Control": "public, max-age=300"})
 
 
 @router.get("/sync-logs")

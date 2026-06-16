@@ -12,8 +12,8 @@ import uuid
 
 from app.core.config import settings
 
-# Расширения, которые считаем картинками в обмене
-IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp", ".gif"}
+# Расширения, которые считаем картинками (обмен + загрузка фото/логотипа в админке)
+IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp", ".gif", ".svg"}
 
 
 def _safe_name(filename: str) -> str:

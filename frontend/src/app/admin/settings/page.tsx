@@ -2,14 +2,14 @@
 
 import { useEffect, useState } from "react";
 import AdminShell from "@/components/AdminShell";
-import { adminFetch } from "@/lib/adminApi";
+import { adminFetch, adminUpload } from "@/lib/adminApi";
 
 interface OwnerSettings {
   shop_name: string; contact_phone: string; contact_email: string; contact_hours: string;
   delivery_info: string;
   exchange_login: string; exchange_password: string;
   vk_peer_id: string; notify_email: string;
-  vk_ready?: boolean; email_ready?: boolean;
+  vk_ready?: boolean; email_ready?: boolean; has_logo?: boolean;
 }
 
 const EMPTY: OwnerSettings = {
@@ -36,12 +36,33 @@ export default function SettingsPage() {
   const [pw, setPw] = useState({ current_password: "", new_password: "" });
   const [pwMsg, setPwMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [pwLoading, setPwLoading] = useState(false);
+  const [hasLogo, setHasLogo] = useState(false);
+  const [logoVer, setLogoVer] = useState(0);   // сброс кэша превью логотипа
+  const [logoBusy, setLogoBusy] = useState(false);
 
   useEffect(() => {
     adminFetch<OwnerSettings>("/settings")
-      .then(d => { setForm(d); setVkReady(!!d.vk_ready); setEmailReady(!!d.email_ready); })
+      .then(d => { setForm(d); setVkReady(!!d.vk_ready); setEmailReady(!!d.email_ready); setHasLogo(!!d.has_logo); })
       .catch(() => {});
   }, []);
+
+  async function handleLogoUpload(file: File | undefined) {
+    if (!file) return;
+    setLogoBusy(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      await adminUpload("/logo", fd);
+      setHasLogo(true); setLogoVer(v => v + 1);
+    } catch { /* ignore */ } finally { setLogoBusy(false); }
+  }
+  async function handleLogoRemove() {
+    setLogoBusy(true);
+    try {
+      await adminFetch("/logo", { method: "DELETE" });
+      setHasLogo(false); setLogoVer(v => v + 1);
+    } catch { /* ignore */ } finally { setLogoBusy(false); }
+  }
 
   // Сохраняет только поля одного блока
   async function saveSection(e: React.FormEvent, id: string, keys: (keyof OwnerSettings)[]) {
@@ -144,7 +165,35 @@ export default function SettingsPage() {
         <div style={inputStyle}>
           <label className="form-label">Название магазина</label>
           <input className="form-input" value={form.shop_name} onChange={set("shop_name")} placeholder="Магазин" />
-          <p style={{ fontSize: 12, color: "var(--ink-secondary)" }}>Отображается в шапке, футере и на вкладке браузера</p>
+          <p style={{ fontSize: 12, color: "var(--ink-secondary)" }}>В футере и на вкладке браузера; в шапке — если не задан логотип</p>
+        </div>
+
+        {/* Логотип (показывается в шапке вместо названия) */}
+        <div style={inputStyle}>
+          <label className="form-label">Логотип (в шапке сайта)</label>
+          <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
+            {hasLogo && (
+              <span style={{ display: "inline-flex", alignItems: "center", height: 44, padding: "0 12px",
+                background: "var(--cloud)", border: "1px solid var(--hairline-soft)", borderRadius: 8 }}>
+                <img src={`/api/v1/admin/logo?v=${logoVer}`} alt="логотип" style={{ height: 28, width: "auto", display: "block" }} />
+              </span>
+            )}
+            <label style={{ padding: "0 16px", height: 38, display: "inline-flex", alignItems: "center", borderRadius: "var(--radius-md)",
+              border: "1px solid var(--graphite)", color: "var(--ink)", fontWeight: 600, fontSize: 14,
+              cursor: logoBusy ? "wait" : "pointer", opacity: logoBusy ? 0.5 : 1 }}>
+              {hasLogo ? "Заменить" : "Загрузить логотип"}
+              <input type="file" accept="image/*" hidden
+                onChange={e => { handleLogoUpload(e.target.files?.[0]); e.target.value = ""; }} />
+            </label>
+            {hasLogo && (
+              <button type="button" onClick={handleLogoRemove} disabled={logoBusy}
+                style={{ padding: "0 14px", height: 38, borderRadius: "var(--radius-md)", border: "1px solid var(--hairline-soft)",
+                  background: "transparent", color: "var(--ink-secondary)", fontWeight: 600, fontSize: 14, cursor: "pointer" }}>
+                Убрать
+              </button>
+            )}
+          </div>
+          <p style={{ fontSize: 12, color: "var(--ink-secondary)" }}>PNG/JPG/SVG. Если загружен — показывается в шапке вместо названия.</p>
         </div>
         <div style={inputStyle}>
           <label className="form-label">Телефон (футер сайта)</label>

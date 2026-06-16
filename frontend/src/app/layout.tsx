@@ -44,7 +44,7 @@ function UserIcon() {
   );
 }
 
-interface StoreInfo { name: string; phone: string; email: string; hours: string; }
+interface StoreInfo { name: string; phone: string; email: string; hours: string; logo: boolean; }
 
 async function getStoreInfo(): Promise<StoreInfo> {
   try {
@@ -58,10 +58,11 @@ async function getStoreInfo(): Promise<StoreInfo> {
         phone: d.contact_phone || "",
         email: d.contact_email || "",
         hours: d.contact_hours || "",
+        logo: !!d.has_logo,
       };
     }
   } catch {}
-  return { name: SITE_NAME, phone: "", email: "", hours: "" };
+  return { name: SITE_NAME, phone: "", email: "", hours: "", logo: false };
 }
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
@@ -83,7 +84,11 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <CartProvider>
           <header className="header">
             <div className="container header__inner">
-              <Link href="/" className="brand">{shopName}<b>.</b></Link>
+              <Link href="/" className="brand" aria-label={shopName}>
+                {store.logo
+                  ? <img src="/api/v1/admin/logo" alt={shopName} style={{ height: 34, width: "auto", display: "block" }} />
+                  : <>{shopName}<b>.</b></>}
+              </Link>
 
               {SHOW_SOON && (
                 <nav className="nav hide-mobile">
