@@ -14,6 +14,39 @@ function plural(n: number, one: string, few: string, many: string): string {
   return many;
 }
 
+// Мини-фото с превью по наведению (большое фото рядом, не обрезанное).
+function ProductThumb({ product }: { product: Product }) {
+  const [box, setBox] = useState<{ left: number; top: number } | null>(null);
+  const hasImg = !!product.image_url;
+  const SIZE = 260;
+
+  function onEnter(e: React.MouseEvent) {
+    if (!hasImg) return;
+    const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    let left = r.right + 12;
+    if (left + SIZE > window.innerWidth - 8) left = r.left - SIZE - 12; // у правого края — показываем слева
+    const top = Math.max(8, Math.min(r.top + r.height / 2 - SIZE / 2, window.innerHeight - SIZE - 8));
+    setBox({ left, top });
+  }
+
+  return (
+    <Link href={`/products/${product.id}`} onMouseEnter={onEnter} onMouseLeave={() => setBox(null)}
+      style={{ display: "block", width: 44, height: 44, borderRadius: 8, overflow: "hidden",
+        background: "var(--cloud)", border: "1px solid var(--hairline-soft)", position: "relative" }}>
+      {hasImg
+        ? <img src={`/api/v1/products/${product.id}/image`} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+        : <span style={{ display: "flex", width: "100%", height: "100%", alignItems: "center", justifyContent: "center", color: "var(--graphite)", opacity: .5 }}><IconImage width="1.2em" height="1.2em" /></span>}
+      {box && (
+        <span style={{ position: "fixed", left: box.left, top: box.top, zIndex: 60, pointerEvents: "none",
+          width: SIZE, height: SIZE, borderRadius: 12, overflow: "hidden", background: "#fff",
+          border: "1px solid var(--hairline-soft)", boxShadow: "0 12px 44px rgba(0,0,0,.22)" }}>
+          <img src={`/api/v1/products/${product.id}/image`} alt={product.name} style={{ width: "100%", height: "100%", objectFit: "contain", display: "block" }} />
+        </span>
+      )}
+    </Link>
+  );
+}
+
 // Ячейка количества: − [число] + . Пишет точное число в корзину (на blur / Enter / кнопки).
 function QtyCell({ product }: { product: Product }) {
   const { items, setItemQuantity } = useCart();
@@ -96,14 +129,7 @@ export default function CatalogList({ products }: { products: Product[] }) {
           <tbody>
             {products.map((p) => (
               <tr key={p.id}>
-                <td style={td}>
-                  <Link href={`/products/${p.id}`} style={{ display: "block", width: 44, height: 44, borderRadius: 8,
-                    overflow: "hidden", background: "var(--cloud)", border: "1px solid var(--hairline-soft)" }}>
-                    {p.image_url
-                      ? <img src={`/api/v1/products/${p.id}/image`} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
-                      : <span style={{ display: "flex", width: "100%", height: "100%", alignItems: "center", justifyContent: "center", color: "var(--graphite)", opacity: .5 }}><IconImage width="1.2em" height="1.2em" /></span>}
-                  </Link>
-                </td>
+                <td style={td}><ProductThumb product={p} /></td>
                 <td style={td}>
                   <Link href={`/products/${p.id}`} style={{ fontWeight: 600, color: "var(--ink)", textDecoration: "none" }}>{p.name}</Link>
                   {p.category?.name && <div style={{ fontSize: 12, color: "var(--ink-tertiary)" }}>{p.category.name}</div>}
