@@ -31,7 +31,7 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     restart: always
-    mem_limit: 640m
+    mem_limit: 1024m          # запас под разбор большого каталога (10000+ товаров) в памяти
     env_file: .env.prod
     depends_on:
       db:

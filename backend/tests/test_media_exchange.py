@@ -54,6 +54,27 @@ def test_exchange_accepts_image_file(client, monkeypatch, tmp_path):
     assert (tmp_path / "prod-img.jpg").exists()
 
 
+def test_exchange_reassembles_chunked_import(client, db_session):
+    """Большой import.xml приходит несколькими кусками — обмен их склеивает, а не затирает."""
+    xml = (
+        '<?xml version="1.0" encoding="UTF-8"?>'
+        '<КоммерческаяИнформация><Каталог><Товары>'
+        '<Товар><Ид>chunk-1</Ид><Наименование>Чанк Тест</Наименование><Артикул>CHK-1</Артикул></Товар>'
+        '</Товары></Каталог></КоммерческаяИнформация>'
+    ).encode("utf-8")
+    half = len(xml) // 2
+
+    client.get("/api/v1/1c/exchange?mode=init")  # старт сеанса — сброс накопленного
+    client.post("/api/v1/1c/exchange?mode=file&filename=import.xml", content=xml[:half])
+    client.post("/api/v1/1c/exchange?mode=file&filename=import.xml", content=xml[half:])
+    r = client.get("/api/v1/1c/exchange?mode=import&filename=import.xml")
+
+    assert "failure" not in r.text.lower()           # не "Start tag expected"
+    db_session.expire_all()
+    p = db_session.query(Product).filter_by(moysklad_id="chunk-1").first()
+    assert p is not None and p.article == "CHK-1"     # склеилось и распарсилось
+
+
 def test_exchange_rejects_unknown_file(client):
     resp = client.post("/api/v1/1c/exchange?mode=file&filename=evil.exe", content=b"x")
     assert "failure" in resp.text

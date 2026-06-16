@@ -41,8 +41,11 @@ def upsert_catalog(db: Session, catalog: ParsedCatalog, source: str = "commercem
         category_id_map: dict[str, str] = {}       # moysklad_id → наш internal id
         category_objs: dict[str, Category] = {}    # moysklad_id → объект Category
 
+        # Все существующие категории — одним запросом (а не по одной на каждую: важно для
+        # больших каталогs МойСклад с сотнями категорий).
+        existing_cats = {c.moysklad_id: c for c in db.query(Category).all()}
         for parsed_cat in catalog.categories:
-            cat = db.query(Category).filter_by(moysklad_id=parsed_cat.moysklad_id).first()
+            cat = existing_cats.get(parsed_cat.moysklad_id)
             if cat is None:
                 cat = Category(
                     id=str(uuid.uuid4()),
@@ -50,6 +53,7 @@ def upsert_catalog(db: Session, catalog: ParsedCatalog, source: str = "commercem
                     name=parsed_cat.name,
                 )
                 db.add(cat)
+                existing_cats[parsed_cat.moysklad_id] = cat
             else:
                 cat.name = parsed_cat.name
 
@@ -67,8 +71,11 @@ def upsert_catalog(db: Session, catalog: ParsedCatalog, source: str = "commercem
         db.flush()
 
         # ─── Товары ───────────────────────────────────────────────────────────
+        # Все существующие товары — одним запросом (на 10000 товаров 10000 отдельных
+        # SELECT'ов повесили бы обмен и дали таймаут у МойСклад).
+        existing_products = {p.moysklad_id: p for p in db.query(Product).all()}
         for parsed_product in catalog.products:
-            product = db.query(Product).filter_by(moysklad_id=parsed_product.moysklad_id).first()
+            product = existing_products.get(parsed_product.moysklad_id)
 
             # Определяем internal category_id
             cat_id = None
@@ -91,6 +98,7 @@ def upsert_catalog(db: Session, catalog: ParsedCatalog, source: str = "commercem
                     synced_at=_utcnow(),
                 )
                 db.add(product)
+                existing_products[parsed_product.moysklad_id] = product
                 created += 1
             else:
                 product.name = parsed_product.name

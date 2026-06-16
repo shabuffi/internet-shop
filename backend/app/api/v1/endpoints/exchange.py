@@ -249,9 +249,12 @@ async def exchange_get(
         return "failure\nНе авторизовано"
 
     # ── Шаг 2: init ───────────────────────────────────────────────────────────
-    # МойСклад спрашивает параметры: поддерживаем ли zip, максимальный размер файла
+    # МойСклад спрашивает параметры: поддерживаем ли zip, максимальный размер файла.
+    # init = старт нового сеанса обмена → сбрасываем накопленные ранее куски файлов
+    # (большой каталог приходит несколькими POST'ами с тем же именем — мы их склеиваем).
     if mode == "init":
-        return "zip=no\nfile_limit=10485760"  # 10 MB
+        redis_client.delete(_file_key("import.xml"), _file_key("offers.xml"))
+        return "zip=no\nfile_limit=10485760"  # 10 MB на один кусок; большие файлы шлются частями
 
     # ── Выдача заказов: МойСклад сам забирает заказы из магазина ──────────────
     # query → отдаём невыгруженные заказы XML; success → помечаем их выгруженными.
@@ -270,6 +273,11 @@ async def exchange_get(
         import_xml = redis_client.get(_file_key("import.xml"))
         if not import_xml:
             return "failure\nНет данных для импорта"
+
+        # Диагностическая копия полного (склеенного) каталога — сутки; заход с картинками — неделю
+        redis_client.set("exchange:diag:import.xml", import_xml, ex=86400)
+        if "Картинка".encode() in import_xml:
+            redis_client.set("exchange:diag:import_with_kartinka.xml", import_xml, ex=7 * 86400)
 
         try:
             catalog = parse_import_xml(import_xml)
@@ -331,14 +339,13 @@ async def exchange_post(
         body = await request.body()
         # XML каталога/предложений — складываем сырьё в Redis (парсится на шаге import)
         if filename in ("import.xml", "offers.xml"):
-            redis_client.set(_file_key(filename), body, ex=_TTL)
-            # Копия для диагностики на /admin/dev (не удаляется шагом import), сутки
-            redis_client.set(f"exchange:diag:{filename}", body, ex=86400)
-            has_kartinka = "Картинка".encode() in body if filename == "import.xml" else False
-            if has_kartinka:
-                # отдельно держим заход С картинками (его не перезатрёт обычный каталог), неделю
-                redis_client.set("exchange:diag:import_with_kartinka.xml", body, ex=7 * 86400)
-            logger.info("Received file: %s (%d bytes, Картинка=%s)", filename, len(body), has_kartinka)
+            # Большой каталог МойСклад шлёт НЕСКОЛЬКИМИ кусками с тем же именем —
+            # склеиваем (append), а не перезаписываем, иначе остаётся только последний обрезок
+            # (он начинается не с '<' → "Start tag expected"). Диагностику снимаем на шаге import.
+            key = _file_key(filename)
+            redis_client.append(key, body)
+            redis_client.expire(key, _TTL)
+            logger.info("Received file chunk: %s (+%d bytes)", filename, len(body))
             return "success"
         # Картинка товара (опция «Выгружать изображения») — сохраняем в медиа-хранилище
         if is_image_filename(filename):
