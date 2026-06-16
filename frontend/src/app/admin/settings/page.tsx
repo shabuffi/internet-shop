@@ -195,6 +195,30 @@ export default function SettingsPage() {
           <input className="form-input" value={form.vk_peer_id} onChange={set("vk_peer_id")} placeholder="например, 123456789" autoComplete="off" />
         </div>
         {readyNote(vkReady, "Сообщество")}
+
+        <details style={{ marginBottom: 14, border: "1px solid var(--hairline-soft)", borderRadius: 10, background: "var(--surface)" }}>
+          <summary style={{ cursor: "pointer", padding: "11px 14px", fontSize: 13, fontWeight: 600, color: "var(--accent, #2563eb)" }}>
+            Как узнать свой id и сделать, чтобы сообщения точно приходили →
+          </summary>
+          <div style={{ padding: "0 16px 14px", fontSize: 13, color: "var(--ink-secondary)", lineHeight: 1.65 }}>
+            <p style={{ fontWeight: 600, color: "var(--ink)", margin: "6px 0 4px" }}>1. Узнать свой id (peer_id)</p>
+            <ol style={{ margin: "0 0 10px", paddingLeft: 18 }}>
+              <li>Откройте свою страницу ВКонтакте.</li>
+              <li>Если в адресе <code>vk.com/id123456789</code> — это число и есть ваш id.</li>
+              <li>Если короткое имя (<code>vk.com/ivanov</code>) — откройте сервис <b>regvk.com/id</b>, вставьте ссылку на свою страницу → получите числовой id. Его и впишите в поле выше.</li>
+            </ol>
+            <p style={{ fontWeight: 600, color: "var(--ink)", margin: "6px 0 4px" }}>2. Чтобы сообщения доходили (обязательно один раз)</p>
+            <ol style={{ margin: 0, paddingLeft: 18 }}>
+              <li>Откройте сообщество магазина в ВК и <b>напишите ему любое сообщение</b> от своего личного аккаунта (например, «привет»).</li>
+              <li>Это нужно, потому что ВК запрещает сообществу писать вам первым. После вашего сообщения — бот сможет вам отвечать.</li>
+              <li>Теперь нажмите <b>«Отправить тест»</b> ниже — должно прийти сообщение в личку ВК.</li>
+            </ol>
+            <p style={{ marginTop: 10, fontSize: 12, color: "var(--ink-tertiary)" }}>
+              Само сообщество и его ключ доступа настраивает разработчик — если выше стоит «✓ Сообщество подключено», эта часть уже готова.
+            </p>
+          </div>
+        </details>
+
         {saveRow("vk")}
         {testButton("vk")}
       </form>
