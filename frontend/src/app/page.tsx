@@ -6,18 +6,20 @@ import { formatPrice } from "@/lib/format";
 import AddToCartCard from "@/components/AddToCartCard";
 import CatalogList from "@/components/CatalogList";
 import CategorySelect from "@/components/CategorySelect";
+import SortSelect from "@/components/SortSelect";
 import { IconImage, IconSearch } from "@/components/icons";
 
 interface Props {
-  searchParams: Promise<{ category_id?: string; search?: string; page?: string; view?: string }>;
+  searchParams: Promise<{ category_id?: string; search?: string; page?: string; view?: string; sort?: string }>;
 }
 
-// Собирает URL каталога, сохраняя фильтры и режим (плитка/список). page>1 — только при необходимости.
-function buildHref(params: { category_id?: string; search?: string; page?: number; view?: string }) {
+// Собирает URL каталога, сохраняя фильтры, сортировку и режим (плитка/список). page>1 — только при необходимости.
+function buildHref(params: { category_id?: string; search?: string; page?: number; view?: string; sort?: string }) {
   const q = new URLSearchParams();
   if (params.category_id) q.set("category_id", params.category_id);
   if (params.search) q.set("search", params.search);
   if (params.view) q.set("view", params.view);
+  if (params.sort && params.sort !== "name") q.set("sort", params.sort);
   if (params.page && params.page > 1) q.set("page", String(params.page));
   const s = q.toString();
   return s ? `/?${s}` : "/";
@@ -41,10 +43,11 @@ export default async function CatalogPage({ searchParams }: Props) {
   const page = Math.max(1, parseInt(params.page ?? "1", 10) || 1);
   const view = params.view === "list" ? "list" : "grid";
   const listView = view === "list";
+  const sort = params.sort === "price_asc" || params.sort === "price_desc" ? params.sort : "name";
 
   const [data, categories] = await Promise.all([
     // В списке («бланк заказа») показываем больше товаров на странице
-    getProducts({ category_id: categoryId, search, page, page_size: listView ? 100 : undefined }),
+    getProducts({ category_id: categoryId, search, page, sort, page_size: listView ? 100 : undefined }),
     getCategories(),
   ]);
 
@@ -70,9 +73,9 @@ export default async function CatalogPage({ searchParams }: Props) {
       {/* Hero */}
       <div className="band band--hero">
         <div className="container catalog__hero">
-          <div className="eyebrow">Магазин</div>
-          <h1 style={{ marginTop: "var(--s-3)" }}>Каталог</h1>
-          <p>Выберите категорию или воспользуйтесь поиском — мы покажем, что есть в наличии.</p>
+          <div className="eyebrow">Торговый дом</div>
+          <h1 style={{ marginTop: "var(--s-3)" }}>Каталог товаров</h1>
+          <p>Тысячи товаров для дома, дачи, сада и хозяйства. Подберите нужное по категории или через поиск.</p>
         </div>
       </div>
 
@@ -81,17 +84,19 @@ export default async function CatalogPage({ searchParams }: Props) {
         <form action="/" method="get" className="search only-mobile" style={{ width: "100%", marginBottom: "var(--s-5)" }}>
           {categoryId && <input type="hidden" name="category_id" value={categoryId} />}
           {listView && <input type="hidden" name="view" value="list" />}
+          {sort !== "name" && <input type="hidden" name="sort" value={sort} />}
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="7" /><line x1="21" y1="21" x2="16.5" y2="16.5" /></svg>
           <input name="search" defaultValue={search ?? ""} placeholder="Поиск товаров" aria-label="Поиск товаров" />
         </form>
 
-        {/* Тулбар: фильтры + переключатель режима + счётчик */}
+        {/* Тулбар: фильтры + сортировка + переключатель режима + счётчик */}
         <div className="toolbar">
-          <CategorySelect categories={categories} current={categoryId} search={search} view={listView ? "list" : undefined} />
-          <div style={{ display: "flex", alignItems: "center", gap: "var(--s-4)" }}>
+          <CategorySelect categories={categories} current={categoryId} search={search} view={listView ? "list" : undefined} sort={sort} />
+          <SortSelect current={sort} categoryId={categoryId} search={search} view={listView ? "list" : undefined} />
+          <div style={{ display: "flex", alignItems: "center", gap: "var(--s-4)", marginLeft: "auto" }}>
             <div style={{ display: "inline-flex", border: "1px solid var(--hairline)", borderRadius: 8, overflow: "hidden" }}>
-              <Link href={buildHref({ category_id: categoryId, search })} style={toggle(!listView)} title="Плиткой" aria-label="Плиткой">{IconGrid}</Link>
-              <Link href={buildHref({ category_id: categoryId, search, view: "list" })} style={toggle(listView)} title="Списком (бланк заказа)" aria-label="Списком (бланк заказа)">{IconRows}</Link>
+              <Link href={buildHref({ category_id: categoryId, search, sort })} style={toggle(!listView)} title="Плиткой" aria-label="Плиткой">{IconGrid}</Link>
+              <Link href={buildHref({ category_id: categoryId, search, sort, view: "list" })} style={toggle(listView)} title="Списком (бланк заказа)" aria-label="Списком (бланк заказа)">{IconRows}</Link>
             </div>
             <span className="result-count">{data.total} товаров</span>
           </div>
@@ -141,14 +146,14 @@ export default async function CatalogPage({ searchParams }: Props) {
             {data.pages > 1 && (
               <div className="pagination">
                 {page > 1
-                  ? <Link href={buildHref({ category_id: categoryId, search, page: page - 1, view: listView ? "list" : undefined })} className="page-dot" aria-label="Назад">‹</Link>
+                  ? <Link href={buildHref({ category_id: categoryId, search, sort, page: page - 1, view: listView ? "list" : undefined })} className="page-dot" aria-label="Назад">‹</Link>
                   : <span className="page-dot page-dot--disabled">‹</span>}
                 {pageNumbers(page, data.pages).map((n) => (
-                  <Link key={n} href={buildHref({ category_id: categoryId, search, page: n, view: listView ? "list" : undefined })}
+                  <Link key={n} href={buildHref({ category_id: categoryId, search, sort, page: n, view: listView ? "list" : undefined })}
                     className={"page-dot " + (n === page ? "page-dot--active" : "")}>{n}</Link>
                 ))}
                 {page < data.pages
-                  ? <Link href={buildHref({ category_id: categoryId, search, page: page + 1, view: listView ? "list" : undefined })} className="page-dot" aria-label="Вперёд">›</Link>
+                  ? <Link href={buildHref({ category_id: categoryId, search, sort, page: page + 1, view: listView ? "list" : undefined })} className="page-dot" aria-label="Вперёд">›</Link>
                   : <span className="page-dot page-dot--disabled">›</span>}
               </div>
             )}

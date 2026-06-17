@@ -1,36 +1,39 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import type { Category } from "@/types/product";
 
-// Компактный выпадающий выбор категории (вместо длинной ленты чипов при сотнях категорий).
-export default function CategorySelect({ categories, current, search, view, sort }: {
-  categories: Category[];
+// Выбор сортировки витрины. Сохраняет остальные фильтры и режим (плитка/список).
+const OPTIONS = [
+  { value: "name", label: "По названию" },
+  { value: "price_asc", label: "Сначала дешевле" },
+  { value: "price_desc", label: "Сначала дороже" },
+];
+
+export default function SortSelect({ current, categoryId, search, view }: {
   current?: string;
+  categoryId?: string;
   search?: string;
   view?: string;
-  sort?: string;
 }) {
   const router = useRouter();
 
   function onChange(e: React.ChangeEvent<HTMLSelectElement>) {
-    const cid = e.target.value;
     const q = new URLSearchParams();
-    if (cid) q.set("category_id", cid);
+    if (categoryId) q.set("category_id", categoryId);
     if (search) q.set("search", search);
     if (view) q.set("view", view);
-    if (sort) q.set("sort", sort);
+    if (e.target.value && e.target.value !== "name") q.set("sort", e.target.value);
     const s = q.toString();
     router.push(s ? `/?${s}` : "/");
   }
 
   return (
     <select
-      value={current ?? ""}
+      value={current ?? "name"}
       onChange={onChange}
-      aria-label="Категория"
+      aria-label="Сортировка"
       style={{
-        height: 40, maxWidth: "100%", minWidth: 220, padding: "0 36px 0 14px",
+        height: 40, padding: "0 36px 0 14px",
         border: "1px solid var(--hairline)", borderRadius: 10, background: "var(--paper)",
         color: "var(--ink)", fontSize: 14, fontWeight: 500, cursor: "pointer",
         appearance: "none", WebkitAppearance: "none",
@@ -38,9 +41,8 @@ export default function CategorySelect({ categories, current, search, view, sort
         backgroundRepeat: "no-repeat", backgroundPosition: "right 12px center",
       }}
     >
-      <option value="">Все категории</option>
-      {categories.map((c) => (
-        <option key={c.id} value={c.id}>{c.name}</option>
+      {OPTIONS.map((o) => (
+        <option key={o.value} value={o.value}>{o.label}</option>
       ))}
     </select>
   );

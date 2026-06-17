@@ -114,7 +114,8 @@ export default function CatalogList({ products }: { products: Product[] }) {
 
   return (
     <>
-      <div style={{ overflowX: "auto", border: "1px solid var(--hairline-soft)", borderRadius: "var(--radius-lg)", marginBottom: 96 }}>
+      {/* Десктоп: таблица (на телефоне прячется) */}
+      <div className="clist-desktop" style={{ overflowX: "auto", border: "1px solid var(--hairline-soft)", borderRadius: "var(--radius-lg)", marginBottom: 96 }}>
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14, minWidth: 720 }}>
           <thead>
             <tr style={{ background: "var(--cloud)" }}>
@@ -147,6 +148,33 @@ export default function CatalogList({ products }: { products: Product[] }) {
           </tbody>
         </table>
       </div>
+
+      {/* Мобильный: компактные строки без фото — название+цена сверху,
+          артикул+наличие мелко снизу, степпер справа; тап по названию открывает товар */}
+      <div className="clist-mobile" style={{ flexDirection: "column", border: "1px solid var(--hairline-soft)",
+        borderRadius: "var(--radius-lg)", overflow: "hidden", marginBottom: 96 }}>
+        {products.map((p, i) => (
+          <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 14px",
+            borderTop: i === 0 ? "none" : "1px solid var(--hairline-soft)" }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ display: "flex", gap: 10, alignItems: "baseline", justifyContent: "space-between" }}>
+                <Link href={`/products/${p.id}`} style={{ fontWeight: 600, color: "var(--ink)", textDecoration: "none",
+                  fontSize: 14, lineHeight: 1.3 }}>{p.name}</Link>
+                <span style={{ fontWeight: 700, whiteSpace: "nowrap", fontSize: 14 }}>{formatPrice(p.price)}</span>
+              </div>
+              <div style={{ marginTop: 4, fontSize: 12, color: "var(--ink-tertiary)", display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+                {p.article && <span style={{ fontVariantNumeric: "tabular-nums" }}>Арт. {p.article}</span>}
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 5, color: p.available ? "var(--stock)" : "var(--ink-tertiary)" }}>
+                  <span style={{ width: 6, height: 6, borderRadius: 999, background: "currentColor" }} />
+                  {p.available ? "В наличии" : "Нет"}
+                </span>
+              </div>
+            </div>
+            <QtyCell product={p} />
+          </div>
+        ))}
+      </div>
+
       <CartBar />
     </>
   );

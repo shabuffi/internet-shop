@@ -1,3 +1,18 @@
+/** Убирает код склада в начале названия товара: «с2 Швабра…» → «Швабра…».
+ *  МойСклад в этом каталоге шлёт префикс «с1/с2/с3/с4 » (кириллическая «с»). */
+export function cleanProductName(name: string): string {
+  const out = name.replace(/^[сcСC]\s?\d+[.\s]+\s*/u, "").trim();
+  return out || name;
+}
+
+/** Убирает числовой код-префикс в начале названия категории:
+ *  «00001.00. Лето» → «Лето», «001.10.01 Перчатки…» → «Перчатки…».
+ *  Требуем точку в коде, чтобы не срезать настоящие названия вроде «100 мелочей». */
+export function cleanCategoryName(name: string): string {
+  const out = name.replace(/^\d[\d.]*\.[\d.]*\s+/u, "").trim();
+  return out || name;
+}
+
 /** Форматирует цену в рублях: 8900 → "8 900 ₽", 24.9 → "24,9 ₽". */
 export function formatPrice(value: string | number): string {
   const n = typeof value === "string" ? Number(value) : value;

@@ -13,8 +13,8 @@ export async function generateMetadata(): Promise<Metadata> {
     metadataBase: new URL(SITE_URL),
     title: { default: `${name} — интернет-магазин`, template: `%s — ${name}` },
     description: SITE_DESCRIPTION,
-    // Если в админке загружен логотип — он же становится иконкой вкладки (favicon)
-    ...(logo ? { icons: { icon: "/api/v1/admin/logo" } } : {}),
+    // Иконка вкладки (favicon): загруженный в админке логотип, иначе — квадратная эмблема
+    icons: { icon: logo ? "/api/v1/admin/logo" : "/icon.png" },
     openGraph: {
       type: "website",
       siteName: name,
@@ -88,8 +88,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             <div className="container header__inner">
               <Link href="/" className="brand" aria-label={shopName}>
                 {store.logo
-                  ? <img src="/api/v1/admin/logo" alt={shopName} style={{ height: 34, width: "auto", display: "block" }} />
-                  : <>{shopName}<b>.</b></>}
+                  ? <img src="/api/v1/admin/logo" alt={shopName} style={{ height: 38, width: "auto", display: "block" }} />
+                  : <img src="/logo.png" alt={shopName} style={{ height: 38, width: "auto", display: "block" }} />}
               </Link>
 
               {SHOW_SOON && (
@@ -128,7 +128,6 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                   <h4>Магазин</h4>
                   <Link href="/">Каталог</Link>
                   <Link href="/cart">Корзина</Link>
-                  <Link href="/checkout">Оформление заказа</Link>
                 </div>
 
                 {hasContacts && (

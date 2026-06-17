@@ -34,15 +34,18 @@ def list_products(
     page_size: int = Query(20, ge=1, le=100),
     category_id: str | None = Query(None),
     search: str | None = Query(None),
+    sort: str | None = Query(None),
     db: Session = Depends(get_db),
 ):
-    """Возвращает список активных товаров с пагинацией, фильтром и поиском.
+    """Возвращает список активных товаров с пагинацией, фильтром, поиском и сортировкой.
 
     Args:
         page: Номер страницы (с 1).
         page_size: Размер страницы (1–100).
         category_id: Если задан — фильтр по категории.
         search: Если задан — поиск без учёта регистра по названию или артикулу.
+        sort: Порядок: ``price_asc`` / ``price_desc`` / ``name`` (по умолчанию — name).
+            При сортировке по имени отбрасываем код склада в начале («с1/с2 …»).
         db: Сессия БД.
 
     Returns:
@@ -65,7 +68,15 @@ def list_products(
             Product.name.ilike(pattern) | Product.article.ilike(pattern)
         )
 
-    total = db.scalar(select(func.count()).select_from(query.subquery()))
+    if sort == "price_asc":
+        query = query.order_by(Product.price.asc())
+    elif sort == "price_desc":
+        query = query.order_by(Product.price.desc())
+    else:  # name (по умолчанию) — без кода склада «с1/с2 …» в начале
+        clean_name = func.regexp_replace(Product.name, r"^[сcСC]\s?\d+[.\s]+\s*", "", "i")
+        query = query.order_by(clean_name.asc())
+
+    total = db.scalar(select(func.count()).select_from(query.order_by(None).subquery()))
     items = db.scalars(query.offset((page - 1) * page_size).limit(page_size)).all()
 
     return ProductListOut(
