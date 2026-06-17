@@ -5,15 +5,19 @@
 
 :root {
   /* поверхности */
-  --canvas:#FFFFFF; --paper:#FFFFFF; --cloud:#F6F5F3; --fog:#ECEBE8;
-  --hairline:#E7E5E1; --steel:#CFCDC8;
-  /* текст */
-  --ink:#1C1B1A; --ink-soft:#2A2926; --charcoal:#57554F; --graphite:#8C8A84; --on-ink:#FAF9F7;
-  /* акцент */
-  --accent:#5B6B82;
+  --canvas:#FFFFFF; --paper:#FFFFFF; --cloud:#F6F5F3; --fog:#EDECEA;
+  --hairline:#E7E5E1; --steel:#CFCCC6;
+  /* текст — холодный графит (дружит с синим триколора) */
+  --ink:#161A20; --ink-soft:#11161F; --charcoal:#4C535E; --graphite:#828995; --on-ink:#F7F9FC;
+  /* акцент — триколор флага России (бело-сине-красный) */
+  --accent:#0039A6;            /* синий — рабочая лошадка: кнопки, ссылки, актив */
   --accent-deep: color-mix(in srgb, var(--accent), #000 22%);
-  --accent-soft: color-mix(in srgb, var(--accent), #fff 88%);
+  --accent-soft: color-mix(in srgb, var(--accent), #fff 92%);
   --on-accent:#FFFFFF;
+  --accent-2:#D52B1E;          /* красный — точечно: цена, итог, CTA, точка лого */
+  --accent-2-deep: color-mix(in srgb, var(--accent-2), #000 16%);
+  --accent-2-soft: color-mix(in srgb, var(--accent-2), #fff 90%);
+  --on-accent-2:#FFFFFF;
   /* семантика */
   --stock:#4B7A5E; --stock-soft:#E9F0EB; --out:#9A9893; --sale:#B0654C; --error:#B0463F;
   /* шрифты */
@@ -75,6 +79,8 @@ button, input, textarea, select { font-family: inherit; }
 .container { width: 100%; max-width: var(--container); margin: 0 auto; padding: 0 var(--s-8); }
 .app-main { flex: 1 1 auto; }
 .band { background: var(--cloud); }
+.band--hero { background: var(--accent-soft); border-bottom: 1px solid color-mix(in srgb, var(--accent), #fff 80%); }
+.band--hero .eyebrow { color: var(--accent); }
 /* только вертикальные отступы — горизонтальные оставляем за .container */
 .section { padding-top: var(--s-16); padding-bottom: var(--s-16); }
 .row { display: flex; align-items: center; gap: var(--s-3); }
@@ -91,6 +97,8 @@ button, input, textarea, select { font-family: inherit; }
 .btn:active { transform: translateY(1px); }
 .btn--primary { background: var(--accent); color: var(--on-accent); }
 .btn--primary:hover { background: var(--accent-deep); }
+.btn--cta { background: var(--accent-2); color: var(--on-accent-2); }
+.btn--cta:hover { background: var(--accent-2-deep); }
 .btn--ink { background: var(--ink); color: var(--on-ink); }
 .btn--ink:hover { background: #000; }
 .btn--outline { background: var(--paper); color: var(--ink); border-color: var(--steel); }
@@ -111,7 +119,7 @@ button, input, textarea, select { font-family: inherit; }
 .iconbtn:hover { background: var(--cloud); }
 .cart-count {
   position: absolute; top: 4px; right: 4px; min-width: 18px; height: 18px; padding: 0 4px;
-  background: var(--accent); color: var(--on-accent); border-radius: 999px;
+  background: var(--accent-2); color: var(--on-accent-2); border-radius: 999px;
   font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center;
 }
 
@@ -124,7 +132,7 @@ button, input, textarea, select { font-family: inherit; }
   transition: all .15s ease;
 }
 .chip:hover { border-color: var(--steel); color: var(--ink); }
-.chip--active { background: var(--ink); color: var(--on-ink); border-color: var(--ink); }
+.chip--active { background: var(--accent-2); color: var(--on-accent-2); border-color: var(--accent-2); }
 
 /* ---------- бейджи ---------- */
 .badge {
@@ -188,7 +196,7 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .
   font-family: var(--font-display); font-size: 24px; font-weight: 600; letter-spacing: -.01em;
   color: var(--ink); cursor: pointer; line-height: 1; white-space: nowrap;
 }
-.brand b { color: var(--accent); font-weight: 600; }
+.brand b { color: var(--accent-2); font-weight: 600; }
 .nav { display: flex; align-items: center; gap: var(--s-2); margin-left: var(--s-4); }
 .nav a { position: relative; padding: var(--s-2) var(--s-3); color: var(--ink); white-space: nowrap; font-size: var(--t-sm); font-weight: 500; cursor: pointer; border-radius: var(--r-sm); }
 .nav a:hover { color: var(--accent); }
@@ -204,9 +212,10 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .
 .search:focus-within { border-color: var(--steel); }
 
 /* ---------- подвал ---------- */
-.footer { background: var(--ink-soft); color: var(--on-ink); margin-top: auto; }
+.footer { background: var(--accent-deep); color: var(--on-ink); margin-top: auto; }
 .footer__top { padding: var(--s-16) 0 var(--s-12); display: grid; grid-template-columns: 1.6fr repeat(3, 1fr); gap: var(--s-8); }
 .footer__brand .brand { color: var(--on-ink); }
+.footer__brand .brand b { color: #FF6B5E; }
 .footer__brand p { color: rgba(250,249,247,.6); font-size: var(--t-sm); max-width: 30ch; margin: var(--s-4) 0 0; line-height: 1.6; }
 .footer__col h4 { font-size: var(--t-xs); letter-spacing: .14em; text-transform: uppercase; color: rgba(250,249,247,.5); margin: 0 0 var(--s-4); font-weight: 600; }
 .footer__col a { display: block; color: rgba(250,249,247,.82); font-size: var(--t-sm); padding: 6px 0; cursor: pointer; }
@@ -227,7 +236,7 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .
 }
 .textarea { height: auto; min-height: 96px; padding: var(--s-3) var(--s-4); resize: vertical; line-height: 1.5; }
 .input::placeholder, .textarea::placeholder { color: var(--graphite); }
-.input:focus, .textarea:focus, .select:focus { border-color: var(--ink); box-shadow: 0 0 0 3px var(--accent-soft); }
+.input:focus, .textarea:focus, .select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
 
 /* ---------- карточка товара ---------- */
 .pcard {
@@ -256,7 +265,7 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .
 .pagination { display: flex; align-items: center; justify-content: center; gap: var(--s-2); margin-top: var(--s-12); }
 .page-dot { min-width: 42px; height: 42px; padding: 0 var(--s-3); border-radius: var(--r-md); border: 1px solid var(--hairline); background: var(--paper); color: var(--ink); font-size: var(--t-sm); font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; text-decoration: none; }
 .page-dot:hover { border-color: var(--steel); }
-.page-dot--active { background: var(--ink); color: var(--on-ink); border-color: var(--ink); }
+.page-dot--active { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
 .page-dot--disabled { color: var(--steel); cursor: not-allowed; pointer-events: none; }
 
 /* ---------- карточка товара (PDP) ---------- */
@@ -268,7 +277,7 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .
 .pdp__cat { color: var(--graphite); font-size: var(--t-sm); }
 .pdp__title { font-family: var(--font-display); font-size: var(--t-h1); font-weight: 600; letter-spacing: -.01em; margin: var(--s-2) 0; line-height: 1.1; }
 .pdp__sku { color: var(--graphite); font-size: var(--t-sm); font-variant-numeric: tabular-nums; }
-.pdp__price { font-family: var(--font-ui); font-size: 30px; font-weight: 700; letter-spacing: -.01em; margin: var(--s-5) 0; font-variant-numeric: tabular-nums; }
+.pdp__price { font-family: var(--font-ui); font-size: 30px; font-weight: 700; letter-spacing: -.01em; margin: var(--s-5) 0; font-variant-numeric: tabular-nums; color: var(--accent-2); }
 .pdp__desc { color: var(--charcoal); line-height: 1.65; font-size: var(--t-body); white-space: pre-line; }
 .pdp__divider { height: 1px; background: var(--hairline); margin: var(--s-6) 0; }
 .pdp__buy { display: flex; gap: var(--s-3); align-items: stretch; margin: var(--s-6) 0; }
@@ -306,7 +315,7 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .
 .summary__row b { color: var(--ink); font-variant-numeric: tabular-nums; }
 .summary__total { display: flex; justify-content: space-between; align-items: baseline; gap: var(--s-3); padding: var(--s-4) 0; margin-top: var(--s-2); border-top: 1px solid var(--hairline); white-space: nowrap; }
 .summary__total span { font-weight: 600; }
-.summary__total b { font-size: 24px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.summary__total b { font-size: 24px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--accent-2); }
 
 .empty { text-align: center; padding: var(--s-16) var(--s-4); }
 .empty__icon { width: 64px; height: 64px; border-radius: 999px; background: var(--cloud); display: flex; align-items: center; justify-content: center; margin: 0 auto var(--s-5); color: var(--graphite); font-size: 28px; }
@@ -317,7 +326,7 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .
 .checkout { display: grid; grid-template-columns: 1fr 400px; gap: var(--s-12); align-items: start; }
 .checkout__section { margin-bottom: var(--s-8); }
 .checkout__section h3 { font-size: var(--t-h3); font-weight: 600; margin: 0 0 var(--s-5); display: flex; align-items: center; gap: var(--s-3); }
-.checkout__num { width: 28px; height: 28px; border-radius: 999px; background: var(--ink); color: var(--on-ink); font-size: var(--t-sm); font-weight: 700; display: inline-flex; align-items: center; justify-content: center; }
+.checkout__num { width: 28px; height: 28px; border-radius: 999px; background: var(--accent); color: var(--on-accent); font-size: var(--t-sm); font-weight: 700; display: inline-flex; align-items: center; justify-content: center; }
 .formgrid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s-4); }
 .formgrid .span2 { grid-column: 1 / -1; }
 .osummary { background: var(--cloud); border-radius: var(--r-xl); padding: var(--s-6); position: sticky; top: 92px; }
@@ -330,7 +339,7 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .
 
 /* ---------- спасибо ---------- */
 .thanks { text-align: center; max-width: 640px; margin: 0 auto; padding: var(--s-20) var(--s-4); }
-.thanks__check { width: 84px; height: 84px; border-radius: 999px; background: var(--stock-soft); color: var(--stock); display: flex; align-items: center; justify-content: center; margin: 0 auto var(--s-8); font-size: 40px; }
+.thanks__check { width: 84px; height: 84px; border-radius: 999px; background: var(--accent); color: var(--on-accent); display: flex; align-items: center; justify-content: center; margin: 0 auto var(--s-8); font-size: 40px; box-shadow: 0 8px 24px color-mix(in srgb, var(--accent-2), transparent 70%); }
 .thanks h1 { font-family: var(--font-display); font-size: var(--t-display); font-weight: 600; letter-spacing: -.01em; margin: 0 0 var(--s-4); line-height: 1.1; }
 .thanks p { color: var(--charcoal); font-size: var(--t-body-lg); line-height: 1.6; margin: 0 0 var(--s-8); }
 .thanks__order { display: inline-flex; flex-direction: column; gap: 4px; background: var(--cloud); border-radius: var(--r-lg); padding: var(--s-5) var(--s-12); margin-bottom: var(--s-8); }
@@ -359,7 +368,7 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .
   font-size: var(--t-body); color: var(--ink); outline: none;
   transition: border-color .15s ease, box-shadow .15s ease;
 }
-.form-input:focus { border-color: var(--ink); box-shadow: 0 0 0 3px var(--accent-soft); }
+.form-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
 .form-input::placeholder { color: var(--graphite); }
 textarea.form-input { height: auto; min-height: 90px; padding: var(--s-3) var(--s-4); resize: vertical; line-height: 1.5; }
 

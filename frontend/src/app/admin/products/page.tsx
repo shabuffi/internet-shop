@@ -10,13 +10,30 @@ interface AdminProduct { id: string; name: string; article: string | null; price
 export default function AdminProductsPage() {
   const [products, setProducts] = useState<AdminProduct[]>([]);
   const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
+  const [query, setQuery] = useState("");                  // активный поисковый запрос
+  const [search, setSearch] = useState("");                // текст в поле (до отправки)
   const [ver, setVer] = useState(0);                       // для сброса кэша миниатюр
   const [busyId, setBusyId] = useState<string | null>(null);
 
-  function load() {
-    adminFetch<{ items: AdminProduct[]; total: number }>("/products").then(d => { setProducts(d.items); setTotal(d.total); }).catch(() => {});
+  const pages = Math.max(1, Math.ceil(total / pageSize));
+
+  function load(p = page, q = query) {
+    const qs = new URLSearchParams({ page: String(p) });
+    if (q.trim()) qs.set("q", q.trim());
+    adminFetch<{ items: AdminProduct[]; total: number; page_size: number }>(`/products?${qs}`)
+      .then(d => { setProducts(d.items); setTotal(d.total); setPageSize(d.page_size || 50); })
+      .catch(() => {});
   }
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(page, query); }, [page, query]);
+
+  // Поиск: сбрасываем на первую страницу и фиксируем запрос
+  function submitSearch(e: React.FormEvent) {
+    e.preventDefault();
+    setPage(1);
+    setQuery(search);
+  }
 
   async function toggleAvailability(id: string, next: boolean) {
     setProducts(ps => ps.map(p => p.id === id ? { ...p, available: next } : p)); // оптимистично
@@ -50,14 +67,33 @@ export default function AdminProductsPage() {
 
   return (
     <AdminShell>
-      <div style={{ display: "flex", alignItems: "baseline", gap: 12, marginBottom: 32 }}>
+      <div style={{ display: "flex", alignItems: "baseline", gap: 12, marginBottom: 20, flexWrap: "wrap" }}>
         <h1 style={{ fontSize: 24, fontWeight: 700, letterSpacing: -0.3 }}>Товары</h1>
-        <span style={{ fontSize: 14, color: "var(--ink-secondary)" }}>{total} всего</span>
+        <span style={{ fontSize: 14, color: "var(--ink-secondary)" }}>
+          {query ? `найдено: ${total}` : `${total} всего`}
+        </span>
       </div>
+
+      <form onSubmit={submitSearch} style={{ display: "flex", gap: 8, marginBottom: 20, maxWidth: 480 }}>
+        <input
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          placeholder="Поиск по названию или артикулу"
+          style={{ flex: 1, height: 40, padding: "0 14px", border: "1px solid var(--hairline-soft)",
+            borderRadius: "var(--radius-md)", fontSize: 14, background: "var(--canvas)", color: "var(--ink)" }}
+        />
+        <button type="submit" className="btn btn--primary btn--sm">Найти</button>
+        {query && (
+          <button type="button" className="btn btn--outline btn--sm"
+            onClick={() => { setSearch(""); setQuery(""); setPage(1); }}>Сброс</button>
+        )}
+      </form>
 
       <div style={{ background: "var(--canvas)", borderRadius: "var(--radius-lg)", border: "1px solid var(--hairline-soft)", overflow: "hidden" }}>
         {products.length === 0 ? (
-          <p style={{ padding: 32, color: "var(--ink-secondary)", textAlign: "center" }}>Товаров нет — запустите синхронизацию</p>
+          <p style={{ padding: 32, color: "var(--ink-secondary)", textAlign: "center" }}>
+            {query ? `По запросу «${query}» ничего не найдено` : "Товаров нет — запустите синхронизацию"}
+          </p>
         ) : (
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
             <thead>
@@ -124,6 +160,18 @@ export default function AdminProductsPage() {
           </table>
         )}
       </div>
+
+      {pages > 1 && (
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 12, marginTop: 24 }}>
+          <button className="btn btn--outline btn--sm" disabled={page <= 1}
+            onClick={() => setPage(p => Math.max(1, p - 1))}>‹ Назад</button>
+          <span style={{ fontSize: 14, color: "var(--ink-secondary)" }}>
+            Страница {page} из {pages}
+          </span>
+          <button className="btn btn--outline btn--sm" disabled={page >= pages}
+            onClick={() => setPage(p => Math.min(pages, p + 1))}>Вперёд ›</button>
+        </div>
+      )}
     </AdminShell>
   );
 }

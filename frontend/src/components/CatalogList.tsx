@@ -97,7 +97,7 @@ function CartBar() {
           {" · "}<b>{totalItems}</b> {plural(totalItems, "штука", "штуки", "штук")}
           {" · "}<b>{formatPrice(totalAmount)}</b>
         </div>
-        <Link href="/cart" style={{ background: "#fff", color: "var(--ink)", fontWeight: 700, fontSize: 15,
+        <Link href="/cart" style={{ background: "var(--accent-2)", color: "var(--on-accent-2)", fontWeight: 700, fontSize: 15,
           padding: "10px 22px", borderRadius: 10, textDecoration: "none" }}>
           Оформить →
         </Link>

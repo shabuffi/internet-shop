@@ -50,7 +50,7 @@ export default async function CatalogPage({ searchParams }: Props) {
 
   const toggle = (active: boolean): React.CSSProperties => ({
     display: "flex", alignItems: "center", justifyContent: "center", padding: "7px 12px", textDecoration: "none",
-    background: active ? "var(--ink)" : "transparent", color: active ? "#fff" : "var(--ink-secondary)",
+    background: active ? "var(--accent)" : "transparent", color: active ? "var(--on-accent)" : "var(--ink-secondary)",
   });
   const IconGrid = (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -68,7 +68,7 @@ export default async function CatalogPage({ searchParams }: Props) {
   return (
     <div className="page">
       {/* Hero */}
-      <div className="band">
+      <div className="band band--hero">
         <div className="container catalog__hero">
           <div className="eyebrow">Магазин</div>
           <h1 style={{ marginTop: "var(--s-3)" }}>Каталог</h1>

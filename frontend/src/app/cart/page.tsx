@@ -65,7 +65,7 @@ export default function CartPage() {
           <div className="summary__row"><span>Товары ({totalItems})</span><b>{formatPrice(totalAmount)}</b></div>
           <div className="summary__row"><span>Доставка</span><b>Бесплатно</b></div>
           <div className="summary__total"><span>К оплате</span><b>{formatPrice(totalAmount)}</b></div>
-          <Link href="/checkout" className="btn btn--primary btn--lg btn--block" style={{ marginTop: "var(--s-4)" }}>
+          <Link href="/checkout" className="btn btn--cta btn--lg btn--block" style={{ marginTop: "var(--s-4)" }}>
             Оформить заказ
           </Link>
           <Link href="/" className="btn btn--ghost btn--block" style={{ marginTop: "var(--s-3)", justifyContent: "center" }}>

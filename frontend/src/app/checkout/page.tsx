@@ -135,7 +135,7 @@ export default function CheckoutPage() {
           <div className="summary__row"><span>Товары</span><b>{formatPrice(totalAmount)}</b></div>
           <div className="summary__row"><span>Доставка</span><b>Бесплатно</b></div>
           <div className="summary__total"><span>К оплате</span><b>{formatPrice(totalAmount)}</b></div>
-          <button className="btn btn--primary btn--lg btn--block" type="submit" disabled={loading} style={{ marginTop: "var(--s-4)" }}>
+          <button className="btn btn--cta btn--lg btn--block" type="submit" disabled={loading} style={{ marginTop: "var(--s-4)" }}>
             {loading ? "Оформляем…" : "Подтвердить заказ"}
           </button>
           <p className="fine" style={{ textAlign: "center", marginTop: "var(--s-3)" }}>Нажимая кнопку, вы соглашаетесь с условиями оферты</p>

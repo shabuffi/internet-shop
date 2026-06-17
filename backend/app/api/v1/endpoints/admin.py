@@ -10,7 +10,7 @@ from typing import Literal
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, UploadFile, File, Query
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
-from sqlalchemy import select
+from sqlalchemy import or_, select
 
 from app.core.config import settings
 from app.db.session import get_db
@@ -663,24 +663,36 @@ def update_order_status(
 @router.get("/products")
 def list_products_admin(
     page: int = 1,
+    q: str | None = None,
     db: Session = Depends(get_db),
     _=Depends(_get_current_admin),
 ):
-    """Список товаров для админки с пагинацией (по 50 на страницу).
+    """Список товаров для админки с пагинацией (по 50 на страницу) и поиском.
+
+    Показывает ВСЕ товары (без фильтра по остатку/активности) — в отличие от витрины.
 
     Args:
         page: Номер страницы (с 1).
+        q: Строка поиска по названию или артикулу (необязательно).
         db: Сессия БД.
 
     Returns:
-        Словарь с товарами текущей страницы, общим числом и номером страницы.
+        Словарь с товарами текущей страницы, общим числом (с учётом поиска),
+        размером страницы и номером страницы.
     """
     PAGE = 50
+    stmt = select(Product)
+    if q and q.strip():
+        like = f"%{q.strip()}%"
+        stmt = stmt.where(or_(Product.name.ilike(like), Product.article.ilike(like)))
+
     products = db.scalars(
-        select(Product).order_by(Product.name)
-        .offset((page - 1) * PAGE).limit(PAGE)
+        stmt.order_by(Product.name).offset((page - 1) * PAGE).limit(PAGE)
     ).all()
-    total = db.scalar(select(__import__("sqlalchemy", fromlist=["func"]).func.count()).select_from(Product))
+    total = db.scalar(
+        select(__import__("sqlalchemy", fromlist=["func"]).func.count())
+        .select_from(stmt.order_by(None).subquery())
+    )
 
     return {
         "items": [
@@ -696,6 +708,7 @@ def list_products_admin(
         ],
         "total": total,
         "page": page,
+        "page_size": PAGE,
     }
 
 
