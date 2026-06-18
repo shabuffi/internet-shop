@@ -23,8 +23,7 @@ export default async function AboutPage() {
     <div className="page">
       <div className="band band--hero">
         <div className="container catalog__hero">
-          <div className="eyebrow">Торговый дом</div>
-          <h1 style={{ marginTop: "var(--s-3)" }}>О компании</h1>
+          <h1>О компании</h1>
         </div>
       </div>
 

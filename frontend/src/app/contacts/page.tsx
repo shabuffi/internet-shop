@@ -26,8 +26,7 @@ export default async function ContactsPage() {
     <div className="page">
       <div className="band band--hero">
         <div className="container catalog__hero">
-          <div className="eyebrow">Торговый дом</div>
-          <h1 style={{ marginTop: "var(--s-3)" }}>Контакты</h1>
+          <h1>Контакты</h1>
         </div>
       </div>
 
