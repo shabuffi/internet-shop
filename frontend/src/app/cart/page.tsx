@@ -6,7 +6,7 @@ import { formatPrice } from "@/lib/format";
 import { IconImage, IconCart } from "@/components/icons";
 
 export default function CartPage() {
-  const { items, totalItems, totalAmount, removeItem, updateQuantity } = useCart();
+  const { items, totalItems, totalAmount, removeItem, updateQuantity, clearCart } = useCart();
 
   if (items.length === 0) {
     return (
@@ -23,9 +23,15 @@ export default function CartPage() {
 
   return (
     <div className="container section" style={{ paddingTop: "var(--s-8)" }}>
-      <h1 className="section-title">
-        Корзина <span style={{ color: "var(--graphite)", fontWeight: 400 }}>· {totalItems}</span>
-      </h1>
+      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: "var(--s-4)", flexWrap: "wrap" }}>
+        <h1 className="section-title" style={{ marginBottom: 0 }}>
+          Корзина <span style={{ color: "var(--graphite)", fontWeight: 400 }}>· {totalItems}</span>
+        </h1>
+        <button className="linkbtn" onClick={() => { if (confirm("Очистить корзину?")) clearCart(); }}>
+          Очистить корзину
+        </button>
+      </div>
+      <div style={{ height: "var(--s-6)" }} />
 
       <div className="cart">
         <div className="cart__list">

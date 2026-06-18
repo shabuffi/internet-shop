@@ -36,7 +36,7 @@ export default function HomePage() {
         background: "linear-gradient(105deg, rgba(0,30,90,.92) 0%, rgba(0,51,153,.86) 45%, rgba(0,51,153,.55) 100%), url('/hero.jpg') center/cover no-repeat, var(--accent-deep)",
         color: "#fff",
       }}>
-        <div className="container" style={{ padding: "var(--s-20) 0" }}>
+        <div className="container" style={{ paddingTop: "var(--s-20)", paddingBottom: "var(--s-20)" }}>
           <div style={{ maxWidth: 720 }}>
             <div className="eyebrow" style={{ color: "rgba(255,255,255,.8)" }}>Оптовый поставщик</div>
             <h1 style={{ fontFamily: "var(--font-display)", fontSize: "var(--t-display)", lineHeight: 1.07,
@@ -60,7 +60,7 @@ export default function HomePage() {
       {/* Полоса доверия */}
       <div className="band">
         <div className="container" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
-          gap: "var(--s-6)", padding: "var(--s-8) 0" }}>
+          gap: "var(--s-6)", paddingTop: "var(--s-8)", paddingBottom: "var(--s-8)" }}>
           {TRUST.map((t) => (
             <div key={t.small} style={{ textAlign: "center" }}>
               <div style={{ fontFamily: "var(--font-display)", fontSize: 28, fontWeight: 600, color: "var(--accent)" }}>{t.big}</div>
