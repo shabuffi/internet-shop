@@ -4,6 +4,7 @@ import "./globals.css";
 import { CartProvider } from "@/context/CartContext";
 import CartIcon from "@/components/CartIcon";
 import MainNav from "@/components/MainNav";
+import MobileMenu from "@/components/MobileMenu";
 import { SITE_URL, SITE_NAME, SITE_DESCRIPTION } from "@/lib/site";
 
 // Метаданные (включая <title> вкладки) берут название из настройки магазина —
@@ -98,6 +99,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                   <a href={telHref} className="header__phone hide-mobile">{store.phone}</a>
                 )}
                 <CartIcon />
+                <MobileMenu phone={store.phone} />
               </div>
             </div>
           </header>
