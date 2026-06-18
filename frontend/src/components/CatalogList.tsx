@@ -111,7 +111,7 @@ export default function CatalogList({ products }: { products: Product[] }) {
                     ? <span style={{ fontSize: 13, fontWeight: 600, color: "var(--stock)" }}>В наличии</span>
                     : <span style={{ fontSize: 13, fontWeight: 600, color: "var(--ink-tertiary)" }}>Нет</span>}
                 </td>
-                <td style={{ ...td, textAlign: "right", fontWeight: 700, whiteSpace: "nowrap" }}>{formatPrice(p.price)}</td>
+                <td style={{ ...td, textAlign: "right", fontWeight: 700, whiteSpace: "nowrap" }}>{Number(p.price) > 0 ? formatPrice(p.price) : "—"}</td>
                 <td style={{ ...td, textAlign: "center" }}><QtyCell product={p} /></td>
               </tr>
             ))}
@@ -119,28 +119,30 @@ export default function CatalogList({ products }: { products: Product[] }) {
         </table>
       </div>
 
-      {/* Мобильный: компактные строки без фото — название+цена сверху,
-          артикул+наличие мелко снизу, степпер справа; тап по названию открывает товар */}
+      {/* Мобильный: компактные строки без фото. Сверху — название + цена;
+          снизу отдельной строкой — артикул/наличие слева и степпер справа (не «плавает»). */}
       <div className="clist-mobile" style={{ flexDirection: "column", border: "1px solid var(--hairline-soft)",
         borderRadius: "var(--radius-lg)", overflow: "hidden", marginBottom: 24 }}>
         {products.map((p, i) => (
-          <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 14px",
+          <div key={p.id} style={{ display: "flex", flexDirection: "column", gap: 10, padding: "12px 14px",
             borderTop: i === 0 ? "none" : "1px solid var(--hairline-soft)" }}>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ display: "flex", gap: 10, alignItems: "baseline", justifyContent: "space-between" }}>
-                <Link href={`/products/${p.id}`} style={{ fontWeight: 600, color: "var(--ink)", textDecoration: "none",
-                  fontSize: 14, lineHeight: 1.3 }}>{p.name}</Link>
-                <span style={{ fontWeight: 700, whiteSpace: "nowrap", fontSize: 14 }}>{formatPrice(p.price)}</span>
-              </div>
-              <div style={{ marginTop: 4, fontSize: 12, color: "var(--ink-tertiary)", display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+            <div style={{ display: "flex", gap: 12, alignItems: "flex-start", justifyContent: "space-between" }}>
+              <Link href={`/products/${p.id}`} style={{ fontWeight: 600, color: "var(--ink)", textDecoration: "none",
+                fontSize: 14, lineHeight: 1.35 }}>{p.name}</Link>
+              <span style={{ fontWeight: 700, whiteSpace: "nowrap", fontSize: 14 }}>
+                {Number(p.price) > 0 ? formatPrice(p.price) : "—"}
+              </span>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+              <div style={{ fontSize: 12, color: "var(--ink-tertiary)", display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap", minWidth: 0 }}>
                 {p.article && <span style={{ fontVariantNumeric: "tabular-nums" }}>Арт. {p.article}</span>}
-                <span style={{ display: "inline-flex", alignItems: "center", gap: 5, color: p.available ? "var(--stock)" : "var(--ink-tertiary)" }}>
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 5, whiteSpace: "nowrap", color: p.available ? "var(--stock)" : "var(--ink-tertiary)" }}>
                   <span style={{ width: 6, height: 6, borderRadius: 999, background: "currentColor" }} />
                   {p.available ? "В наличии" : "Нет"}
                 </span>
               </div>
+              <QtyCell product={p} />
             </div>
-            <QtyCell product={p} />
           </div>
         ))}
       </div>

@@ -145,7 +145,7 @@ export default async function CatalogPage({ searchParams }: Props) {
                       <Link href={`/products/${p.id}`} className="pcard__name">{p.name}</Link>
                       <div className="pcard__sku">{p.article ? `Арт. ${p.article}` : " "}</div>
                       <div className="pcard__foot">
-                        <span className="price">{formatPrice(p.price)}</span>
+                        <span className="price">{Number(p.price) > 0 ? formatPrice(p.price) : "—"}</span>
                         <AddToCartCard product={p} />
                       </div>
                     </div>
