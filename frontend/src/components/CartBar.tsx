@@ -18,9 +18,12 @@ export default function CartBar() {
   const { items, totalItems, totalAmount } = useCart();
   const positions = items.length;
 
+  // Резервируем место под липкую панель в самом футере (он синий) — чтобы панель
+  // не перекрывала нижнюю строку футера и НЕ возникало белой полосы под ним.
   useEffect(() => {
-    document.body.style.paddingBottom = totalItems > 0 ? "72px" : "";
-    return () => { document.body.style.paddingBottom = ""; };
+    const f = document.querySelector(".footer") as HTMLElement | null;
+    if (f) f.style.paddingBottom = totalItems > 0 ? "76px" : "";
+    return () => { if (f) f.style.paddingBottom = ""; };
   }, [totalItems]);
 
   if (totalItems === 0) return null;

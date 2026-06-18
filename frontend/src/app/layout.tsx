@@ -109,8 +109,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               <div className="footer__top">
                 <div className="footer__brand">
                   <img src="/logo-white.png" alt={shopName} className="footer__logo" />
-                  <p>Оптовые поставки хозтоваров, бытовой химии и товаров для дома и дачи.
-                    Доставка по Тверской, Московской, Смоленской и Новгородской областям.</p>
+                  <p>Оптовые поставки товаров первой необходимости: бытовая химия, канцтовары,
+                    товары для дома, сад и огород. Доставка по Тверской, Московской, Смоленской
+                    и Новгородской областям.</p>
                 </div>
 
                 <div className="footer__col">
