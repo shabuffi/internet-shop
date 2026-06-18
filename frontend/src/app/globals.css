@@ -22,7 +22,8 @@
   --stock:#38A169; --stock-soft:#C6F6D5; --out:#9A9893; --sale:#B0654C; --error:#B0463F;
   /* шрифты */
   --font-ui:'Onest', system-ui, -apple-system, 'Segoe UI', sans-serif;
-  --font-display:'Spectral', Georgia, 'Times New Roman', serif;
+  /* Заголовки — тот же sans, что и интерфейс (единый шрифт без засечек) */
+  --font-display: var(--font-ui);
   --t-display:44px; --t-h1:34px; --t-h2:26px; --t-h3:20px;
   --t-body-lg:18px; --t-body:16px; --t-sm:14px; --t-xs:12px; --t-price:22px;
   /* отступы (база 8px) */
