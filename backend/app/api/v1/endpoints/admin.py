@@ -454,6 +454,11 @@ def get_settings(db: Session = Depends(get_db), _=Depends(_get_current_admin)):
         "contact_phone":      _get_setting(db, "contact_phone"),
         "contact_email":      _get_setting(db, "contact_email"),
         "contact_hours":      _get_setting(db, "contact_hours"),
+        # Реквизиты компании (страницы «О компании» / «Контакты», футер)
+        "company_legal_name": _get_setting(db, "company_legal_name"),
+        "company_inn":        _get_setting(db, "company_inn"),
+        "company_ogrn":       _get_setting(db, "company_ogrn"),
+        "warehouse_address":  _get_setting(db, "warehouse_address"),
         # Условия доставки — единый текст для всех товаров (показывается на карточке товара)
         "delivery_info":      _get_setting(db, "delivery_info"),
         # Логотип в шапке (загружается отдельной кнопкой)
@@ -487,6 +492,7 @@ def save_settings(body: dict, db: Session = Depends(get_db), _=Depends(_get_curr
     allowed = {
         "shop_name",
         "contact_phone", "contact_email", "contact_hours",
+        "company_legal_name", "company_inn", "company_ogrn", "warehouse_address",
         "delivery_info",
         # обмен с МойСклад + личные идентификаторы получателя (id ВК, email)
         "exchange_login", "exchange_password",
@@ -829,12 +835,16 @@ def delete_product_image(
 def store_info_public(db: Session = Depends(get_db)):
     """Публичный эндпойнт — название магазина для фронтенда."""
     return {
-        "shop_name":     _get_setting(db, "shop_name", "Магазин"),
-        "contact_phone": _get_setting(db, "contact_phone"),
-        "contact_email": _get_setting(db, "contact_email"),
-        "contact_hours": _get_setting(db, "contact_hours"),
-        "delivery_info": _get_setting(db, "delivery_info"),
-        "has_logo":      bool(_get_setting(db, "logo_file")),
+        "shop_name":          _get_setting(db, "shop_name", "Магазин"),
+        "contact_phone":      _get_setting(db, "contact_phone"),
+        "contact_email":      _get_setting(db, "contact_email"),
+        "contact_hours":      _get_setting(db, "contact_hours"),
+        "company_legal_name": _get_setting(db, "company_legal_name"),
+        "company_inn":        _get_setting(db, "company_inn"),
+        "company_ogrn":       _get_setting(db, "company_ogrn"),
+        "warehouse_address":  _get_setting(db, "warehouse_address"),
+        "delivery_info":      _get_setting(db, "delivery_info"),
+        "has_logo":           bool(_get_setting(db, "logo_file")),
     }
 
 

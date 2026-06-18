@@ -3,6 +3,7 @@ import Link from "next/link";
 import "./globals.css";
 import { CartProvider } from "@/context/CartContext";
 import CartIcon from "@/components/CartIcon";
+import MainNav from "@/components/MainNav";
 import { SITE_URL, SITE_NAME, SITE_DESCRIPTION } from "@/lib/site";
 
 // Метаданные (включая <title> вкладки) берут название из настройки магазина —
@@ -25,9 +26,6 @@ export async function generateMetadata(): Promise<Metadata> {
   };
 }
 
-// Навигация и профиль — задел на будущее, пока скрыты. Включить → true.
-const SHOW_SOON = false;
-
 function SearchIcon() {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -37,16 +35,10 @@ function SearchIcon() {
   );
 }
 
-function UserIcon() {
-  return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-      strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" style={{ display: "block" }}>
-      <circle cx="12" cy="8" r="4" /><path d="M4 21c0-4 3.6-6 8-6s8 2 8 6" />
-    </svg>
-  );
+interface StoreInfo {
+  name: string; phone: string; email: string; hours: string;
+  legalName: string; address: string; logo: boolean;
 }
-
-interface StoreInfo { name: string; phone: string; email: string; hours: string; logo: boolean; }
 
 async function getStoreInfo(): Promise<StoreInfo> {
   try {
@@ -60,20 +52,23 @@ async function getStoreInfo(): Promise<StoreInfo> {
         phone: d.contact_phone || "",
         email: d.contact_email || "",
         hours: d.contact_hours || "",
+        legalName: d.company_legal_name || "",
+        address: d.warehouse_address || "",
         logo: !!d.has_logo,
       };
     }
   } catch {}
-  return { name: SITE_NAME, phone: "", email: "", hours: "", logo: false };
+  return { name: SITE_NAME, phone: "", email: "", hours: "", legalName: "", address: "", logo: false };
 }
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const store = await getStoreInfo();
   const shopName = store.name;
-  const hasContacts = Boolean(store.phone || store.email || store.hours);
+  const telHref = store.phone ? `tel:${store.phone.replace(/[^+\d]/g, "")}` : "";
+  const hasContacts = Boolean(store.phone || store.email || store.hours || store.address);
 
   return (
-    <html lang="ru">
+    <html lang="ru" suppressHydrationWarning>
       <head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
@@ -82,7 +77,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           rel="stylesheet"
         />
       </head>
-      <body>
+      <body suppressHydrationWarning>
         <CartProvider>
           <header className="header">
             <div className="container header__inner">
@@ -92,22 +87,15 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                   : <img src="/logo.png" alt={shopName} style={{ height: 38, width: "auto", display: "block" }} />}
               </Link>
 
-              {SHOW_SOON && (
-                <nav className="nav hide-mobile">
-                  <Link href="/" className="active">Каталог</Link>
-                  <Link href="/">Новинки</Link>
-                  <Link href="/">Доставка</Link>
-                  <Link href="/">О магазине</Link>
-                </nav>
-              )}
+              <MainNav />
 
               <div className="header__actions">
-                <form action="/" method="get" className="search hide-mobile">
+                <form action="/catalog" method="get" className="search hide-mobile">
                   <SearchIcon />
                   <input name="search" placeholder="Поиск товаров" aria-label="Поиск товаров" />
                 </form>
-                {SHOW_SOON && (
-                  <button className="iconbtn hide-mobile" aria-label="Профиль"><UserIcon /></button>
+                {telHref && (
+                  <a href={telHref} className="header__phone hide-mobile">{store.phone}</a>
                 )}
                 <CartIcon />
               </div>
@@ -120,28 +108,36 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             <div className="container">
               <div className="footer__top">
                 <div className="footer__brand">
-                  <span className="brand">{shopName}<b>.</b></span>
-                  <p>Аккуратный интернет-магазин. Спокойный дизайн, честные цены, бережная доставка по России.</p>
+                  <img src="/logo-white.png" alt={shopName} className="footer__logo" />
+                  <p>Оптовые поставки хозтоваров, бытовой химии и товаров для дома и дачи.
+                    Доставка по Тверской, Московской, Смоленской и Новгородской областям.</p>
                 </div>
 
                 <div className="footer__col">
                   <h4>Магазин</h4>
-                  <Link href="/">Каталог</Link>
+                  <Link href="/catalog">Каталог</Link>
                   <Link href="/cart">Корзина</Link>
+                </div>
+
+                <div className="footer__col">
+                  <h4>Компания</h4>
+                  <Link href="/about">О компании</Link>
+                  <Link href="/contacts">Контакты</Link>
                 </div>
 
                 {hasContacts && (
                   <div className="footer__col">
                     <h4>Контакты</h4>
-                    {store.phone && <a href={`tel:${store.phone.replace(/[^+\d]/g, "")}`}>{store.phone}</a>}
+                    {store.phone && <a href={telHref}>{store.phone}</a>}
                     {store.email && <a href={`mailto:${store.email}`}>{store.email}</a>}
+                    {store.address && <span>{store.address}</span>}
                     {store.hours && <span>{store.hours}</span>}
                   </div>
                 )}
               </div>
               <div className="footer__bottom">
-                <span>© {new Date().getFullYear()} {shopName}. Все права защищены.</span>
-                <span>Россия · ₽ · Русский</span>
+                <span>© {new Date().getFullYear()} {store.legalName || shopName}. Все права защищены.</span>
+                <span>Produced by Sofi Sh</span>
               </div>
             </div>
           </footer>

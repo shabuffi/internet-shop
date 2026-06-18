@@ -7,13 +7,6 @@ import { formatPrice } from "@/lib/format";
 import { IconImage } from "@/components/icons";
 import type { Product } from "@/types/product";
 
-function plural(n: number, one: string, few: string, many: string): string {
-  const m10 = n % 10, m100 = n % 100;
-  if (m10 === 1 && m100 !== 11) return one;
-  if (m10 >= 2 && m10 <= 4 && (m100 < 10 || m100 >= 20)) return few;
-  return many;
-}
-
 // Мини-фото с превью по наведению (большое фото рядом, не обрезанное).
 function ProductThumb({ product }: { product: Product }) {
   const [box, setBox] = useState<{ left: number; top: number } | null>(null);
@@ -82,31 +75,8 @@ function QtyCell({ product }: { product: Product }) {
   );
 }
 
-// Липкая панель корзины снизу — итог по всем страницам в реальном времени.
-function CartBar() {
-  const { items, totalItems, totalAmount } = useCart();
-  const positions = items.length;
-  if (totalItems === 0) return null;
-  return (
-    <div style={{ position: "fixed", left: 0, right: 0, bottom: 0, zIndex: 30,
-      background: "var(--ink)", color: "#fff", boxShadow: "0 -6px 24px rgba(0,0,0,.18)" }}>
-      <div className="container" style={{ display: "flex", alignItems: "center", justifyContent: "space-between",
-        gap: 16, padding: "14px 0", flexWrap: "wrap" }}>
-        <div style={{ fontSize: 15 }}>
-          Выбрано <b>{positions}</b> {plural(positions, "позиция", "позиции", "позиций")}
-          {" · "}<b>{totalItems}</b> {plural(totalItems, "штука", "штуки", "штук")}
-          {" · "}<b>{formatPrice(totalAmount)}</b>
-        </div>
-        <Link href="/cart" style={{ background: "var(--accent-2)", color: "var(--on-accent-2)", fontWeight: 700, fontSize: 15,
-          padding: "10px 22px", borderRadius: 10, textDecoration: "none" }}>
-          Оформить →
-        </Link>
-      </div>
-    </div>
-  );
-}
-
-// Табличный «бланк заказа»: строки-товары, быстрый ввод количества, липкая корзина.
+// Табличный «бланк заказа»: строки-товары, быстрый ввод количества.
+// Липкая панель корзины вынесена на уровень страницы (общая для «Плитки» и «Списка»).
 export default function CatalogList({ products }: { products: Product[] }) {
   const th: React.CSSProperties = { textAlign: "left", padding: "10px 14px", fontSize: 12, fontWeight: 600,
     color: "var(--ink-secondary)", textTransform: "uppercase", letterSpacing: ".03em", whiteSpace: "nowrap" };
@@ -115,7 +85,7 @@ export default function CatalogList({ products }: { products: Product[] }) {
   return (
     <>
       {/* Десктоп: таблица (на телефоне прячется) */}
-      <div className="clist-desktop" style={{ overflowX: "auto", border: "1px solid var(--hairline-soft)", borderRadius: "var(--radius-lg)", marginBottom: 96 }}>
+      <div className="clist-desktop" style={{ overflowX: "auto", border: "1px solid var(--hairline-soft)", borderRadius: "var(--radius-lg)", marginBottom: 24 }}>
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14, minWidth: 720 }}>
           <thead>
             <tr style={{ background: "var(--cloud)" }}>
@@ -152,7 +122,7 @@ export default function CatalogList({ products }: { products: Product[] }) {
       {/* Мобильный: компактные строки без фото — название+цена сверху,
           артикул+наличие мелко снизу, степпер справа; тап по названию открывает товар */}
       <div className="clist-mobile" style={{ flexDirection: "column", border: "1px solid var(--hairline-soft)",
-        borderRadius: "var(--radius-lg)", overflow: "hidden", marginBottom: 96 }}>
+        borderRadius: "var(--radius-lg)", overflow: "hidden", marginBottom: 24 }}>
         {products.map((p, i) => (
           <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 14px",
             borderTop: i === 0 ? "none" : "1px solid var(--hairline-soft)" }}>
@@ -174,8 +144,6 @@ export default function CatalogList({ products }: { products: Product[] }) {
           </div>
         ))}
       </div>
-
-      <CartBar />
     </>
   );
 }

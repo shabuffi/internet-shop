@@ -21,7 +21,7 @@ export default function CategorySelect({ categories, current, search, view, sort
     if (view) q.set("view", view);
     if (sort) q.set("sort", sort);
     const s = q.toString();
-    router.push(s ? `/?${s}` : "/");
+    router.push(s ? `/catalog?${s}` : "/catalog");
   }
 
   return (
@@ -31,7 +31,7 @@ export default function CategorySelect({ categories, current, search, view, sort
       aria-label="Категория"
       style={{
         height: 40, maxWidth: "100%", minWidth: 220, padding: "0 36px 0 14px",
-        border: "1px solid var(--hairline)", borderRadius: 10, background: "var(--paper)",
+        border: "1px solid color-mix(in srgb, var(--accent), #fff 55%)", borderRadius: 10, background: "var(--paper)",
         color: "var(--ink)", fontSize: 14, fontWeight: 500, cursor: "pointer",
         appearance: "none", WebkitAppearance: "none",
         backgroundImage: "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>\")",
@@ -40,7 +40,9 @@ export default function CategorySelect({ categories, current, search, view, sort
     >
       <option value="">Все категории</option>
       {categories.map((c) => (
-        <option key={c.id} value={c.id}>{c.name}</option>
+        <option key={c.id} value={c.id}>
+          {(c.depth ?? 0) > 0 ? "    ".repeat(c.depth ?? 0) + "└ " : ""}{c.name}
+        </option>
       ))}
     </select>
   );

@@ -1,3 +1,5 @@
+import re
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import Response
 from sqlalchemy.orm import Session, joinedload
@@ -16,16 +18,62 @@ _IMG_TTL = 86400  # 1 день
 
 @router.get("/categories", response_model=list[CategoryOut])
 def list_categories(db: Session = Depends(get_db)):
-    """Возвращает все категории (для чипов-фильтра на витрине).
+    """Возвращает категории с вычисленной вложенностью (для фильтра на витрине).
+
+    У этого каталога МойСклад не передаёт связь родитель-ребёнок (``parent_id``
+    в БД пуст), но иерархия зашита в числовом коде названия: ``001.01`` —
+    подкатегория ``001``, ``00001.02`` — подкатегория ``00001`` и т.д. Здесь мы
+    восстанавливаем родителя (код без последнего сегмента, поднимаясь до первого
+    существующего кода) и глубину, и сортируем так, чтобы дети шли за родителем.
 
     Args:
         db: Сессия БД.
 
     Returns:
-        Список категорий, отсортированный по имени.
+        Список категорий с ``parent_id``/``depth``, упорядоченный для показа деревом.
     """
-    cats = db.scalars(select(Category).order_by(Category.name)).all()
-    return cats
+    cats = db.scalars(select(Category)).all()
+
+    def code_of(name: str) -> str | None:
+        m = re.match(r"\s*([\d.]+)", name)
+        return m.group(1).rstrip(".") if m and m.group(1).strip(".") else None
+
+    by_code: dict[str, Category] = {}
+    for c in cats:
+        code = code_of(c.name)
+        if code:
+            by_code[code] = c
+
+    def parent_code(code: str) -> str | None:
+        segs = code.split(".")
+        while len(segs) > 1:
+            segs = segs[:-1]
+            p = ".".join(segs)
+            if p in by_code:
+                return p
+        return None
+
+    def depth_of(code: str | None) -> int:
+        d = 0
+        while code is not None:
+            code = parent_code(code)
+            if code is not None:
+                d += 1
+        return d
+
+    # Категории с кодом — в порядке кода (дети идут за родителем); без кода — по имени в конце.
+    out: list[CategoryOut] = []
+    for code in sorted(by_code.keys()):
+        c = by_code[code]
+        pc = parent_code(code)
+        out.append(CategoryOut(
+            id=c.id, name=c.name,
+            parent_id=by_code[pc].id if pc else None,
+            depth=depth_of(code),
+        ))
+    for c in sorted((c for c in cats if code_of(c.name) is None), key=lambda c: c.name):
+        out.append(CategoryOut(id=c.id, name=c.name, parent_id=None, depth=0))
+    return out
 
 
 @router.get("", response_model=ProductListOut)

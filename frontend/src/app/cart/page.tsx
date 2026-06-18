@@ -15,7 +15,7 @@ export default function CartPage() {
           <div className="empty__icon"><IconCart width="1em" height="1em" /></div>
           <h3>В корзине пока пусто</h3>
           <p>Загляните в каталог — там есть на что посмотреть.</p>
-          <Link href="/" className="btn btn--primary">Перейти в каталог</Link>
+          <Link href="/catalog" className="btn btn--primary">Перейти в каталог</Link>
         </div>
       </div>
     );
@@ -68,7 +68,7 @@ export default function CartPage() {
           <Link href="/checkout" className="btn btn--cta btn--lg btn--block" style={{ marginTop: "var(--s-4)" }}>
             Оформить заказ
           </Link>
-          <Link href="/" className="btn btn--ghost btn--block" style={{ marginTop: "var(--s-3)", justifyContent: "center" }}>
+          <Link href="/catalog" className="btn btn--ghost btn--block" style={{ marginTop: "var(--s-3)", justifyContent: "center" }}>
             Продолжить покупки
           </Link>
         </aside>

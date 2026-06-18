@@ -6,6 +6,7 @@ import { adminFetch, adminUpload } from "@/lib/adminApi";
 
 interface OwnerSettings {
   shop_name: string; contact_phone: string; contact_email: string; contact_hours: string;
+  company_legal_name: string; company_inn: string; company_ogrn: string; warehouse_address: string;
   delivery_info: string;
   exchange_login: string; exchange_password: string;
   vk_peer_id: string; notify_email: string;
@@ -13,7 +14,9 @@ interface OwnerSettings {
 }
 
 const EMPTY: OwnerSettings = {
-  shop_name: "", contact_phone: "", contact_email: "", contact_hours: "", delivery_info: "",
+  shop_name: "", contact_phone: "", contact_email: "", contact_hours: "",
+  company_legal_name: "", company_inn: "", company_ogrn: "", warehouse_address: "",
+  delivery_info: "",
   exchange_login: "", exchange_password: "", vk_peer_id: "", notify_email: "",
 };
 const CH_LABEL: Record<string, string> = { vk: "ВКонтакте", email: "Email" };
@@ -160,7 +163,7 @@ export default function SettingsPage() {
       {error && <p className="form-error" style={{ maxWidth: 520, marginBottom: 16 }}>{error}</p>}
 
       {/* Магазин */}
-      <form style={cardStyle} onSubmit={e => saveSection(e, "shop", ["shop_name", "contact_phone", "contact_email", "contact_hours", "delivery_info"])}>
+      <form style={cardStyle} onSubmit={e => saveSection(e, "shop", ["shop_name", "contact_phone", "contact_email", "contact_hours", "company_legal_name", "company_inn", "company_ogrn", "warehouse_address", "delivery_info"])}>
         <p style={{ fontWeight: 600, fontSize: 16, marginBottom: 16 }}>Магазин</p>
         <div style={inputStyle}>
           <label className="form-label">Название магазина</label>
@@ -207,6 +210,26 @@ export default function SettingsPage() {
           <label className="form-label">Часы работы (футер сайта)</label>
           <input className="form-input" value={form.contact_hours} onChange={set("contact_hours")} placeholder="Пн–Пт · 10:00–19:00" />
         </div>
+
+        <div style={inputStyle}>
+          <label className="form-label">Юр. наименование</label>
+          <input className="form-input" value={form.company_legal_name} onChange={set("company_legal_name")} placeholder="ООО «Инженер» / ИП Иванов И. И." />
+          <p style={{ fontSize: 12, color: "var(--ink-secondary)" }}>Страницы «О компании» / «Контакты» и подвал.</p>
+        </div>
+        <div style={inputStyle}>
+          <label className="form-label">ИНН</label>
+          <input className="form-input" value={form.company_inn} onChange={set("company_inn")} placeholder="7700000000" />
+        </div>
+        <div style={inputStyle}>
+          <label className="form-label">ОГРН / ОГРНИП</label>
+          <input className="form-input" value={form.company_ogrn} onChange={set("company_ogrn")} placeholder="необязательно" />
+        </div>
+        <div style={inputStyle}>
+          <label className="form-label">Адрес склада</label>
+          <input className="form-input" value={form.warehouse_address} onChange={set("warehouse_address")} placeholder="г. Тверь, ул. …, д. …" />
+          <p style={{ fontSize: 12, color: "var(--ink-secondary)" }}>Покажется на «Контактах» с картой.</p>
+        </div>
+
         <div style={inputStyle}>
           <label className="form-label">Доставка (на странице товара)</label>
           <input className="form-input" value={form.delivery_info} onChange={set("delivery_info")} placeholder="например, 1–3 дня по России" />

@@ -2,6 +2,7 @@ export interface Category {
   id: string;
   name: string;
   parent_id: string | null;
+  depth?: number;   // уровень вложенности (0 — корень) для показа деревом
 }
 
 export interface Product {

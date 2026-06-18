@@ -21,7 +21,7 @@ export default function CheckoutPage() {
           <div className="empty__icon"><IconCart width="1em" height="1em" /></div>
           <h3>Корзина пуста</h3>
           <p>Сначала добавьте товары из каталога.</p>
-          <Link href="/" className="btn btn--primary">В каталог</Link>
+          <Link href="/catalog" className="btn btn--primary">В каталог</Link>
         </div>
       </div>
     );

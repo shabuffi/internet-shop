@@ -1,164 +1,110 @@
-export const dynamic = 'force-dynamic';
+export const dynamic = "force-dynamic";
 
 import Link from "next/link";
-import { getProducts, getCategories } from "@/lib/api";
-import { formatPrice } from "@/lib/format";
-import AddToCartCard from "@/components/AddToCartCard";
-import CatalogList from "@/components/CatalogList";
-import CategorySelect from "@/components/CategorySelect";
-import SortSelect from "@/components/SortSelect";
-import { IconImage, IconSearch } from "@/components/icons";
+import LeadForm from "@/components/LeadForm";
 
-interface Props {
-  searchParams: Promise<{ category_id?: string; search?: string; page?: string; view?: string; sort?: string }>;
-}
+// Иконки-плитки категорий (простые штриховые)
+const tileIcon: Record<string, React.ReactNode> = {
+  chem: (<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M9 3h6M10 3v5L5 19a2 2 0 0 0 2 3h10a2 2 0 0 0 2-3l-5-11V3" /><path d="M7.5 14h9" /></svg>),
+  home: (<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M3 11l9-7 9 7" /><path d="M5 10v10h14V10" /><path d="M9 20v-6h6v6" /></svg>),
+  garden: (<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22V11" /><path d="M12 11c0-4 3-7 8-7 0 4-3 7-8 7Z" /><path d="M12 14c0-3-2.5-5-6-5 0 3 2.5 5 6 5Z" /></svg>),
+  tools: (<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18v3h3l6.3-6.3a4 4 0 0 0 5.4-5.4l-2.3 2.3-2-2 2.3-2.3Z" /></svg>),
+};
 
-// Собирает URL каталога, сохраняя фильтры, сортировку и режим (плитка/список). page>1 — только при необходимости.
-function buildHref(params: { category_id?: string; search?: string; page?: number; view?: string; sort?: string }) {
-  const q = new URLSearchParams();
-  if (params.category_id) q.set("category_id", params.category_id);
-  if (params.search) q.set("search", params.search);
-  if (params.view) q.set("view", params.view);
-  if (params.sort && params.sort !== "name") q.set("sort", params.sort);
-  if (params.page && params.page > 1) q.set("page", String(params.page));
-  const s = q.toString();
-  return s ? `/?${s}` : "/";
-}
+const TILES = [
+  { key: "chem", title: "Бытовая химия", note: "Чистящие, моющие, гигиена" },
+  { key: "home", title: "Хозтовары", note: "Для дома и уборки" },
+  { key: "garden", title: "Сад и дача", note: "Семена, удобрения, сезон" },
+  { key: "tools", title: "Инструмент и авто", note: "Метизы, авто-товары" },
+];
 
-// Окно из максимум 5 номеров страниц вокруг текущей.
-function pageNumbers(current: number, total: number): number[] {
-  const span = 2;
-  let start = Math.max(1, current - span);
-  const end = Math.min(total, start + span * 2);
-  start = Math.max(1, end - span * 2);
-  const out: number[] = [];
-  for (let n = start; n <= end; n++) out.push(n);
-  return out;
-}
+const TRUST = [
+  { big: "Тысячи", small: "товаров со склада" },
+  { big: "4 области", small: "доставка по региону" },
+  { big: "Прайс", small: "по запросу" },
+  { big: "−10%", small: "на первый заказ" },
+];
 
-export default async function CatalogPage({ searchParams }: Props) {
-  const params = await searchParams;
-  const categoryId = params.category_id;
-  const search = params.search;
-  const page = Math.max(1, parseInt(params.page ?? "1", 10) || 1);
-  const view = params.view === "list" ? "list" : "grid";
-  const listView = view === "list";
-  const sort = params.sort === "price_asc" || params.sort === "price_desc" ? params.sort : "name";
+const REGIONS = ["Тверская область", "Московская область", "Смоленская область", "Новгородская область"];
 
-  const [data, categories] = await Promise.all([
-    // В списке («бланк заказа») показываем больше товаров на странице
-    getProducts({ category_id: categoryId, search, page, sort, page_size: listView ? 100 : undefined }),
-    getCategories(),
-  ]);
-
-  const toggle = (active: boolean): React.CSSProperties => ({
-    display: "flex", alignItems: "center", justifyContent: "center", padding: "7px 12px", textDecoration: "none",
-    background: active ? "var(--accent)" : "transparent", color: active ? "var(--on-accent)" : "var(--ink-secondary)",
-  });
-  const IconGrid = (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="3" y="3" width="7" height="7" rx="1.5" /><rect x="14" y="3" width="7" height="7" rx="1.5" />
-      <rect x="3" y="14" width="7" height="7" rx="1.5" /><rect x="14" y="14" width="7" height="7" rx="1.5" />
-    </svg>
-  );
-  const IconRows = (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <line x1="8" y1="6" x2="21" y2="6" /><line x1="8" y1="12" x2="21" y2="12" /><line x1="8" y1="18" x2="21" y2="18" />
-      <line x1="3.5" y1="6" x2="3.5" y2="6" /><line x1="3.5" y1="12" x2="3.5" y2="12" /><line x1="3.5" y1="18" x2="3.5" y2="18" />
-    </svg>
-  );
-
+export default function HomePage() {
   return (
     <div className="page">
       {/* Hero */}
-      <div className="band band--hero">
-        <div className="container catalog__hero">
-          <div className="eyebrow">Торговый дом</div>
-          <h1 style={{ marginTop: "var(--s-3)" }}>Каталог товаров</h1>
-          <p>Тысячи товаров для дома, дачи, сада и хозяйства. Подберите нужное по категории или через поиск.</p>
+      <section style={{
+        position: "relative",
+        background: "linear-gradient(105deg, rgba(0,30,90,.92) 0%, rgba(0,51,153,.86) 45%, rgba(0,51,153,.55) 100%), url('/hero.jpg') center/cover no-repeat, var(--accent-deep)",
+        color: "#fff",
+      }}>
+        <div className="container" style={{ padding: "var(--s-20) 0" }}>
+          <div style={{ maxWidth: 720 }}>
+            <div className="eyebrow" style={{ color: "rgba(255,255,255,.8)" }}>Оптовый поставщик</div>
+            <h1 style={{ fontFamily: "var(--font-display)", fontSize: "var(--t-display)", lineHeight: 1.07,
+              letterSpacing: "-.015em", margin: "var(--s-3) 0 0", color: "#fff" }}>
+              Хозтовары, бытовая химия и товары для дома и дачи — оптом
+            </h1>
+            <p style={{ fontSize: "var(--t-body-lg)", lineHeight: 1.6, margin: "var(--s-5) 0 0", color: "rgba(255,255,255,.9)", maxWidth: 600 }}>
+              Доставка по Тверской, Московской, Смоленской и Новгородской областям. Тысячи позиций со склада,
+              удобный бланк заказа и быстрая отгрузка для магазинов.
+            </p>
+            <div style={{ display: "flex", gap: "var(--s-3)", marginTop: "var(--s-8)", flexWrap: "wrap" }}>
+              <LeadForm />
+              <Link href="/catalog" className="btn btn--lg" style={{ background: "#fff", color: "var(--accent)" }}>
+                Перейти в каталог
+              </Link>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Полоса доверия */}
+      <div className="band">
+        <div className="container" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
+          gap: "var(--s-6)", padding: "var(--s-8) 0" }}>
+          {TRUST.map((t) => (
+            <div key={t.small} style={{ textAlign: "center" }}>
+              <div style={{ fontFamily: "var(--font-display)", fontSize: 28, fontWeight: 600, color: "var(--accent)" }}>{t.big}</div>
+              <div style={{ fontSize: "var(--t-sm)", color: "var(--charcoal)", marginTop: 2 }}>{t.small}</div>
+            </div>
+          ))}
         </div>
       </div>
 
-      <div className="container section" style={{ paddingTop: "var(--s-12)" }}>
-        {/* Поиск — на мобильных (в шапке он скрыт) */}
-        <form action="/" method="get" className="search only-mobile" style={{ width: "100%", marginBottom: "var(--s-5)" }}>
-          {categoryId && <input type="hidden" name="category_id" value={categoryId} />}
-          {listView && <input type="hidden" name="view" value="list" />}
-          {sort !== "name" && <input type="hidden" name="sort" value={sort} />}
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="7" /><line x1="21" y1="21" x2="16.5" y2="16.5" /></svg>
-          <input name="search" defaultValue={search ?? ""} placeholder="Поиск товаров" aria-label="Поиск товаров" />
-        </form>
-
-        {/* Тулбар: фильтры + сортировка + переключатель режима + счётчик */}
-        <div className="toolbar">
-          <CategorySelect categories={categories} current={categoryId} search={search} view={listView ? "list" : undefined} sort={sort} />
-          <SortSelect current={sort} categoryId={categoryId} search={search} view={listView ? "list" : undefined} />
-          <div style={{ display: "flex", alignItems: "center", gap: "var(--s-4)", marginLeft: "auto" }}>
-            <div style={{ display: "inline-flex", border: "1px solid var(--hairline)", borderRadius: 8, overflow: "hidden" }}>
-              <Link href={buildHref({ category_id: categoryId, search, sort })} style={toggle(!listView)} title="Плиткой" aria-label="Плиткой">{IconGrid}</Link>
-              <Link href={buildHref({ category_id: categoryId, search, sort, view: "list" })} style={toggle(listView)} title="Списком (бланк заказа)" aria-label="Списком (бланк заказа)">{IconRows}</Link>
-            </div>
-            <span className="result-count">{data.total} товаров</span>
-          </div>
+      {/* Категории */}
+      <div className="container section">
+        <h2 className="section-title">Категории товаров</h2>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "var(--s-4)" }}>
+          {TILES.map((t) => (
+            <Link key={t.key} href="/catalog" style={{ textDecoration: "none", color: "var(--ink)",
+              background: "var(--paper)", borderRadius: "var(--r-xl)", padding: "var(--s-6)",
+              boxShadow: "0 4px 6px -1px rgba(0,0,0,.10), 0 2px 4px -1px rgba(0,0,0,.06)",
+              display: "flex", flexDirection: "column", gap: "var(--s-3)", transition: "transform .2s ease, box-shadow .2s ease" }}>
+              <span style={{ width: 56, height: 56, borderRadius: "var(--r-lg)", background: "var(--accent-soft)",
+                color: "var(--accent)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                {tileIcon[t.key]}
+              </span>
+              <span style={{ fontWeight: 600, fontSize: "var(--t-h3)" }}>{t.title}</span>
+              <span style={{ fontSize: "var(--t-sm)", color: "var(--graphite)" }}>{t.note}</span>
+            </Link>
+          ))}
         </div>
+      </div>
 
-        {data.items.length === 0 ? (
-          <div className="empty">
-            <div className="empty__icon"><IconSearch width="1em" height="1em" /></div>
-            <h3>Ничего не найдено</h3>
-            <p>{search ? `По запросу «${search}» товаров нет.` : "В этой категории пока пусто."}</p>
-            <Link href="/" className="btn btn--primary">Сбросить фильтры</Link>
+      {/* Доставка */}
+      <div className="band">
+        <div className="container section">
+          <h2 className="section-title">Доставка по регионам</h2>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "var(--s-4)", marginBottom: "var(--s-8)" }}>
+            {REGIONS.map((r) => (
+              <div key={r} style={{ display: "flex", alignItems: "center", gap: "var(--s-3)", background: "var(--paper)",
+                borderRadius: "var(--r-lg)", padding: "var(--s-4) var(--s-5)", fontWeight: 600 }}>
+                <span style={{ width: 8, height: 8, borderRadius: 999, background: "var(--accent-2)", flex: "none" }} />
+                {r}
+              </div>
+            ))}
           </div>
-        ) : (
-          <>
-            {listView ? (
-              <CatalogList products={data.items} />
-            ) : (
-              <div className="catalog-grid">
-                {data.items.map((p) => (
-                  <article className="pcard" key={p.id}>
-                    <Link href={`/products/${p.id}`} className="pcard__media" aria-label={p.name}>
-                      <span className="pcard__badge">
-                        {p.available
-                          ? <span className="badge badge--stock"><span className="badge__dot" />В наличии</span>
-                          : <span className="badge badge--out"><span className="badge__dot" />Нет</span>}
-                      </span>
-                      <div className="photo photo--square">
-                        {p.image_url
-                          ? <img src={`/api/v1/products/${p.id}/image`} alt={p.name} />
-                          : <span className="photo__ph"><IconImage /></span>}
-                      </div>
-                    </Link>
-                    <div className="pcard__body">
-                      <div className="pcard__cat">{p.category?.name ?? " "}</div>
-                      <Link href={`/products/${p.id}`} className="pcard__name">{p.name}</Link>
-                      <div className="pcard__sku">{p.article ? `Арт. ${p.article}` : " "}</div>
-                      <div className="pcard__foot">
-                        <span className="price">{formatPrice(p.price)}</span>
-                        <AddToCartCard product={p} />
-                      </div>
-                    </div>
-                  </article>
-                ))}
-              </div>
-            )}
-
-            {data.pages > 1 && (
-              <div className="pagination">
-                {page > 1
-                  ? <Link href={buildHref({ category_id: categoryId, search, sort, page: page - 1, view: listView ? "list" : undefined })} className="page-dot" aria-label="Назад">‹</Link>
-                  : <span className="page-dot page-dot--disabled">‹</span>}
-                {pageNumbers(page, data.pages).map((n) => (
-                  <Link key={n} href={buildHref({ category_id: categoryId, search, sort, page: n, view: listView ? "list" : undefined })}
-                    className={"page-dot " + (n === page ? "page-dot--active" : "")}>{n}</Link>
-                ))}
-                {page < data.pages
-                  ? <Link href={buildHref({ category_id: categoryId, search, sort, page: page + 1, view: listView ? "list" : undefined })} className="page-dot" aria-label="Вперёд">›</Link>
-                  : <span className="page-dot page-dot--disabled">›</span>}
-              </div>
-            )}
-          </>
-        )}
+          <LeadForm label="Узнать условия и получить прайс" />
+        </div>
       </div>
     </div>
   );

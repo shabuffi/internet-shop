@@ -17,7 +17,7 @@ export default async function SuccessPage({ searchParams }: Props) {
           </div>
         )}
         <div className="thanks__actions">
-          <Link href="/" className="btn btn--primary btn--lg">Продолжить покупки</Link>
+          <Link href="/catalog" className="btn btn--primary btn--lg">Продолжить покупки</Link>
         </div>
       </div>
     </div>

@@ -9,6 +9,7 @@ class CategoryOut(BaseModel):
     id: str
     name: str
     parent_id: str | None = None
+    depth: int = 0  # уровень вложенности (0 — корень), вычисляется из кода в названии
 
 
 class ProductOut(BaseModel):
