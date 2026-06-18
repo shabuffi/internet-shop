@@ -427,6 +427,9 @@ textarea.form-input { height: auto; min-height: 90px; padding: var(--s-3) var(--
   .checkout { grid-template-columns: 1fr; gap: var(--s-8); }
   .formgrid { grid-template-columns: 1fr; }
   .thanks h1 { font-size: 32px; }
-  .footer__top { grid-template-columns: 1fr 1fr; gap: var(--s-8) var(--s-6); padding: var(--s-12) 0 var(--s-8); }
+  .footer__top { grid-template-columns: 1fr 1fr; gap: var(--s-6) var(--s-5); padding: var(--s-12) 0 var(--s-8); }
+  .footer__brand { grid-column: 1 / -1; margin-bottom: var(--s-2); }
+  .footer__brand p { max-width: none; }
+  .footer__logo { height: 38px; }
   .footer__bottom { flex-direction: column; align-items: flex-start; gap: var(--s-2); }
 }

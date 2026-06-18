@@ -63,8 +63,8 @@ export default function HomePage() {
           gap: "var(--s-6)", paddingTop: "var(--s-8)", paddingBottom: "var(--s-8)" }}>
           {TRUST.map((t) => (
             <div key={t.small} style={{ textAlign: "center" }}>
-              <div style={{ fontFamily: "var(--font-display)", fontSize: 28, fontWeight: 600, color: "var(--accent)" }}>{t.big}</div>
-              <div style={{ fontSize: "var(--t-sm)", color: "var(--charcoal)", marginTop: 2 }}>{t.small}</div>
+              <div style={{ fontSize: 26, fontWeight: 700, letterSpacing: "-.01em", color: "var(--accent)" }}>{t.big}</div>
+              <div style={{ fontSize: "var(--t-sm)", color: "var(--charcoal)", marginTop: 4 }}>{t.small}</div>
             </div>
           ))}
         </div>

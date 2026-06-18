@@ -83,6 +83,7 @@ def list_products(
     category_id: str | None = Query(None),
     search: str | None = Query(None),
     sort: str | None = Query(None),
+    with_photo: bool = Query(False),
     db: Session = Depends(get_db),
 ):
     """Возвращает список активных товаров с пагинацией, фильтром, поиском и сортировкой.
@@ -115,6 +116,9 @@ def list_products(
         query = query.where(
             Product.name.ilike(pattern) | Product.article.ilike(pattern)
         )
+
+    if with_photo:
+        query = query.where(Product.image_url.isnot(None), Product.image_url != "")
 
     if sort == "price_asc":
         query = query.order_by(Product.price.asc())

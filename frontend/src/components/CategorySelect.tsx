@@ -4,12 +4,13 @@ import { useRouter } from "next/navigation";
 import type { Category } from "@/types/product";
 
 // Компактный выпадающий выбор категории (вместо длинной ленты чипов при сотнях категорий).
-export default function CategorySelect({ categories, current, search, view, sort }: {
+export default function CategorySelect({ categories, current, search, view, sort, photo }: {
   categories: Category[];
   current?: string;
   search?: string;
   view?: string;
   sort?: string;
+  photo?: boolean;
 }) {
   const router = useRouter();
 
@@ -20,6 +21,7 @@ export default function CategorySelect({ categories, current, search, view, sort
     if (search) q.set("search", search);
     if (view) q.set("view", view);
     if (sort) q.set("sort", sort);
+    if (photo) q.set("photo", "1");
     const s = q.toString();
     router.push(s ? `/catalog?${s}` : "/catalog");
   }

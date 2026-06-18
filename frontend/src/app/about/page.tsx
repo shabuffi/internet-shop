@@ -31,7 +31,7 @@ export default async function AboutPage() {
       <div className="container section" style={{ maxWidth: 820 }}>
         <div style={{ fontSize: "var(--t-body-lg)", lineHeight: 1.7, color: "var(--charcoal)" }}>
           <p>
-            <b style={{ color: "var(--ink)" }}>{name}</b> работает на рынке с 2015 года. Мы — оптовый
+            <b style={{ color: "var(--ink)" }}>{name}</b> работает на рынке с 2016 года. Мы — оптовый
             поставщик товаров первой необходимости: бытовая химия, канцтовары, товары для дома, сад и огород.
           </p>
           <p style={{ marginTop: "var(--s-4)" }}>

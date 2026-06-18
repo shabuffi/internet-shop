@@ -9,11 +9,12 @@ const OPTIONS = [
   { value: "price_desc", label: "Сначала дороже" },
 ];
 
-export default function SortSelect({ current, categoryId, search, view }: {
+export default function SortSelect({ current, categoryId, search, view, photo }: {
   current?: string;
   categoryId?: string;
   search?: string;
   view?: string;
+  photo?: boolean;
 }) {
   const router = useRouter();
 
@@ -22,6 +23,7 @@ export default function SortSelect({ current, categoryId, search, view }: {
     if (categoryId) q.set("category_id", categoryId);
     if (search) q.set("search", search);
     if (view) q.set("view", view);
+    if (photo) q.set("photo", "1");
     if (e.target.value && e.target.value !== "name") q.set("sort", e.target.value);
     const s = q.toString();
     router.push(s ? `/catalog?${s}` : "/catalog");

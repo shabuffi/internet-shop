@@ -35,6 +35,7 @@ export async function getProducts(params?: {
   search?: string;
   category_id?: string;
   sort?: string;          // name | price_asc | price_desc
+  with_photo?: boolean;   // только товары с фото
 }): Promise<ProductListResponse> {
   const query = new URLSearchParams();
   if (params?.page) query.set("page", String(params.page));
@@ -42,6 +43,7 @@ export async function getProducts(params?: {
   if (params?.search) query.set("search", params.search);
   if (params?.category_id) query.set("category_id", params.category_id);
   if (params?.sort) query.set("sort", params.sort);
+  if (params?.with_photo) query.set("with_photo", "1");
   const qs = query.toString();
   const res = await apiFetch<ProductListResponse>(`/products${qs ? `?${qs}` : ""}`);
   return { ...res, items: res.items.map(cleanProduct) };
