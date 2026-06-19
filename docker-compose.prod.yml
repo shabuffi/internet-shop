@@ -81,6 +81,8 @@ services:
     mem_limit: 1024m          # Next.js SSR может зависать на маленьком лимите под ботами/каталогом
     env_file: .env.prod
     environment:
+      HOSTNAME: "0.0.0.0"
+      PORT: "3000"
       NODE_OPTIONS: "--max-old-space-size=768"
     depends_on:
       backend:
