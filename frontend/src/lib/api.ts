@@ -20,9 +20,16 @@ const API_BASE =
     : "/api/v1";                      // client-side (через nginx)
 
 
+// Таймаут на серверные запросы к backend: без него зависший fetch (медленный
+// бэкенд во время ночного обмена МойСклад, моргнувшая сеть) ждёт вечно. Под
+// постоянным трафиком ботов такие подвисшие SSR-запросы накапливаются и в итоге
+// вешают весь Next.js-сервер (healthcheck падает → nginx отдаёт 504).
+const SERVER_FETCH_TIMEOUT_MS = 8000;
+
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
     ...init,
+    signal: AbortSignal.timeout(SERVER_FETCH_TIMEOUT_MS),
     next: { revalidate: 60 }, // кеш 60 секунд — Next.js перезапросит не чаще раза в минуту
   });
   if (!res.ok) throw new Error(`API error ${res.status}: ${path}`);

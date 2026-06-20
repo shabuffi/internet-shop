@@ -44,6 +44,7 @@ interface StoreInfo {
 async function getStoreInfo(): Promise<StoreInfo> {
   try {
     const res = await fetch("http://backend:8000/api/v1/admin/store-info", {
+      signal: AbortSignal.timeout(8000), // рендерится на КАЖДЫЙ запрос — без таймаута зависший fetch вешает весь сайт
       next: { revalidate: 60 },
     });
     if (res.ok) {

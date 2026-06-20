@@ -108,6 +108,21 @@ services:
       frontend:
         condition: service_healthy
 
+  # Docker сам НЕ перезапускает контейнер в статусе unhealthy (restart:always
+  # ловит только падение процесса). Autoheal следит за health-статусом и
+  # перезапускает любой зависший контейнер с healthcheck → фронт сам встаёт за
+  # ~30 сек, без ручного ssh + deploy.sh.
+  autoheal:
+    image: willfarrell/autoheal:latest
+    restart: always
+    mem_limit: 64m
+    environment:
+      AUTOHEAL_CONTAINER_LABEL: all   # следить за всеми контейнерами, у которых есть healthcheck
+      AUTOHEAL_INTERVAL: "30"         # проверка каждые 30 сек
+      AUTOHEAL_START_PERIOD: "60"     # дать сервисам подняться перед первой проверкой
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+
 volumes:
   postgres_data:
   media_data:
