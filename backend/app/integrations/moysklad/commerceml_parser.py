@@ -277,8 +277,13 @@ def _property_values(товар, prop_map: dict[str, str], ns: str = "") -> list
         pid = _text(item, "Ид", ns=ns)
         value = _text(item, "Значение", ns=ns)
         name = prop_map.get(pid) if pid else None
-        if name and value:
-            out.append({"name": name, "value": value})
+        if not name or not value:
+            continue
+        # Юридические/сертификатные свойства покупателю не нужны — пропускаем.
+        low = name.lower()
+        if any(k in low for k in ("сертификат", "деклар", "выдавш", "госуд.регистр")):
+            continue
+        out.append({"name": name, "value": value})
     return out
 
 
