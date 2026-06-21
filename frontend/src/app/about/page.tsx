@@ -18,16 +18,6 @@ const HIGHLIGHTS: { icon: React.ReactNode; big: string; small: string }[] = [
     icon: (<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21a8 8 0 0 0-16 0" /><circle cx="12" cy="8" r="4" /></svg>) },
 ];
 
-const _check = (<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5" /></svg>);
-const BENEFITS = [
-  { t: "Широкий ассортимент", d: "Тысячи позиций со склада с актуальными остатками." },
-  { t: "Ежедневные поступления", d: "Новый товар приходит и обрабатывается в тот же день." },
-  { t: "Индивидуальный подход", d: "Работаем с каждым клиентом и его задачами." },
-  { t: "Доставка по 6 областям", d: "Тверская, Московская, Смоленская, Новгородская, Владимирская, Ярославская." },
-  { t: "Оптовые цены", d: "Выгодные условия для магазинов и торговых точек." },
-  { t: "Заказы 24/7", d: "Бланк заказа на сайте принимается круглосуточно." },
-];
-
 export default async function AboutPage() {
   let store;
   try { store = await getStoreInfo(); } catch { store = null; }
@@ -87,32 +77,9 @@ export default async function AboutPage() {
           <p style={{ marginTop: "var(--s-4)" }}>
             Наш интернет-магазин предлагает всё самое необходимое для дома, дачи и семьи.
           </p>
-        </div>
-
-        <section style={{ marginTop: "var(--s-12)" }}>
-          <h2 className="section-title" style={{ fontSize: "var(--t-h3)" }}>Почему с нами работают</h2>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "var(--s-4)" }}>
-            {BENEFITS.map((b, i) => (
-              <Reveal key={b.t} delay={i * 60}>
-                <div className="lift" style={{ background: "var(--paper)", borderRadius: "var(--r-lg)", height: "100%",
-                  boxShadow: "0 4px 6px -1px rgba(0,0,0,.10), 0 2px 4px -1px rgba(0,0,0,.06)", padding: "var(--s-5)",
-                  display: "flex", gap: "var(--s-4)", alignItems: "flex-start" }}>
-                  <span className="icon-badge" style={{ width: 40, height: 40 }}>{_check}</span>
-                  <div>
-                    <div style={{ fontWeight: 600, fontSize: "var(--t-body)" }}>{b.t}</div>
-                    <div style={{ marginTop: 4, color: "var(--charcoal)", fontSize: "var(--t-sm)", lineHeight: 1.5 }}>{b.d}</div>
-                  </div>
-                </div>
-              </Reveal>
-            ))}
-          </div>
-        </section>
-
-        <div style={{ marginTop: "var(--s-12)", background: "var(--accent)", color: "#fff",
-          borderRadius: "var(--r-xl)", padding: "var(--s-8) var(--s-6)", textAlign: "center" }}>
-          <div style={{ fontFamily: "var(--font-display)", fontSize: "var(--t-h2)", fontWeight: 700 }}>
+          <p style={{ marginTop: "var(--s-4)", fontWeight: 600, color: "var(--ink)" }}>
             Спасибо, что Вы с нами!
-          </div>
+          </p>
         </div>
 
         {reqs.length > 0 && (
