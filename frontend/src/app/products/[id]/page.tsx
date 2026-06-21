@@ -49,15 +49,16 @@ export default async function ProductPage({ params }: Props) {
   const store = await getStoreInfo().catch(() => null);
   const inStock = product.available;
   const stockLabel = product.stock > 0 ? `${product.stock} шт.` : "Нет на складе";
-  const specs: [string, string][] = [
-    ["Артикул", product.article || "—"],
-    ["Категория", product.category?.name || "—"],
-    ["Остаток на складе", stockLabel],
-    ["Статус", inStock ? "В наличии" : "Нет в наличии"],
-    // Доставка — единый текст из настроек; пусто → строку не показываем
-    ...(store?.delivery_info ? [["Доставка", store.delivery_info] as [string, string]] : []),
-  ];
+  // Характеристики = модификации/реквизиты из МойСклад + базовые поля товара в одной таблице.
   const attributes = product.attributes?.filter((item) => item.name && item.value) ?? [];
+  const specs: { name: string; value: string }[] = [
+    ...attributes,
+    ...(product.article ? [{ name: "Артикул", value: product.article }] : []),
+    ...(product.category?.name ? [{ name: "Категория", value: product.category.name }] : []),
+    { name: "Остаток на складе", value: stockLabel },
+    { name: "Наличие", value: inStock ? "В наличии" : "Нет в наличии" },
+    ...(store?.delivery_info ? [{ name: "Доставка", value: store.delivery_info }] : []),
+  ];
 
   return (
     <div className="page">
@@ -89,38 +90,30 @@ export default async function ProductPage({ params }: Props) {
 
             <div className="pdp__price">{formatPrice(product.price)}</div>
 
-            <div className="pdp__divider" />
-            {product.description && (
-              <section style={{ marginBottom: "var(--s-6)" }}>
-                <h2 className="pdp__section-title">Описание</h2>
-                <p className="pdp__desc">{product.description}</p>
-              </section>
-            )}
-
             <AddToCartButton product={product} />
 
-            <div className="pdp__divider" />
-            {attributes.length > 0 && (
+            {product.description && (
               <>
-                <section>
-                  <h2 className="pdp__section-title">Характеристики</h2>
-                  <div className="pdp__specs">
-                    {attributes.map((item) => (
-                      <div className="srow" key={`${item.name}-${item.value}`}>
-                        <span>{item.name}</span>
-                        <span style={{ fontWeight: 500 }}>{item.value}</span>
-                      </div>
-                    ))}
-                  </div>
-                </section>
                 <div className="pdp__divider" />
+                <section>
+                  <h2 className="pdp__section-title">Описание</h2>
+                  <p className="pdp__desc">{product.description}</p>
+                </section>
               </>
             )}
-            <div className="pdp__specs">
-              {specs.map(([k, v]) => (
-                <div className="srow" key={k}><span>{k}</span><span style={{ fontWeight: 500 }}>{v}</span></div>
-              ))}
-            </div>
+
+            <div className="pdp__divider" />
+            <section>
+              <h2 className="pdp__section-title">Характеристики</h2>
+              <div className="pdp__specs">
+                {specs.map((s) => (
+                  <div className="srow" key={s.name}>
+                    <span>{s.name}</span>
+                    <span style={{ fontWeight: 500 }}>{s.value}</span>
+                  </div>
+                ))}
+              </div>
+            </section>
           </div>
         </div>
       </div>
