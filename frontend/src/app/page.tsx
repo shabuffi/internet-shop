@@ -4,6 +4,7 @@ import Link from "next/link";
 import { getCategories } from "@/lib/api";
 import { CATEGORY_GROUPS } from "@/lib/categoryGroups";
 import DeliveryMap from "@/components/DeliveryMap";
+import Reveal from "@/components/Reveal";
 
 // Плитки категорий. `title` — ключ группы в CATEGORY_GROUPS (там список реальных категорий
 // каталога). `icon` — имя файла картинки в /public/categories/<icon>.png.
@@ -106,19 +107,21 @@ export default async function HomePage() {
       <div className="container section">
         <h2 className="section-title">Категории товаров</h2>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: "var(--s-5)" }}>
-          {TILES.map((t) => (
-            <Link key={t.icon} href={tileHref(t.title)} style={{ textDecoration: "none", color: "var(--ink)",
-              background: "var(--paper)", borderRadius: "var(--r-xl)", padding: "var(--s-10) var(--s-5)",
-              boxShadow: "0 4px 6px -1px rgba(0,0,0,.10), 0 2px 4px -1px rgba(0,0,0,.06)",
-              display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center",
-              gap: "var(--s-2)", transition: "transform .2s ease, box-shadow .2s ease" }}>
-              {/* фикс-высота: иконки с разными пропорциями (обувь широкая, носки высокие) выравниваются */}
-              <span style={{ height: 116, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: "var(--s-2)" }}>
-                <img src={`/categories/${t.icon}.png`} alt={t.title}
-                  style={{ maxHeight: 116, maxWidth: 150, width: "auto", height: "auto", objectFit: "contain" }} />
-              </span>
-              <span style={{ fontWeight: 600, fontSize: "var(--t-h3)" }}>{t.title}</span>
-            </Link>
+          {TILES.map((t, i) => (
+            <Reveal key={t.icon} delay={i * 70}>
+              <Link href={tileHref(t.title)} className="cat-tile" style={{ textDecoration: "none", color: "var(--ink)",
+                background: "var(--paper)", borderRadius: "var(--r-xl)", padding: "var(--s-10) var(--s-5)",
+                boxShadow: "0 4px 6px -1px rgba(0,0,0,.10), 0 2px 4px -1px rgba(0,0,0,.06)",
+                display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center",
+                gap: "var(--s-2)", transition: "transform .2s ease, box-shadow .2s ease" }}>
+                {/* фикс-высота: иконки с разными пропорциями (обувь широкая, носки высокие) выравниваются */}
+                <span style={{ height: 116, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: "var(--s-2)" }}>
+                  <img src={`/categories/${t.icon}.png`} alt={t.title}
+                    style={{ maxHeight: 116, maxWidth: 150, width: "auto", height: "auto", objectFit: "contain" }} />
+                </span>
+                <span style={{ fontWeight: 600, fontSize: "var(--t-h3)" }}>{t.title}</span>
+              </Link>
+            </Reveal>
           ))}
         </div>
       </div>
@@ -127,13 +130,11 @@ export default async function HomePage() {
       <div className="band">
         <div className="container section">
           <h2 className="section-title">Доставка по регионам</h2>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "var(--s-4)" }}>
-            {REGIONS.map((r) => (
-              <div key={r} style={{ display: "flex", alignItems: "center", gap: "var(--s-3)", background: "var(--paper)",
-                borderRadius: "var(--r-lg)", padding: "var(--s-4) var(--s-5)", fontWeight: 600 }}>
-                <span style={{ width: 8, height: 8, borderRadius: 999, background: "var(--accent-2)", flex: "none" }} />
-                {r}
-              </div>
+          <div className="regions">
+            {REGIONS.map((r, i) => (
+              <Reveal key={r} delay={i * 60}>
+                <div className="region-chip"><span className="dot" />{r}</div>
+              </Reveal>
             ))}
           </div>
         </div>
