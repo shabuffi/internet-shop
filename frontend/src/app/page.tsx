@@ -94,7 +94,7 @@ export default async function HomePage() {
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: "var(--s-5)" }}>
           {TILES.map((t) => (
             <Link key={t.icon} href={tileHref(t.title)} style={{ textDecoration: "none", color: "var(--ink)",
-              background: "var(--paper)", borderRadius: "var(--r-xl)", padding: "var(--s-7) var(--s-5)",
+              background: "var(--paper)", borderRadius: "var(--r-xl)", padding: "var(--s-10) var(--s-5)",
               boxShadow: "0 4px 6px -1px rgba(0,0,0,.10), 0 2px 4px -1px rgba(0,0,0,.06)",
               display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center",
               gap: "var(--s-2)", transition: "transform .2s ease, box-shadow .2s ease" }}>
