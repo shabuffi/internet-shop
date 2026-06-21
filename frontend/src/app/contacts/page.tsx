@@ -1,10 +1,17 @@
 export const dynamic = "force-dynamic";
 
 import type { Metadata } from "next";
+import Link from "next/link";
 import { getStoreInfo } from "@/lib/api";
 import Reveal from "@/components/Reveal";
 
 export const metadata: Metadata = { title: "Контакты" };
+
+const STEPS = [
+  { title: "Выберите товары", text: "Соберите корзину в каталоге — тысячи позиций со склада с актуальными остатками." },
+  { title: "Оформите заказ", text: "Минимальная сумма — 5 000 ₽. Заявки принимаем круглосуточно, 24/7." },
+  { title: "Получите доставку", text: "Согласуем отгрузку и привезём по Тверской, Московской и ещё 4 областям." },
+];
 
 const icon: Record<string, React.ReactNode> = {
   Телефон: (<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3 19.5 19.5 0 0 1-6-6 19.8 19.8 0 0 1-3-8.6A2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1.9.3 1.8.6 2.6a2 2 0 0 1-.5 2.1L8.1 9.9a16 16 0 0 0 6 6l1.5-1.1a2 2 0 0 1 2.1-.5c.8.3 1.7.5 2.6.6a2 2 0 0 1 1.7 2Z" /></svg>),
@@ -63,6 +70,26 @@ export default async function ContactsPage() {
         ) : (
           <p style={{ color: "var(--charcoal)" }}>Контактные данные скоро появятся.</p>
         )}
+
+        <section style={{ marginTop: "var(--s-12)" }}>
+          <h2 className="section-title" style={{ fontSize: "var(--t-h3)" }}>Как сделать заказ</h2>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "var(--s-4)" }}>
+            {STEPS.map((s, i) => (
+              <Reveal key={s.title} delay={i * 70}>
+                <div className="lift" style={{ background: "var(--paper)", borderRadius: "var(--r-lg)", height: "100%",
+                  boxShadow: "0 4px 6px -1px rgba(0,0,0,.10), 0 2px 4px -1px rgba(0,0,0,.06)", padding: "var(--s-5)" }}>
+                  <span style={{ width: 36, height: 36, borderRadius: 999, background: "var(--accent)", color: "#fff",
+                    display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700 }}>{i + 1}</span>
+                  <div style={{ marginTop: "var(--s-3)", fontWeight: 600, fontSize: "var(--t-body)" }}>{s.title}</div>
+                  <div style={{ marginTop: 4, color: "var(--charcoal)", fontSize: "var(--t-sm)", lineHeight: 1.5 }}>{s.text}</div>
+                </div>
+              </Reveal>
+            ))}
+          </div>
+          <div style={{ marginTop: "var(--s-6)" }}>
+            <Link href="/catalog" className="btn btn--primary">Перейти в каталог →</Link>
+          </div>
+        </section>
 
         {address ? (
           <div style={{ marginTop: "var(--s-8)", borderRadius: "var(--r-lg)", overflow: "hidden", border: "1px solid var(--hairline)" }}>
