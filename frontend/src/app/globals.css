@@ -601,10 +601,10 @@ textarea.form-input { height: auto; min-height: 90px; padding: var(--s-3) var(--
 }
 
 /* ── Анимации главной ─────────────────────────────────────────────────────── */
-/* Появление при прокрутке (класс is-visible вешает компонент Reveal по IntersectionObserver) */
-.reveal { opacity: 0; transform: translateY(20px);
-  transition: opacity .6s ease, transform .6s cubic-bezier(.2,.7,.2,1); }
-.reveal.is-visible { opacity: 1; transform: none; }
+/* Появление: чистая CSS-анимация (без JS) — контент не может остаться скрытым.
+   animation-delay задаётся инлайн в компоненте Reveal для эффекта «лесенки». */
+.reveal { animation: reveal-in .6s cubic-bezier(.2,.7,.2,1) both; }
+@keyframes reveal-in { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: none; } }
 
 /* Подъём плитки категории при наведении */
 .cat-tile { will-change: transform; }
@@ -651,7 +651,7 @@ textarea.form-input { height: auto; min-height: 90px; padding: var(--s-3) var(--
   background: var(--accent-soft); color: var(--accent); }
 
 @media (prefers-reduced-motion: reduce) {
-  .reveal { opacity: 1; transform: none; transition: none; }
+  .reveal { animation: none; opacity: 1; transform: none; }
   .cat-tile:hover, .trust-item:hover, .lift:hover { transform: none; }
   .region-chip .dot::after { animation: none; }
   .marquee__track { animation: none; }
