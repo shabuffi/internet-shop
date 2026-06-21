@@ -113,8 +113,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                 <div className="footer__brand">
                   <img src="/logo-white.png" alt={shopName} className="footer__logo" />
                   <p>Оптовые поставки товаров первой необходимости: бытовая химия, канцтовары,
-                    товары для дома, сад и огород. Доставка по Тверской, Московской, Смоленской
-                    и Новгородской областям.</p>
+                    товары для дома, сад и огород. Доставка по Тверской, Московской, Смоленской,
+                    Новгородской, Владимирской и Ярославской областям.</p>
                 </div>
 
                 <div className="footer__col">
@@ -141,7 +141,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               </div>
               <div className="footer__bottom">
                 <span>© {new Date().getFullYear()} {store.legalName || shopName}. Все права защищены.</span>
-                <span>Produced by Sofi Sh</span>
+                <span>Produced by soffit</span>
               </div>
             </div>
           </footer>

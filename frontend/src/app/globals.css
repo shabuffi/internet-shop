@@ -643,9 +643,16 @@ textarea.form-input { height: auto; min-height: 90px; padding: var(--s-3) var(--
   display: flex; align-items: center; justify-content: center;
   background: var(--accent-soft); color: var(--accent); }
 
+/* Универсальная карточка с подъёмом + иконка-плашка (Контакты, О компании) */
+.lift { transition: transform .2s ease, box-shadow .2s ease; }
+.lift:hover { transform: translateY(-4px); box-shadow: 0 16px 30px -14px rgba(0,0,0,.22); }
+.icon-badge { width: 48px; height: 48px; border-radius: 14px; flex: none;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--accent-soft); color: var(--accent); }
+
 @media (prefers-reduced-motion: reduce) {
   .reveal { opacity: 1; transform: none; transition: none; }
-  .cat-tile:hover, .trust-item:hover { transform: none; }
+  .cat-tile:hover, .trust-item:hover, .lift:hover { transform: none; }
   .region-chip .dot::after { animation: none; }
   .marquee__track { animation: none; }
   .marquee { overflow-x: auto; }
