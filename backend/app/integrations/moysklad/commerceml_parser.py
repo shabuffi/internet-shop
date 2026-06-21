@@ -132,10 +132,13 @@ def parse_import_xml(xml_bytes: bytes) -> ParsedCatalog:
 
     # ─── Категории ────────────────────────────────────────────────────────────
     classifier = root.find(_tag("Классификатор", ns))
+    prop_map: dict[str, str] = {}
     if classifier is not None:
         groups_el = classifier.find(_tag("Группы", ns))
         if groups_el is not None:
             catalog.categories = _parse_groups(groups_el, parent_id=None, ns=ns)
+        # Карта свойств классификатора (Ид → название) для характеристик товара
+        prop_map = _parse_properties(classifier, ns=ns)
 
     # ─── Товары ───────────────────────────────────────────────────────────────
     catalog_el = root.find(_tag("Каталог", ns))
@@ -143,7 +146,7 @@ def parse_import_xml(xml_bytes: bytes) -> ParsedCatalog:
         products_el = catalog_el.find(_tag("Товары", ns))
         if products_el is not None:
             for товар in products_el.findall(_tag("Товар", ns)):
-                product = _parse_product(товар, ns=ns)
+                product = _parse_product(товар, ns=ns, prop_map=prop_map)
                 if product:
                     catalog.products.append(product)
 
@@ -229,6 +232,56 @@ _NON_ATTR_REQS = {
 }
 
 
+def _parse_properties(classifier, ns: str = "") -> dict[str, str]:
+    """{Ид свойства: Наименование} из <Классификатор><Свойства>.
+
+    МойСклад кладёт характеристики товара в свойства классификатора, а у товара —
+    только их значения (<ЗначенияСвойств>), ссылаясь на свойство по Ид. Эта карта
+    нужна, чтобы превратить значение обратно в пару «название: значение».
+    """
+    out: dict[str, str] = {}
+    if classifier is None:
+        return out
+    props_el = classifier.find(_tag("Свойства", ns))
+    if props_el is None and ns:
+        props_el = classifier.find("Свойства")
+    if props_el is None:
+        return out
+    for prop in list(props_el):
+        if not prop.tag.endswith("Свойство"):
+            continue
+        pid = _text(prop, "Ид", ns=ns)
+        name = _text(prop, "Наименование", ns=ns)
+        if pid and name:
+            out[pid] = name
+    return out
+
+
+def _property_values(товар, prop_map: dict[str, str], ns: str = "") -> list[dict]:
+    """Характеристики товара из <ЗначенияСвойств> → [{"name", "value"}].
+
+    Имя свойства берём из ``prop_map`` по Ид. Контейнер у МойСклад — <ЗначенияСвойств>,
+    элемент — <ЗначенияСвойства> (нестандартно), поддерживаем и стандартное <ЗначениеСвойства>.
+    """
+    if not prop_map:
+        return []
+    container = товар.find(_tag("ЗначенияСвойств", ns))
+    if container is None and ns:
+        container = товар.find("ЗначенияСвойств")
+    if container is None:
+        return []
+    out: list[dict] = []
+    for item in list(container):
+        if not (item.tag.endswith("ЗначениеСвойства") or item.tag.endswith("ЗначенияСвойства")):
+            continue
+        pid = _text(item, "Ид", ns=ns)
+        value = _text(item, "Значение", ns=ns)
+        name = prop_map.get(pid) if pid else None
+        if name and value:
+            out.append({"name": name, "value": value})
+    return out
+
+
 def _requisites(товар, ns: str = "") -> dict[str, str]:
     """Собирает <ЗначениеРеквизита> товара в словарь {Наименование: Значение}.
 
@@ -248,7 +301,7 @@ def _requisites(товар, ns: str = "") -> dict[str, str]:
     return out
 
 
-def _parse_product(товар, ns: str = "") -> ParsedProduct | None:
+def _parse_product(товар, ns: str = "", prop_map: dict[str, str] | None = None) -> ParsedProduct | None:
     """Парсит один элемент <Товар>."""
     product_id = _text(товар, "Ид", ns=ns)
     name = _text(товар, "Наименование", ns=ns)
@@ -262,8 +315,11 @@ def _parse_product(товар, ns: str = "") -> ParsedProduct | None:
                   or reqs.get("Полное наименование"))
     article = _text(товар, "Артикул", ns=ns) or reqs.get("Артикул")
 
-    # Характеристики = реквизиты, кроме технических и тех, что уже показаны отдельно.
-    attributes = [
+    # Характеристики = свойства классификатора (<ЗначенияСвойств>) + реквизиты, кроме
+    # технических и тех, что уже показаны отдельно. Свойства идут первыми — это и есть
+    # «характеристики/модификации» из МойСклад; реквизиты — фолбэк.
+    attributes = _property_values(товар, prop_map or {}, ns=ns)
+    attributes += [
         {"name": k, "value": v}
         for k, v in reqs.items()
         if k not in _NON_ATTR_REQS
