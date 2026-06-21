@@ -20,6 +20,7 @@ class ProductOut(BaseModel):
     description: str | None = None
     image_url: str | None = None          # первая картинка (для карточки/списка/OG)
     images: list[str] | None = None       # все картинки (для галереи на карточке товара)
+    attributes: list[dict] | None = None  # характеристики из МойСклад: [{name, value}]
     article: str | None = None
     price: Decimal
     stock: int

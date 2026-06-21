@@ -48,19 +48,22 @@ export default async function ProductPage({ params }: Props) {
 
   const store = await getStoreInfo().catch(() => null);
   const inStock = product.available;
+  const stockLabel = product.stock > 0 ? `${product.stock} шт.` : "Нет на складе";
   const specs: [string, string][] = [
     ["Артикул", product.article || "—"],
     ["Категория", product.category?.name || "—"],
-    ["Наличие", inStock ? "В наличии" : "Нет в наличии"],
+    ["Остаток на складе", stockLabel],
+    ["Статус", inStock ? "В наличии" : "Нет в наличии"],
     // Доставка — единый текст из настроек; пусто → строку не показываем
     ...(store?.delivery_info ? [["Доставка", store.delivery_info] as [string, string]] : []),
   ];
+  const attributes = product.attributes?.filter((item) => item.name && item.value) ?? [];
 
   return (
     <div className="page">
       <div className="container">
         <div className="breadcrumb">
-          <Link href="/">Каталог</Link>
+          <Link href="/catalog">Каталог</Link>
           {product.category && <><span>›</span><span>{product.category.name}</span></>}
           <span>›</span>
           <span style={{ color: "var(--charcoal)" }}>{product.name}</span>
@@ -81,15 +84,38 @@ export default async function ProductPage({ params }: Props) {
               {inStock
                 ? <span className="badge badge--stock"><span className="badge__dot" />В наличии</span>
                 : <span className="badge badge--out"><span className="badge__dot" />Нет в наличии</span>}
+              <span className="pdp__sku">Остаток: {stockLabel}</span>
             </div>
 
             <div className="pdp__price">{formatPrice(product.price)}</div>
 
-            {product.description && <p className="pdp__desc">{product.description}</p>}
+            <div className="pdp__divider" />
+            {product.description && (
+              <section style={{ marginBottom: "var(--s-6)" }}>
+                <h2 className="pdp__section-title">Описание</h2>
+                <p className="pdp__desc">{product.description}</p>
+              </section>
+            )}
 
             <AddToCartButton product={product} />
 
             <div className="pdp__divider" />
+            {attributes.length > 0 && (
+              <>
+                <section>
+                  <h2 className="pdp__section-title">Характеристики</h2>
+                  <div className="pdp__specs">
+                    {attributes.map((item) => (
+                      <div className="srow" key={`${item.name}-${item.value}`}>
+                        <span>{item.name}</span>
+                        <span style={{ fontWeight: 500 }}>{item.value}</span>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+                <div className="pdp__divider" />
+              </>
+            )}
             <div className="pdp__specs">
               {specs.map(([k, v]) => (
                 <div className="srow" key={k}><span>{k}</span><span style={{ fontWeight: 500 }}>{v}</span></div>

@@ -47,6 +47,8 @@ class Product(Base):
     image_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     # Все картинки товара (имена файлов в медиа-хранилище). image_url — первая из них.
     images: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
+    # Характеристики из МойСклад: список {"name", "value"} (реквизиты, кроме технических).
+    attributes: Mapped[list | None] = mapped_column(JSON, nullable=True)
     # Картинки заданы вручную в админке сайта — обмен МойСклад их не перезаписывает
     images_manual: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
 

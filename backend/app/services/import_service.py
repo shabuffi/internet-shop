@@ -92,6 +92,7 @@ def upsert_catalog(db: Session, catalog: ParsedCatalog, source: str = "commercem
                     code=parsed_product.code,
                     image_url=image_name(parsed_product.image_url),
                     images=[image_name(x) for x in parsed_product.images],
+                    attributes=parsed_product.attributes or None,
                     price=parsed_product.price,
                     stock=parsed_product.stock,
                     category_id=cat_id,
@@ -121,6 +122,9 @@ def upsert_catalog(db: Session, catalog: ParsedCatalog, source: str = "commercem
                 # что-то прислал — чтобы пустое значение не затёрло уже сохранённое.
                 if parsed_product.description:
                     product.description = parsed_product.description
+                # Характеристики обновляем только если пришли (как и описание/артикул)
+                if parsed_product.attributes:
+                    product.attributes = parsed_product.attributes
                 # Картинки из обмена применяем, только если их не ведут вручную на сайте
                 if parsed_product.images and not product.images_manual:
                     imgs = [image_name(x) for x in parsed_product.images]

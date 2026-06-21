@@ -62,6 +62,9 @@ class ParsedProduct:
     category_id: str | None = None
     image_url: str | None = None          # первая картинка (для списка/карточки/OG)
     images: list[str] = field(default_factory=list)   # все картинки товара
+    # Характеристики товара (реквизиты МойСклад, кроме технических/уже используемых):
+    # список {"name", "value"} — показываются отдельным блоком в карточке.
+    attributes: list[dict] = field(default_factory=list)
     price: Decimal = Decimal("0")
     stock: int = 0
     # Были ли для товара данные в offers.xml этого захода обмена. МойСклад может
@@ -217,6 +220,15 @@ def _parse_groups(groups_el, parent_id: str | None, ns: str = "") -> list[Parsed
     return result
 
 
+# Реквизиты, которые НЕ показываем как характеристики: технические или уже выведенные
+# отдельными полями (описание/артикул/код и служебные поля МойСклад).
+_NON_ATTR_REQS = {
+    "Описание", "ОписаниеВФорматеHTML", "Полное наименование", "Полное наименование товара",
+    "Артикул", "Код", "ВидНоменклатуры", "ТипНоменклатуры", "БазоваяЕдиница",
+    "НоменклатурнаяГруппа", "Группа", "Ставка НДС",
+}
+
+
 def _requisites(товар, ns: str = "") -> dict[str, str]:
     """Собирает <ЗначениеРеквизита> товара в словарь {Наименование: Значение}.
 
@@ -250,6 +262,13 @@ def _parse_product(товар, ns: str = "") -> ParsedProduct | None:
                   or reqs.get("Полное наименование"))
     article = _text(товар, "Артикул", ns=ns) or reqs.get("Артикул")
 
+    # Характеристики = реквизиты, кроме технических и тех, что уже показаны отдельно.
+    attributes = [
+        {"name": k, "value": v}
+        for k, v in reqs.items()
+        if k not in _NON_ATTR_REQS
+    ]
+
     category_id = None
     groups_el = товар.find(_tag("Группы", ns))
     if groups_el is not None:
@@ -270,4 +289,5 @@ def _parse_product(товар, ns: str = "") -> ParsedProduct | None:
         category_id=category_id,
         image_url=images[0] if images else None,
         images=images,
+        attributes=attributes,
     )
