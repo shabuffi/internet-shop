@@ -3,7 +3,7 @@ import re
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import Response
 from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import select, func
+from sqlalchemy import select, func, or_
 
 from app.db.session import get_db
 from app.db.models.product import Product, Category
@@ -14,6 +14,29 @@ router = APIRouter(prefix="/products", tags=["Products"])
 
 # Браузерный кэш картинки на сутки (сами байты лежат локально в медиа-хранилище).
 _IMG_TTL = 86400  # 1 день
+
+# Раскладка клавиатуры: один и тот же физический ряд клавиш в EN (QWERTY) и RU (ЙЦУКЕН).
+# Нужно для поиска при «неправильной раскладке»: ввёл "vjq" → ищем ещё и "мой", и наоборот.
+_EN_KEYS = "`qwertyuiop[]asdfghjkl;'zxcvbnm,./"
+_RU_KEYS = "ёйцукенгшщзхъфывапролджэячсмитьбю."
+_EN2RU = {e: r for e, r in zip(_EN_KEYS, _RU_KEYS)}
+_RU2EN = {r: e for e, r in zip(_EN_KEYS, _RU_KEYS)}
+
+
+def _layout_variants(s: str) -> list[str]:
+    """Возвращает варианты запроса с учётом неправильной раскладки: исходный + EN→RU + RU→EN.
+
+    Только реально отличающиеся непустые варианты (без дублей).
+    """
+    s = s.strip()
+    if not s:
+        return []
+    low = s.lower()
+    variants: list[str] = []
+    for v in (s, "".join(_EN2RU.get(c, c) for c in low), "".join(_RU2EN.get(c, c) for c in low)):
+        if v and v not in variants:
+            variants.append(v)
+    return variants
 
 
 @router.get("/categories", response_model=list[CategoryOut])
@@ -116,10 +139,14 @@ def list_products(
         query = query.where(Product.category_id.in_(ids))
 
     if search:
-        pattern = f"%{search}%"
-        query = query.where(
-            Product.name.ilike(pattern) | Product.article.ilike(pattern)
-        )
+        # Учитываем неправильную раскладку: ищем по исходному запросу и его EN↔RU вариантам.
+        conds = []
+        for variant in _layout_variants(search):
+            pattern = f"%{variant}%"
+            conds.append(Product.name.ilike(pattern))
+            conds.append(Product.article.ilike(pattern))
+        if conds:
+            query = query.where(or_(*conds))
 
     if with_photo:
         query = query.where(Product.image_url.isnot(None), Product.image_url != "")
