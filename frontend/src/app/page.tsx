@@ -72,7 +72,7 @@ export default async function HomePage() {
                 отгрузка для магазинов.
               </p>
               <div style={{ display: "flex", gap: "var(--s-3)", marginTop: "var(--s-8)", flexWrap: "wrap" }}>
-                <Link href="/catalog" className="btn btn--lg" style={{ background: "#fff", color: "var(--accent)" }}>
+                <Link href="/catalog" className="btn btn--lg" style={{ background: "var(--accent-2)", color: "#fff" }}>
                   Перейти в каталог
                 </Link>
               </div>

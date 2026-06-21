@@ -20,11 +20,11 @@ export default function DeliveryMap() {
     <svg viewBox={VIEWBOX} role="img" aria-label="Карта зоны доставки: 6 областей"
       style={{ width: "100%", height: "auto", display: "block" }}>
       <style>{`
-        .dm-base { fill: rgba(255,255,255,.92); }
-        .dm-region path { fill: rgba(255,255,255,.92); stroke: var(--accent, #003399); stroke-width: 2.2;
+        .dm-base { fill: rgba(255,255,255,.95); }
+        .dm-region path { fill: rgba(255,255,255,.95); stroke: var(--accent-2, #E02424); stroke-width: 2.4;
           transition: fill .15s ease; }
-        .dm-region:hover path { fill: var(--accent, #003399); }
-        .dm-region:hover text { fill: #fff; }
+        .dm-region:hover path { fill: var(--accent-2, #E02424); }
+        .dm-region:hover text { fill: #fff; stroke: rgba(140,18,18,.6); }
         .dm-label { fill: var(--accent-deep, #0a2470); font-size: 23px; font-weight: 700;
           paint-order: stroke; stroke: #fff; stroke-width: 4; pointer-events: none; }
       `}</style>
