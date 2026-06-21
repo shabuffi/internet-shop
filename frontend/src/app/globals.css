@@ -625,8 +625,27 @@ textarea.form-input { height: auto; min-height: 90px; padding: var(--s-3) var(--
   background: var(--accent-2); animation: pulse-dot 2.2s ease-out infinite; }
 @keyframes pulse-dot { 0% { transform: scale(1); opacity: .55; } 70%, 100% { transform: scale(2.8); opacity: 0; } }
 
+/* Бегущая строка регионов (рулетка) под баннером */
+.marquee { position: relative; overflow: hidden; padding: var(--s-5) 0;
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 7%, #000 93%, transparent);
+          mask-image: linear-gradient(90deg, transparent, #000 7%, #000 93%, transparent); }
+.marquee__track { display: flex; gap: var(--s-3); width: max-content;
+  animation: marquee-scroll 30s linear infinite; }
+.marquee:hover .marquee__track { animation-play-state: paused; }
+@keyframes marquee-scroll { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+
+/* Полоса доверия: иконка-плашка + подъём */
+.trust-item { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 4px;
+  transition: transform .2s ease; }
+.trust-item:hover { transform: translateY(-4px); }
+.trust-item .ic { width: 52px; height: 52px; border-radius: 14px; margin-bottom: 8px;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--accent-soft); color: var(--accent); }
+
 @media (prefers-reduced-motion: reduce) {
   .reveal { opacity: 1; transform: none; transition: none; }
-  .cat-tile:hover { transform: none; }
+  .cat-tile:hover, .trust-item:hover { transform: none; }
   .region-chip .dot::after { animation: none; }
+  .marquee__track { animation: none; }
+  .marquee { overflow-x: auto; }
 }

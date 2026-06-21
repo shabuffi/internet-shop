@@ -4,6 +4,7 @@ import Link from "next/link";
 import { getCategories } from "@/lib/api";
 import { CATEGORY_GROUPS } from "@/lib/categoryGroups";
 import DeliveryMap from "@/components/DeliveryMap";
+import RegionsMarquee from "@/components/RegionsMarquee";
 import Reveal from "@/components/Reveal";
 
 // Плитки категорий. `title` — ключ группы в CATEGORY_GROUPS (там список реальных категорий
@@ -19,11 +20,18 @@ const TILES = [
   { icon: "cat-jewelry", title: "Бижутерия" },
 ];
 
+const trustIcon: Record<string, React.ReactNode> = {
+  clock: (<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg>),
+  wallet: (<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M3 8a2 2 0 0 1 2-2h12v4" /><rect x="3" y="8" width="18" height="12" rx="2" /><path d="M16 13h2" /></svg>),
+  box: (<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M3 7l9-4 9 4-9 4-9-4Z" /><path d="M3 7v10l9 4 9-4V7" /><path d="M12 11v10" /></svg>),
+  refresh: (<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7" /><path d="M21 3v6h-6" /></svg>),
+};
+
 const TRUST = [
-  { big: "24/7", small: "приём заказов на сайте" },
-  { big: "от 5 000 ₽", small: "минимальный заказ" },
-  { big: "Тысячи", small: "товаров со склада" },
-  { big: "Остатки", small: "обновляются ежедневно" },
+  { icon: "clock", big: "24/7", small: "приём заказов на сайте" },
+  { icon: "wallet", big: "от 5 000 ₽", small: "минимальный заказ" },
+  { icon: "box", big: "Тысячи", small: "товаров со склада" },
+  { icon: "refresh", big: "Остатки", small: "обновляются ежедневно" },
 ];
 
 const REGIONS = [
@@ -90,15 +98,21 @@ export default async function HomePage() {
         </div>
       </section>
 
+      {/* Бегущая строка регионов доставки — сразу под баннером */}
+      <RegionsMarquee items={REGIONS} />
+
       {/* Полоса доверия */}
       <div className="band">
         <div className="container" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
-          gap: "var(--s-6)", paddingTop: "var(--s-8)", paddingBottom: "var(--s-8)" }}>
-          {TRUST.map((t) => (
-            <div key={t.small} style={{ textAlign: "center" }}>
-              <div style={{ fontSize: 26, fontWeight: 700, letterSpacing: "-.01em", color: "var(--accent)" }}>{t.big}</div>
-              <div style={{ fontSize: "var(--t-sm)", color: "var(--charcoal)", marginTop: 4 }}>{t.small}</div>
-            </div>
+          gap: "var(--s-6)", paddingTop: "var(--s-12)", paddingBottom: "var(--s-12)" }}>
+          {TRUST.map((t, i) => (
+            <Reveal key={t.small} delay={i * 80}>
+              <div className="trust-item">
+                <span className="ic">{trustIcon[t.icon]}</span>
+                <div style={{ fontSize: 26, fontWeight: 700, letterSpacing: "-.01em", color: "var(--accent)" }}>{t.big}</div>
+                <div style={{ fontSize: "var(--t-sm)", color: "var(--charcoal)" }}>{t.small}</div>
+              </div>
+            </Reveal>
           ))}
         </div>
       </div>
@@ -126,19 +140,6 @@ export default async function HomePage() {
         </div>
       </div>
 
-      {/* Доставка */}
-      <div className="band">
-        <div className="container section">
-          <h2 className="section-title">Доставка по регионам</h2>
-          <div className="regions">
-            {REGIONS.map((r, i) => (
-              <Reveal key={r} delay={i * 60}>
-                <div className="region-chip"><span className="dot" />{r}</div>
-              </Reveal>
-            ))}
-          </div>
-        </div>
-      </div>
     </div>
   );
 }
