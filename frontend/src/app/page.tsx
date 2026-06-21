@@ -3,6 +3,7 @@ export const dynamic = "force-dynamic";
 import Link from "next/link";
 import { getCategories } from "@/lib/api";
 import { CATEGORY_GROUPS } from "@/lib/categoryGroups";
+import DeliveryMap from "@/components/DeliveryMap";
 
 // Плитки категорий. `title` — ключ группы в CATEGORY_GROUPS (там список реальных категорий
 // каталога). `icon` — имя файла картинки в /public/categories/<icon>.png.
@@ -24,7 +25,10 @@ const TRUST = [
   { big: "Остатки", small: "обновляются ежедневно" },
 ];
 
-const REGIONS = ["Тверская область", "Московская область", "Смоленская область", "Новгородская область"];
+const REGIONS = [
+  "Тверская область", "Московская область", "Смоленская область",
+  "Новгородская область", "Владимирская область", "Ярославская область",
+];
 
 export default async function HomePage() {
   // Тянем категории, чтобы плитки вели в конкретный раздел каталога, а не в общий список.
@@ -54,22 +58,32 @@ export default async function HomePage() {
         background: "linear-gradient(105deg, rgba(0,30,90,.92) 0%, rgba(0,51,153,.86) 45%, rgba(0,51,153,.55) 100%), url('/hero.jpg') center/cover no-repeat, var(--accent-deep)",
         color: "#fff",
       }}>
-        <div className="container" style={{ paddingTop: "var(--s-20)", paddingBottom: "var(--s-20)" }}>
-          <div style={{ maxWidth: 720 }}>
-            <div className="eyebrow" style={{ color: "rgba(255,255,255,.8)" }}>Оптовый поставщик</div>
-            <h1 style={{ fontFamily: "var(--font-display)", fontSize: "var(--t-display)", lineHeight: 1.07,
-              letterSpacing: "-.015em", margin: "var(--s-3) 0 0", color: "#fff" }}>
-              Хозтовары, бытовая химия и товары для дома и дачи — оптом
-            </h1>
-            <p style={{ fontSize: "var(--t-body-lg)", lineHeight: 1.6, margin: "var(--s-5) 0 0", color: "rgba(255,255,255,.9)", maxWidth: 600 }}>
-              Широкий ассортимент со склада с актуальными остатками. Заказы на сайте принимаем
-              круглосуточно, минимальная сумма заказа — 5 000 ₽. Удобный бланк заказа и быстрая
-              отгрузка для магазинов.
-            </p>
-            <div style={{ display: "flex", gap: "var(--s-3)", marginTop: "var(--s-8)", flexWrap: "wrap" }}>
-              <Link href="/catalog" className="btn btn--lg" style={{ background: "#fff", color: "var(--accent)" }}>
-                Перейти в каталог
-              </Link>
+        <div className="container" style={{ paddingTop: "var(--s-16)", paddingBottom: "var(--s-16)" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "var(--s-10)", flexWrap: "wrap" }}>
+            <div style={{ flex: "1 1 460px", minWidth: 0 }}>
+              <div className="eyebrow" style={{ color: "rgba(255,255,255,.8)" }}>Оптовый поставщик</div>
+              <h1 style={{ fontFamily: "var(--font-display)", fontSize: "var(--t-display)", lineHeight: 1.07,
+                letterSpacing: "-.015em", margin: "var(--s-3) 0 0", color: "#fff" }}>
+                Хозтовары, бытовая химия и товары для дома и дачи — оптом
+              </h1>
+              <p style={{ fontSize: "var(--t-body-lg)", lineHeight: 1.6, margin: "var(--s-5) 0 0", color: "rgba(255,255,255,.9)", maxWidth: 600 }}>
+                Широкий ассортимент со склада с актуальными остатками. Заказы на сайте принимаем
+                круглосуточно, минимальная сумма заказа — 5 000 ₽. Удобный бланк заказа и быстрая
+                отгрузка для магазинов.
+              </p>
+              <div style={{ display: "flex", gap: "var(--s-3)", marginTop: "var(--s-8)", flexWrap: "wrap" }}>
+                <Link href="/catalog" className="btn btn--lg" style={{ background: "#fff", color: "var(--accent)" }}>
+                  Перейти в каталог
+                </Link>
+              </div>
+            </div>
+            {/* Карта зоны доставки — вместо пустого синего пространства справа (скрыта на мобильных) */}
+            <div className="hide-mobile" style={{ flex: "0 1 480px", minWidth: 0 }}>
+              <div style={{ fontSize: "var(--t-sm)", fontWeight: 600, color: "rgba(255,255,255,.85)",
+                textTransform: "uppercase", letterSpacing: ".04em", marginBottom: "var(--s-3)", textAlign: "center" }}>
+                Доставляем по 6 областям
+              </div>
+              <DeliveryMap />
             </div>
           </div>
         </div>
