@@ -1,33 +1,51 @@
 export const dynamic = "force-dynamic";
 
 import Link from "next/link";
-import LeadForm from "@/components/LeadForm";
+import { getCategories } from "@/lib/api";
+import { CATEGORY_GROUPS } from "@/lib/categoryGroups";
 
-// Иконки-плитки категорий (простые штриховые)
-const tileIcon: Record<string, React.ReactNode> = {
-  chem: (<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M9 3h6M10 3v5L5 19a2 2 0 0 0 2 3h10a2 2 0 0 0 2-3l-5-11V3" /><path d="M7.5 14h9" /></svg>),
-  home: (<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M3 11l9-7 9 7" /><path d="M5 10v10h14V10" /><path d="M9 20v-6h6v6" /></svg>),
-  garden: (<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22V11" /><path d="M12 11c0-4 3-7 8-7 0 4-3 7-8 7Z" /><path d="M12 14c0-3-2.5-5-6-5 0 3 2.5 5 6 5Z" /></svg>),
-  tools: (<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18v3h3l6.3-6.3a4 4 0 0 0 5.4-5.4l-2.3 2.3-2-2 2.3-2.3Z" /></svg>),
-};
-
+// Плитки категорий. `title` — ключ группы в CATEGORY_GROUPS (там список реальных категорий
+// каталога). `icon` — имя файла картинки в /public/categories/<icon>.png.
 const TILES = [
-  { key: "chem", title: "Бытовая химия", note: "Чистящие, моющие, гигиена" },
-  { key: "home", title: "Хозтовары", note: "Для дома и уборки" },
-  { key: "garden", title: "Сад и дача", note: "Семена, удобрения, сезон" },
-  { key: "tools", title: "Инструмент и авто", note: "Метизы, авто-товары" },
+  { icon: "cat-chem", title: "Бытовая химия" },
+  { icon: "cat-home", title: "Хозтовары" },
+  { icon: "cat-garden", title: "Сад и дача" },
+  { icon: "cat-toys", title: "Игрушки" },
+  { icon: "cat-stationery", title: "Канцтовары" },
+  { icon: "cat-shoes", title: "Обувь" },
+  { icon: "cat-socks", title: "Носки" },
+  { icon: "cat-jewelry", title: "Бижутерия" },
 ];
 
 const TRUST = [
+  { big: "24/7", small: "приём заказов на сайте" },
+  { big: "от 5 000 ₽", small: "минимальный заказ" },
   { big: "Тысячи", small: "товаров со склада" },
-  { big: "4 области", small: "доставка по региону" },
-  { big: "Прайс", small: "по запросу" },
-  { big: "−10%", small: "на первый заказ" },
+  { big: "Остатки", small: "обновляются ежедневно" },
 ];
 
 const REGIONS = ["Тверская область", "Московская область", "Смоленская область", "Новгородская область"];
 
-export default function HomePage() {
+export default async function HomePage() {
+  // Тянем категории, чтобы плитки вели в конкретный раздел каталога, а не в общий список.
+  let categories: { id: string; name: string }[] = [];
+  try {
+    categories = await getCategories();
+  } catch {
+    categories = [];
+  }
+
+  // Ссылка плитки → каталог, отфильтрованный сразу по группе категорий (CATEGORY_GROUPS).
+  // Имена группы резолвим в реальные category_id и склеиваем через запятую (бэкенд понимает
+  // список). Если ни одна категория группы не нашлась — fallback на поиск по названию плитки.
+  function tileHref(title: string): string {
+    const norm = (s: string) => s.trim().toLowerCase();
+    const names = new Set((CATEGORY_GROUPS[title] ?? []).map(norm));
+    const ids = categories.filter((c) => names.has(norm(c.name))).map((c) => c.id);
+    if (ids.length) return `/catalog?category_id=${ids.join(",")}`;
+    return `/catalog?search=${encodeURIComponent(title)}`;
+  }
+
   return (
     <div className="page">
       {/* Hero */}
@@ -44,11 +62,11 @@ export default function HomePage() {
               Хозтовары, бытовая химия и товары для дома и дачи — оптом
             </h1>
             <p style={{ fontSize: "var(--t-body-lg)", lineHeight: 1.6, margin: "var(--s-5) 0 0", color: "rgba(255,255,255,.9)", maxWidth: 600 }}>
-              Доставка по Тверской, Московской, Смоленской и Новгородской областям. Тысячи позиций со склада,
-              удобный бланк заказа и быстрая отгрузка для магазинов.
+              Широкий ассортимент со склада с актуальными остатками. Заказы на сайте принимаем
+              круглосуточно, минимальная сумма заказа — 5 000 ₽. Удобный бланк заказа и быстрая
+              отгрузка для магазинов.
             </p>
             <div style={{ display: "flex", gap: "var(--s-3)", marginTop: "var(--s-8)", flexWrap: "wrap" }}>
-              <LeadForm />
               <Link href="/catalog" className="btn btn--lg" style={{ background: "#fff", color: "var(--accent)" }}>
                 Перейти в каталог
               </Link>
@@ -73,18 +91,19 @@ export default function HomePage() {
       {/* Категории */}
       <div className="container section">
         <h2 className="section-title">Категории товаров</h2>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "var(--s-4)" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: "var(--s-5)" }}>
           {TILES.map((t) => (
-            <Link key={t.key} href="/catalog" style={{ textDecoration: "none", color: "var(--ink)",
-              background: "var(--paper)", borderRadius: "var(--r-xl)", padding: "var(--s-6)",
+            <Link key={t.icon} href={tileHref(t.title)} style={{ textDecoration: "none", color: "var(--ink)",
+              background: "var(--paper)", borderRadius: "var(--r-xl)", padding: "var(--s-7) var(--s-5)",
               boxShadow: "0 4px 6px -1px rgba(0,0,0,.10), 0 2px 4px -1px rgba(0,0,0,.06)",
-              display: "flex", flexDirection: "column", gap: "var(--s-3)", transition: "transform .2s ease, box-shadow .2s ease" }}>
-              <span style={{ width: 56, height: 56, borderRadius: "var(--r-lg)", background: "var(--accent-soft)",
-                color: "var(--accent)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                {tileIcon[t.key]}
+              display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center",
+              gap: "var(--s-2)", transition: "transform .2s ease, box-shadow .2s ease" }}>
+              {/* фикс-высота: иконки с разными пропорциями (обувь широкая, носки высокие) выравниваются */}
+              <span style={{ height: 116, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: "var(--s-2)" }}>
+                <img src={`/categories/${t.icon}.png`} alt={t.title}
+                  style={{ maxHeight: 116, maxWidth: 150, width: "auto", height: "auto", objectFit: "contain" }} />
               </span>
               <span style={{ fontWeight: 600, fontSize: "var(--t-h3)" }}>{t.title}</span>
-              <span style={{ fontSize: "var(--t-sm)", color: "var(--graphite)" }}>{t.note}</span>
             </Link>
           ))}
         </div>
@@ -94,7 +113,7 @@ export default function HomePage() {
       <div className="band">
         <div className="container section">
           <h2 className="section-title">Доставка по регионам</h2>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "var(--s-4)", marginBottom: "var(--s-8)" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "var(--s-4)" }}>
             {REGIONS.map((r) => (
               <div key={r} style={{ display: "flex", alignItems: "center", gap: "var(--s-3)", background: "var(--paper)",
                 borderRadius: "var(--r-lg)", padding: "var(--s-4) var(--s-5)", fontWeight: 600 }}>
@@ -103,7 +122,6 @@ export default function HomePage() {
               </div>
             ))}
           </div>
-          <LeadForm label="Узнать условия и получить прайс" />
         </div>
       </div>
     </div>

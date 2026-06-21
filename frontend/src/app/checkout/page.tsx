@@ -5,11 +5,13 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useCart } from "@/context/CartContext";
 import { formatPrice } from "@/lib/format";
+import { MIN_ORDER_AMOUNT } from "@/lib/site";
 import { IconImage, IconCart } from "@/components/icons";
 
 export default function CheckoutPage() {
   const router = useRouter();
   const { items, totalAmount, clearCart } = useCart();
+  const belowMin = totalAmount < MIN_ORDER_AMOUNT;
   const [form, setForm] = useState({ customer_first_name: "", customer_last_name: "", customer_phone: "", customer_email: "", delivery_address: "", comment: "" });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -135,7 +137,13 @@ export default function CheckoutPage() {
           <div className="summary__row"><span>Товары</span><b>{formatPrice(totalAmount)}</b></div>
           <div className="summary__row"><span>Доставка</span><b>Бесплатно</b></div>
           <div className="summary__total"><span>К оплате</span><b>{formatPrice(totalAmount)}</b></div>
-          <button className="btn btn--cta btn--lg btn--block" type="submit" disabled={loading} style={{ marginTop: "var(--s-4)" }}>
+          {belowMin && (
+            <p className="form-error" style={{ marginTop: "var(--s-4)" }}>
+              Минимальная сумма заказа — {formatPrice(MIN_ORDER_AMOUNT)}.
+              Добавьте товаров ещё на {formatPrice(MIN_ORDER_AMOUNT - totalAmount)}.
+            </p>
+          )}
+          <button className="btn btn--cta btn--lg btn--block" type="submit" disabled={loading || belowMin} style={{ marginTop: "var(--s-4)" }}>
             {loading ? "Оформляем…" : "Подтвердить заказ"}
           </button>
           <p className="fine" style={{ textAlign: "center", marginTop: "var(--s-3)" }}>Нажимая кнопку, вы соглашаетесь с условиями оферты</p>

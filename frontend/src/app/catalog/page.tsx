@@ -2,6 +2,8 @@ export const dynamic = 'force-dynamic';
 
 import Link from "next/link";
 import { getProducts, getCategories } from "@/lib/api";
+import { CATEGORY_GROUPS } from "@/lib/categoryGroups";
+import type { Category } from "@/types/product";
 import { formatPrice } from "@/lib/format";
 import AddToCartCard from "@/components/AddToCartCard";
 import CatalogList from "@/components/CatalogList";
@@ -25,6 +27,25 @@ function buildHref(params: { category_id?: string; search?: string; page?: numbe
   if (params.page && params.page > 1) q.set("page", String(params.page));
   const s = q.toString();
   return s ? `/catalog?${s}` : "/catalog";
+}
+
+// Понятная подпись текущего фильтра по категории: одиночная категория → её имя; группа из
+// нескольких category_id (плитка с главной) → имя группы из CATEGORY_GROUPS (распознаём по
+// совпадению набора id). Так в заголовке каталога видно «Хозтовары», а не «Все категории».
+function resolveCategoryLabel(categoryId: string | undefined, categories: Category[]): string | null {
+  if (!categoryId) return null;
+  const ids = categoryId.split(",").filter(Boolean);
+  if (ids.length === 1) {
+    return categories.find((c) => c.id === ids[0])?.name ?? null;
+  }
+  const norm = (s: string) => s.trim().toLowerCase();
+  const byName = new Map(categories.map((c) => [norm(c.name), c.id]));
+  const urlSet = new Set(ids);
+  for (const [label, names] of Object.entries(CATEGORY_GROUPS)) {
+    const gids = names.map((n) => byName.get(norm(n))).filter(Boolean) as string[];
+    if (gids.length === urlSet.size && gids.every((id) => urlSet.has(id))) return label;
+  }
+  return null;
 }
 
 // Окно из максимум 5 номеров страниц вокруг текущей.
@@ -54,6 +75,8 @@ export default async function CatalogPage({ searchParams }: Props) {
     getCategories(),
   ]);
 
+  const categoryLabel = resolveCategoryLabel(categoryId, categories);
+
   const toggle = (active: boolean): React.CSSProperties => ({
     display: "flex", alignItems: "center", justifyContent: "center", padding: "7px 12px", textDecoration: "none",
     background: active ? "var(--accent)" : "transparent", color: active ? "var(--on-accent)" : "var(--ink-secondary)",
@@ -76,8 +99,16 @@ export default async function CatalogPage({ searchParams }: Props) {
       {/* Hero */}
       <div className="band band--hero">
         <div className="container catalog__hero">
-          <h1>Каталог товаров</h1>
-          <p>Тысячи товаров для дома, дачи, сада и хозяйства. Подберите нужное по категории или через поиск.</p>
+          <h1>{categoryLabel ?? (search ? "Результаты поиска" : "Каталог товаров")}</h1>
+          {categoryLabel ? (
+            <p>
+              Раздел каталога · <Link href="/catalog" style={{ color: "var(--accent)", textDecoration: "underline" }}>весь каталог</Link>
+            </p>
+          ) : search ? (
+            <p>По запросу «{search}» · <Link href="/catalog" style={{ color: "var(--accent)", textDecoration: "underline" }}>сбросить</Link></p>
+          ) : (
+            <p>Тысячи товаров для дома, дачи, сада и хозяйства. Подберите нужное по категории или через поиск.</p>
+          )}
         </div>
       </div>
 

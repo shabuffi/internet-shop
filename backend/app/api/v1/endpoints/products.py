@@ -109,7 +109,11 @@ def list_products(
     )
 
     if category_id:
-        query = query.where(Product.category_id == category_id)
+        # Поддержка нескольких категорий через запятую (плитки-группы на главной:
+        # «Бытовая химия» = стирка+чистящие+посуда+… ). Одиночная категория из
+        # выпадающего фильтра — это просто список из одного id.
+        ids = [c for c in category_id.split(",") if c]
+        query = query.where(Product.category_id.in_(ids))
 
     if search:
         pattern = f"%{search}%"

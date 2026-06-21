@@ -30,6 +30,9 @@ class Settings(BaseSettings):
     DEBUG: bool = False
     ALLOWED_ORIGINS: list[str] = ["http://localhost:3000"]
 
+    # Минимальная сумма заказа (руб). Заказ ниже порога не оформляется (проверка в orders.py).
+    MIN_ORDER_AMOUNT: int = 5000
+
     # Пароль страницы «Разработчик» (техническая настройка: обмен, ВК, SMTP).
     # Задаётся в .env.prod. Пустой — страница недоступна.
     DEV_PASSWORD: str = ""

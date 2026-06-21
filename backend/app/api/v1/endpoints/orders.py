@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import select, func
 
+from app.core.config import settings
 from app.db.session import get_db
 from app.db.models.order import Order, OrderItem
 from app.db.models.product import Product
@@ -70,6 +71,13 @@ def create_order(payload: OrderIn, db: Session = Depends(get_db)):
             price=product.price,
             quantity=item_in.quantity,
         ))
+
+    # Минимальная сумма заказа — защита от обхода фронтенда (там кнопка уже задизейблена).
+    if total < settings.MIN_ORDER_AMOUNT:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Минимальная сумма заказа — {settings.MIN_ORDER_AMOUNT:,} ₽".replace(",", " "),
+        )
 
     order = Order(
         number=_next_order_number(db),

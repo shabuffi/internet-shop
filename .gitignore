@@ -37,3 +37,9 @@ Thumbs.db
 # IDE
 .idea/
 *.swp
+
+# Локальные дампы БД и исходники ассетов (не в гит)
+catalog.sql
+local_backup_*.sql
+8 продуктов.png
+8_категорий.png

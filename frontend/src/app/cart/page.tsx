@@ -3,10 +3,12 @@
 import Link from "next/link";
 import { useCart } from "@/context/CartContext";
 import { formatPrice } from "@/lib/format";
+import { MIN_ORDER_AMOUNT } from "@/lib/site";
 import { IconImage, IconCart } from "@/components/icons";
 
 export default function CartPage() {
   const { items, totalItems, totalAmount, removeItem, updateQuantity, clearCart } = useCart();
+  const belowMin = totalAmount < MIN_ORDER_AMOUNT;
 
   if (items.length === 0) {
     return (
@@ -71,9 +73,21 @@ export default function CartPage() {
           <div className="summary__row"><span>Товары ({totalItems})</span><b>{formatPrice(totalAmount)}</b></div>
           <div className="summary__row"><span>Доставка</span><b>Бесплатно</b></div>
           <div className="summary__total"><span>К оплате</span><b>{formatPrice(totalAmount)}</b></div>
-          <Link href="/checkout" className="btn btn--cta btn--lg btn--block" style={{ marginTop: "var(--s-4)" }}>
-            Оформить заказ
-          </Link>
+          {belowMin && (
+            <p className="form-error" style={{ marginTop: "var(--s-4)" }}>
+              Минимальная сумма заказа — {formatPrice(MIN_ORDER_AMOUNT)}.
+              Добавьте товаров ещё на {formatPrice(MIN_ORDER_AMOUNT - totalAmount)}.
+            </p>
+          )}
+          {belowMin ? (
+            <button className="btn btn--cta btn--lg btn--block" disabled style={{ marginTop: "var(--s-4)" }}>
+              Оформить заказ
+            </button>
+          ) : (
+            <Link href="/checkout" className="btn btn--cta btn--lg btn--block" style={{ marginTop: "var(--s-4)" }}>
+              Оформить заказ
+            </Link>
+          )}
           <Link href="/catalog" className="btn btn--ghost btn--block" style={{ marginTop: "var(--s-3)", justifyContent: "center" }}>
             Продолжить покупки
           </Link>
