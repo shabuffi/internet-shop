@@ -68,8 +68,8 @@ export default async function HomePage() {
         color: "#fff",
       }}>
         <div className="container" style={{ paddingTop: "var(--s-16)", paddingBottom: "var(--s-16)" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "var(--s-10)", flexWrap: "wrap" }}>
-            <div style={{ flex: "1 1 460px", minWidth: 0 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "var(--s-8)", flexWrap: "wrap" }}>
+            <div style={{ flex: "1 1 400px", minWidth: 0 }}>
               <div className="eyebrow" style={{ color: "rgba(255,255,255,.8)" }}>Оптовый поставщик</div>
               <h1 style={{ fontFamily: "var(--font-display)", fontSize: "var(--t-display)", lineHeight: 1.07,
                 letterSpacing: "-.015em", margin: "var(--s-3) 0 0", color: "#fff" }}>
@@ -87,7 +87,7 @@ export default async function HomePage() {
               </div>
             </div>
             {/* Карта зоны доставки — вместо пустого синего пространства справа (скрыта на мобильных) */}
-            <div className="hide-mobile" style={{ flex: "0 1 480px", minWidth: 0 }}>
+            <div className="hide-mobile" style={{ flex: "1.4 1 620px", minWidth: 0 }}>
               <DeliveryMap />
             </div>
           </div>
