@@ -88,10 +88,6 @@ export default async function HomePage() {
             </div>
             {/* Карта зоны доставки — вместо пустого синего пространства справа (скрыта на мобильных) */}
             <div className="hide-mobile" style={{ flex: "0 1 480px", minWidth: 0 }}>
-              <div style={{ fontSize: "var(--t-sm)", fontWeight: 600, color: "rgba(255,255,255,.85)",
-                textTransform: "uppercase", letterSpacing: ".04em", marginBottom: "var(--s-3)", textAlign: "center" }}>
-                Доставляем по 6 областям
-              </div>
               <DeliveryMap />
             </div>
           </div>
