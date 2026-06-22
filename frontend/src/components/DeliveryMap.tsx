@@ -31,12 +31,25 @@ export default function DeliveryMap() {
   return (
     <div ref={wrapRef} style={{ position: "relative" }}>
       <svg viewBox={VIEWBOX} role="img" aria-label="Карта доставки: 6 областей России"
-        style={{ width: "100%", height: "auto", display: "block" }}>
+        style={{ width: "100%", height: "auto", display: "block", overflow: "visible" }}>
+        <defs>
+          <linearGradient id="dm-fill" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stopColor="#ffffff" stopOpacity="0.97" />
+            <stop offset="1" stopColor="#dbe6f7" stopOpacity="0.92" />
+          </linearGradient>
+          <filter id="dm-shadow" x="-8%" y="-8%" width="116%" height="124%">
+            <feDropShadow dx="0" dy="4" stdDeviation="5" floodColor="#00163f" floodOpacity="0.4" />
+          </filter>
+          <filter id="dm-glow" x="-120%" y="-120%" width="340%" height="340%">
+            <feDropShadow dx="0" dy="0" stdDeviation="3" floodColor="#E02424" floodOpacity="0.85" />
+          </filter>
+        </defs>
         <style>{`
-          .dm-russia { fill: rgba(255,255,255,.9); stroke: rgba(255,255,255,.5); stroke-width: 1; }
+          .dm-russia { fill: url(#dm-fill); stroke: rgba(255,255,255,.75); stroke-width: 1.2;
+            stroke-linejoin: round; stroke-linecap: round; filter: url(#dm-shadow); }
           .dm-region path { fill: var(--accent-2, #E02424); stroke: #fff; stroke-width: 1.4;
-            transition: fill .15s ease; cursor: default; }
-          .dm-region:hover path { fill: var(--accent-2-deep, #b81d1d); }
+            stroke-linejoin: round; filter: url(#dm-glow); transition: fill .15s ease; cursor: default; }
+          .dm-region:hover path { fill: #ff3b3b; }
         `}</style>
         <path className="dm-russia" d={RUSSIA} />
         {REGIONS.map((r) => (
