@@ -92,7 +92,7 @@ export default function CatalogList({ products }: { products: Product[] }) {
               <th style={{ ...th, width: 56 }}></th>
               <th style={th}>Товар</th>
               <th style={th}>Артикул</th>
-              <th style={th}>Наличие</th>
+              <th style={th}>Остаток</th>
               <th style={{ ...th, textAlign: "right" }}>Цена</th>
               <th style={{ ...th, textAlign: "center", width: 150 }}>Количество</th>
             </tr>
@@ -107,8 +107,8 @@ export default function CatalogList({ products }: { products: Product[] }) {
                 </td>
                 <td style={{ ...td, color: "var(--ink-secondary)", fontVariantNumeric: "tabular-nums" }}>{p.article || "—"}</td>
                 <td style={td}>
-                  {p.available
-                    ? <span style={{ fontSize: 13, fontWeight: 600, color: "var(--stock)" }}>В наличии</span>
+                  {p.available && p.stock > 0
+                    ? <span style={{ fontSize: 13, fontWeight: 600, color: "var(--stock)" }}>{p.stock} шт.</span>
                     : <span style={{ fontSize: 13, fontWeight: 600, color: "var(--ink-tertiary)" }}>Нет</span>}
                 </td>
                 <td style={{ ...td, textAlign: "right", fontWeight: 700, whiteSpace: "nowrap" }}>{Number(p.price) > 0 ? formatPrice(p.price) : "—"}</td>
@@ -138,7 +138,7 @@ export default function CatalogList({ products }: { products: Product[] }) {
                 {p.article && <span style={{ fontVariantNumeric: "tabular-nums" }}>Арт. {p.article}</span>}
                 <span style={{ display: "inline-flex", alignItems: "center", gap: 5, whiteSpace: "nowrap", color: p.available ? "var(--stock)" : "var(--ink-tertiary)" }}>
                   <span style={{ width: 6, height: 6, borderRadius: 999, background: "currentColor" }} />
-                  {p.available ? "В наличии" : "Нет"}
+                  {p.available && p.stock > 0 ? `${p.stock} шт.` : "Нет"}
                 </span>
               </div>
               <QtyCell product={p} />
