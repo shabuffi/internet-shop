@@ -88,6 +88,14 @@ export default async function HomePage() {
             </div>
             {/* Карта зоны доставки — вместо пустого синего пространства справа (скрыта на мобильных) */}
             <div className="hide-mobile" style={{ flex: "1.4 1 620px", minWidth: 0 }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "var(--s-2)",
+                color: "rgba(255,255,255,.92)", fontWeight: 600, fontSize: "var(--t-sm)",
+                textTransform: "uppercase", letterSpacing: ".04em", marginBottom: "var(--s-3)" }}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M1 3h13v13H1z" /><path d="M14 8h4l3 3v5h-7" /><circle cx="5.5" cy="18.5" r="2" /><circle cx="17.5" cy="18.5" r="2" />
+                </svg>
+                Доставка собственным транспортом
+              </div>
               <DeliveryMap />
             </div>
           </div>
