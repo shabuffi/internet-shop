@@ -86,7 +86,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               <Link href="/" className="brand" aria-label={shopName}>
                 {store.logo
                   ? <img src="/api/v1/admin/logo" alt={shopName} style={{ height: 38, width: "auto", display: "block" }} />
-                  : <img src="/logo.png" alt={shopName} style={{ height: 38, width: "auto", display: "block" }} />}
+                  : <img src="/logo.svg" alt={shopName} style={{ height: 40, width: "auto", display: "block" }} />}
               </Link>
 
               <MainNav />
@@ -111,7 +111,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             <div className="container">
               <div className="footer__top">
                 <div className="footer__brand">
-                  <img src="/logo-white.png" alt={shopName} className="footer__logo" />
+                  <img src="/logo-white.svg" alt={shopName} className="footer__logo" />
                   <p>Оптовые поставки товаров первой необходимости: бытовая химия, канцтовары,
                     товары для дома, сад и огород. Доставка по Тверской, Московской, Смоленской,
                     Новгородской, Владимирской и Ярославской областям.</p>
