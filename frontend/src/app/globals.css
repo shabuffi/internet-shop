@@ -86,12 +86,6 @@ button, input, textarea, select { font-family: inherit; }
   background: linear-gradient(118deg, var(--accent-soft) 0%, color-mix(in srgb, var(--accent-soft), #fff 55%) 45%, #fff 100%);
   border-bottom: 1px solid color-mix(in srgb, var(--accent), #fff 80%);
 }
-/* Бледная эмблема дом-в-шестерёнке справа (водяной знак), уходит за край */
-.band--hero::after {
-  content: ''; position: absolute; right: -36px; top: 50%; transform: translateY(-50%);
-  width: 320px; height: 320px; background: url('/icon.png') center / contain no-repeat;
-  opacity: .1; pointer-events: none;
-}
 .band--hero .catalog__hero { position: relative; z-index: 1; }
 .band--hero .eyebrow { color: var(--accent); }
 /* только вертикальные отступы — горизонтальные оставляем за .container */
@@ -575,7 +569,6 @@ textarea.form-input { height: auto; min-height: 90px; padding: var(--s-3) var(--
   .quick-cats { display: flex; overflow-x: auto; padding-bottom: var(--s-2); -webkit-overflow-scrolling: touch; }
   .quick-cats::-webkit-scrollbar { display: none; }
   .quick-cat { min-width: 112px; min-height: 96px; }
-  .band--hero::after { width: 190px; height: 190px; right: -64px; opacity: .07; }
   .filters { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 4px; -webkit-overflow-scrolling: touch; }
   .filters::-webkit-scrollbar { display: none; }
   .result-count { display: none; }
