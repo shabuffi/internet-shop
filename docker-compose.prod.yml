@@ -1,0 +1,128 @@
+services:
+
+  db:
+    image: postgres:16-alpine
+    restart: always
+    mem_limit: 384m
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    restart: always
+    mem_limit: 256m
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: always
+    mem_limit: 1024m          # запас под разбор большого каталога (10000+ товаров) в памяти
+    env_file: .env.prod
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 2
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=5)\""]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    volumes:
+      - media_data:/app/media       # картинки товаров из обмена CommerceML (persist)
+
+  worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: always
+    mem_limit: 320m
+    env_file: .env.prod
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: celery -A app.tasks.celery_app worker --loglevel=info --concurrency=2
+
+  beat:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: always
+    mem_limit: 160m
+    env_file: .env.prod
+    depends_on:
+      - worker
+    command: celery -A app.tasks.celery_app beat --loglevel=info
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.prod
+    restart: always
+    mem_limit: 1024m          # Next.js SSR может зависать на маленьком лимите под ботами/каталогом
+    env_file: .env.prod
+    environment:
+      HOSTNAME: "0.0.0.0"
+      PORT: "3000"
+      NODE_OPTIONS: "--max-old-space-size=768"
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"fetch('http://127.0.0.1:3000/icon.png').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))\""]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  nginx:
+    image: nginx:alpine
+    restart: always
+    mem_limit: 96m
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.prod.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      backend:
+        condition: service_healthy
+      frontend:
+        condition: service_healthy
+
+  # Docker сам НЕ перезапускает контейнер в статусе unhealthy (restart:always
+  # ловит только падение процесса). Autoheal следит за health-статусом и
+  # перезапускает любой зависший контейнер с healthcheck → фронт сам встаёт за
+  # ~30 сек, без ручного ssh + deploy.sh.
+  autoheal:
+    image: willfarrell/autoheal:latest
+    restart: always
+    mem_limit: 64m
+    environment:
+      AUTOHEAL_CONTAINER_LABEL: all   # следить за всеми контейнерами, у которых есть healthcheck
+      AUTOHEAL_INTERVAL: "30"         # проверка каждые 30 сек
+      AUTOHEAL_START_PERIOD: "60"     # дать сервисам подняться перед первой проверкой
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+
+volumes:
+  postgres_data:
+  media_data:
