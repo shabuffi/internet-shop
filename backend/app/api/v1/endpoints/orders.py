@@ -90,14 +90,27 @@ def create_order(payload: OrderIn, db: Session = Depends(get_db),
             detail=f"Минимальная сумма заказа — {settings.MIN_ORDER_AMOUNT:,} ₽".replace(",", " "),
         )
 
+    # Данные заказчика: из кабинета (профиль вошедшего) либо из гостевой формы.
+    # Заказ из кабинета → в МойСклад уйдут данные заказчика из профиля.
+    if user is not None:
+        cust_name, cust_phone, cust_email = user.customer_name, user.phone, user.email
+        cust_type, cust_inn = user.customer_type, user.inn
+    else:
+        cust_name, cust_phone, cust_email = payload.customer_name, payload.customer_phone, payload.customer_email
+        cust_type, cust_inn = payload.customer_type, payload.customer_inn
+
     order = Order(
         number=_next_order_number(db),
-        customer_name=payload.customer_name,
-        customer_phone=payload.customer_phone,
-        customer_email=payload.customer_email,
+        customer_name=cust_name,
+        customer_phone=cust_phone,
+        customer_email=cust_email,
+        customer_type=cust_type,
+        customer_inn=cust_inn,
         delivery_address=payload.delivery_address,
+        delivery_method=payload.delivery_method,
         comment=payload.comment,
         total_amount=total,
+        user_id=user.id if user is not None else None,
         items=order_items,
     )
     db.add(order)

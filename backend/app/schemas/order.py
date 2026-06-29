@@ -1,0 +1,56 @@
+from decimal import Decimal
+from datetime import datetime
+from typing import Literal
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+import re
+
+
+class OrderItemIn(BaseModel):
+    product_id: str
+    quantity: int = Field(1, ge=1)  # минимум 1 — защита от отрицательного «списания» остатка
+
+
+class OrderIn(BaseModel):
+    customer_name: str
+    customer_phone: str
+    customer_email: str | None = None
+    customer_type: str | None = None          # individual|ip|ooo (для гостя; из кабинета берём из профиля)
+    customer_inn: str | None = None
+    delivery_address: str | None = None
+    # Способ получения обязателен: самовывоз / транспорт ТД / транспортная компания
+    delivery_method: Literal["pickup", "shop_transport", "tk"]
+    comment: str | None = None
+    items: list[OrderItemIn]
+
+    @field_validator("customer_phone")
+    @classmethod
+    def validate_phone(cls, v: str) -> str:
+        digits = re.sub(r"\D", "", v)
+        if len(digits) < 10:
+            raise ValueError("Телефон должен содержать минимум 10 цифр")
+        return v
+
+    @field_validator("items")
+    @classmethod
+    def validate_items(cls, v: list) -> list:
+        if not v:
+            raise ValueError("Корзина пуста")
+        return v
+
+
+class OrderItemOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    product_name: str
+    product_article: str | None = None
+    price: Decimal
+    quantity: int
+
+
+class OrderOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: str
+    number: str
+    status: str
+    total_amount: Decimal
+    items: list[OrderItemOut]
+    created_at: datetime
