@@ -2,9 +2,9 @@
 
 import { useState } from "react";
 
-// Кнопка «Получить прайс и −10%» + модалка-заявка. Отправляет лид на /api/v1/leads
+// Кнопка заявки на условия поставки. Отправляет лид на /api/v1/leads
 // (владельцу падает уведомление, как и о заказе). Задел под будущие личные кабинеты.
-export default function LeadForm({ className, label = "Получить прайс и −10%" }:
+export default function LeadForm({ className, label = "Уточнить условия поставки" }:
   { className?: string; label?: string }) {
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ name: "", phone: "", shop_name: "", region: "" });
@@ -46,7 +46,7 @@ export default function LeadForm({ className, label = "Получить прай
               <div style={{ textAlign: "center" }}>
                 <h3 style={{ fontFamily: "var(--font-display)", fontSize: "var(--t-h2)", margin: "0 0 var(--s-3)" }}>Спасибо!</h3>
                 <p style={{ color: "var(--charcoal)", margin: "0 0 var(--s-6)" }}>
-                  Заявка принята — перезвоним и пришлём прайс со скидкой 10% на первый заказ.
+                  Заявка принята — перезвоним и пришлём актуальные условия поставки.
                 </p>
                 <button className="btn btn--primary btn--block" onClick={() => setOpen(false)}>Закрыть</button>
               </div>
@@ -54,7 +54,7 @@ export default function LeadForm({ className, label = "Получить прай
               <form onSubmit={submit}>
                 <h3 style={{ fontFamily: "var(--font-display)", fontSize: "var(--t-h2)", margin: "0 0 var(--s-2)" }}>Получить прайс</h3>
                 <p style={{ color: "var(--charcoal)", fontSize: "var(--t-sm)", margin: "0 0 var(--s-5)" }}>
-                  Оставьте контакты — пришлём актуальный прайс и скидку 10% на первый заказ.
+                  Оставьте контакты — уточним регион, ассортимент и условия оптовой поставки.
                 </p>
                 <div className="field" style={{ marginBottom: "var(--s-3)" }}>
                   <label>Имя <span className="req">*</span></label>
