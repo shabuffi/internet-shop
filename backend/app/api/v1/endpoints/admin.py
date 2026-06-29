@@ -673,20 +673,27 @@ def update_order_status(
 def list_products_admin(
     page: int = 1,
     q: str | None = None,
+    photo: str | None = None,   # with | without — есть/нет картинки
+    desc: str | None = None,    # with | without — есть/нет описания
+    avail: str | None = None,   # yes | no — в наличии / нет
     db: Session = Depends(get_db),
     _=Depends(_get_current_admin),
 ):
-    """Список товаров для админки с пагинацией (по 50 на страницу) и поиском.
+    """Список товаров для админки с пагинацией (по 50), поиском и фильтрами.
 
     Показывает ВСЕ товары (без фильтра по остатку/активности) — в отличие от витрины.
+    Фильтры помогают находить пробелы каталога: товары без картинок/описаний/не в наличии.
 
     Args:
         page: Номер страницы (с 1).
         q: Строка поиска по названию или артикулу (необязательно).
+        photo: ``with`` — только с картинкой, ``without`` — только без.
+        desc: ``with`` — только с описанием, ``without`` — только без.
+        avail: ``yes`` — только в наличии, ``no`` — только не в наличии.
         db: Сессия БД.
 
     Returns:
-        Словарь с товарами текущей страницы, общим числом (с учётом поиска),
+        Словарь с товарами текущей страницы, общим числом (с учётом фильтров),
         размером страницы и номером страницы.
     """
     PAGE = 50
@@ -694,6 +701,23 @@ def list_products_admin(
     if q and q.strip():
         like = f"%{q.strip()}%"
         stmt = stmt.where(or_(Product.name.ilike(like), Product.article.ilike(like)))
+
+    _has_image = Product.image_url.isnot(None) & (Product.image_url != "")
+    if photo == "with":
+        stmt = stmt.where(_has_image)
+    elif photo == "without":
+        stmt = stmt.where(~_has_image)
+
+    _has_desc = Product.description.isnot(None) & (Product.description != "")
+    if desc == "with":
+        stmt = stmt.where(_has_desc)
+    elif desc == "without":
+        stmt = stmt.where(~_has_desc)
+
+    if avail == "yes":
+        stmt = stmt.where(Product.available == True)
+    elif avail == "no":
+        stmt = stmt.where(Product.available == False)
 
     products = db.scalars(
         stmt.order_by(Product.name).offset((page - 1) * PAGE).limit(PAGE)
