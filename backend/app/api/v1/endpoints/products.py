@@ -10,6 +10,8 @@ from app.db.models.product import Product, Category
 from app.schemas.product import ProductOut, ProductListOut, CategoryOut
 from app.services.media_storage import read_image
 from app.services.pricing import adjusted_price
+from app.api.v1.endpoints.auth import get_optional_user
+from app.db.models.user import User
 
 router = APIRouter(prefix="/products", tags=["Products"])
 
@@ -104,14 +106,19 @@ def list_categories(db: Session = Depends(get_db)):
     return out
 
 
-def _product_out(product: Product) -> ProductOut:
-    """Сериализует товар в :class:`ProductOut` с витринной ценой (наценка для гостей).
+def _percent_for(user: User | None):
+    """Процент корректировки цены: персональная скидка вошедшего, иначе наценка гостя."""
+    return user.discount_percent if user is not None else None
 
-    Цена в ответе = базовая цена МойСклад + наценка ``DEFAULT_MARKUP_PERCENT``.
-    Персональные цены для вошедших клиентов появятся отдельным этапом.
+
+def _product_out(product: Product, percent=None) -> ProductOut:
+    """Сериализует товар в :class:`ProductOut` с витринной ценой.
+
+    Цена = базовая цена МойСклад + корректировка: для гостя — наценка
+    ``DEFAULT_MARKUP_PERCENT``, для вошедшего — его ``discount_percent``.
     """
     po = ProductOut.model_validate(product)
-    po.price = adjusted_price(po.price)
+    po.price = adjusted_price(po.price, percent)
     return po
 
 
@@ -124,6 +131,7 @@ def list_products(
     sort: str | None = Query(None),
     with_photo: bool = Query(False),
     db: Session = Depends(get_db),
+    user: User | None = Depends(get_optional_user),
 ):
     """Возвращает список активных товаров с пагинацией, фильтром, поиском и сортировкой.
 
@@ -191,8 +199,9 @@ def list_products(
     total = db.scalar(select(func.count()).select_from(query.order_by(None).subquery()))
     items = db.scalars(query.offset((page - 1) * page_size).limit(page_size)).all()
 
+    percent = _percent_for(user)
     return ProductListOut(
-        items=[_product_out(p) for p in items],
+        items=[_product_out(p, percent) for p in items],
         total=total,
         page=page,
         page_size=page_size,
@@ -248,7 +257,8 @@ def get_product_image(request: Request, product_id: str, n: int = 0, db: Session
 
 
 @router.get("/{product_id}", response_model=ProductOut)
-def get_product(product_id: str, db: Session = Depends(get_db)):
+def get_product(product_id: str, db: Session = Depends(get_db),
+                user: User | None = Depends(get_optional_user)):
     """Возвращает карточку одного активного товара по внутреннему ID.
 
     Args:
@@ -268,4 +278,4 @@ def get_product(product_id: str, db: Session = Depends(get_db)):
     )
     if not product:
         raise HTTPException(status_code=404, detail="Товар не найден")
-    return _product_out(product)
+    return _product_out(product, _percent_for(user))
