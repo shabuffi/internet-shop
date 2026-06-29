@@ -74,6 +74,14 @@ def upsert_catalog(db: Session, catalog: ParsedCatalog, source: str = "commercem
         # Все существующие товары — одним запросом (на 10000 товаров 10000 отдельных
         # SELECT'ов повесили бы обмен и дали таймаут у МойСклад).
         existing_products = {p.moysklad_id: p for p in db.query(Product).all()}
+
+        # Несёт ли ЭТОТ раунд обмена картинки вообще? У этого аккаунта обычный import.xml
+        # идёт БЕЗ <Картинка> (картинки приходят только в отдельных «фото-раундах»). Поэтому
+        # трогаем картинки ТОЛЬКО когда они реально пришли хоть у одного товара — иначе
+        # обычный обмен обнулил бы ВСЕ фото (инцидент 29.06.2026). Внутри фото-раунда пустой
+        # список у товара = картинку удалили в МойСклад → чистим (так удаление всё же работает).
+        round_has_images = any(p.images for p in catalog.products)
+
         for parsed_product in catalog.products:
             product = existing_products.get(parsed_product.moysklad_id)
 
@@ -125,12 +133,11 @@ def upsert_catalog(db: Session, catalog: ParsedCatalog, source: str = "commercem
                 # Характеристики обновляем только если пришли (как и описание/артикул)
                 if parsed_product.attributes:
                     product.attributes = parsed_product.attributes
-                # Картинки из обмена применяем, только если их не ведут вручную на сайте.
-                # Список из import.xml — авторитетный (картинки описываются в <Товар>,
-                # а НЕ в offers.xml): пустой список = картинки удалили в МойСклад, поэтому
-                # синхронизируем как есть, в т.ч. чистим удалённые. (Цена/остаток — другой
-                # случай: они живут в offers.xml и защищены guard'ом has_offer выше.)
-                if not product.images_manual:
+                # Картинки трогаем ТОЛЬКО в фото-раунде (round_has_images) и если их не ведут
+                # вручную. Обычный import.xml у этого аккаунта идёт без <Картинка> — вне фото-
+                # раунда не трогаем, иначе обнулим все фото (инцидент 29.06.2026). Внутри фото-
+                # раунда пустой список = фото удалили в МойСклад → чистим (удаление работает).
+                if round_has_images and not product.images_manual:
                     imgs = [image_name(x) for x in parsed_product.images]
                     product.images = imgs
                     product.image_url = imgs[0] if imgs else None
