@@ -10,13 +10,21 @@ import { SITE_URL, SITE_NAME, SITE_DESCRIPTION } from "@/lib/site";
 // Метаданные (включая <title> вкладки) берут название из настройки магазина —
 // один источник правды с шапкой/футером. SITE_NAME — лишь фолбэк.
 export async function generateMetadata(): Promise<Metadata> {
-  const { name, logo } = await getStoreInfo();
+  const { name } = await getStoreInfo();
   return {
     metadataBase: new URL(SITE_URL),
     title: { default: `${name} — интернет-магазин`, template: `%s — ${name}` },
     description: SITE_DESCRIPTION,
-    // Иконка вкладки (favicon): загруженный в админке логотип, иначе — квадратная эмблема
-    icons: { icon: logo ? "/api/v1/admin/logo" : "/icon.png" },
+    // Иконка вкладки (favicon): фирменная эмблема ТД ИНЖЕНЕР (набор из RealFaviconGenerator).
+    icons: {
+      icon: [
+        { url: "/favicon.ico", sizes: "any" },
+        { url: "/favicon.svg", type: "image/svg+xml" },
+        { url: "/favicon-96x96.png", type: "image/png", sizes: "96x96" },
+      ],
+      apple: "/apple-touch-icon.png",
+    },
+    manifest: "/site.webmanifest",
     openGraph: {
       type: "website",
       siteName: name,
