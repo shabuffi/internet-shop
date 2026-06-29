@@ -125,8 +125,12 @@ def upsert_catalog(db: Session, catalog: ParsedCatalog, source: str = "commercem
                 # Характеристики обновляем только если пришли (как и описание/артикул)
                 if parsed_product.attributes:
                     product.attributes = parsed_product.attributes
-                # Картинки из обмена применяем, только если их не ведут вручную на сайте
-                if parsed_product.images and not product.images_manual:
+                # Картинки из обмена применяем, только если их не ведут вручную на сайте.
+                # Список из import.xml — авторитетный (картинки описываются в <Товар>,
+                # а НЕ в offers.xml): пустой список = картинки удалили в МойСклад, поэтому
+                # синхронизируем как есть, в т.ч. чистим удалённые. (Цена/остаток — другой
+                # случай: они живут в offers.xml и защищены guard'ом has_offer выше.)
+                if not product.images_manual:
                     imgs = [image_name(x) for x in parsed_product.images]
                     product.images = imgs
                     product.image_url = imgs[0] if imgs else None

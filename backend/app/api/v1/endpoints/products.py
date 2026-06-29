@@ -1,6 +1,6 @@
 import re
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import Response
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import select, func, or_
@@ -12,8 +12,12 @@ from app.services.media_storage import read_image
 
 router = APIRouter(prefix="/products", tags=["Products"])
 
-# Браузерный кэш картинки на сутки (сами байты лежат локально в медиа-хранилище).
-_IMG_TTL = 86400  # 1 день
+# Браузерный кэш картинки. max-age держим небольшим, а свежесть гарантируем ETag'ом по
+# имени файла: при замене фото в МойСклад имя файла меняется → ETag другой → браузер
+# подтягивает новое (не «залипает» на старом до суток). stale-while-revalidate отдаёт
+# кэш мгновенно и обновляет в фоне.
+_IMG_TTL = 600                # 10 минут «свежо без вопросов»
+_IMG_SWR = 86400             # сутки фонового обновления
 
 # Раскладка клавиатуры: один и тот же физический ряд клавиш в EN (QWERTY) и RU (ЙЦУКЕН).
 # Нужно для поиска при «неправильной раскладке»: ввёл "vjq" → ищем ещё и "мой", и наоборот.
@@ -172,7 +176,7 @@ def list_products(
 
 
 @router.get("/{product_id}/image")
-def get_product_image(product_id: str, n: int = 0, db: Session = Depends(get_db)):
+def get_product_image(request: Request, product_id: str, n: int = 0, db: Session = Depends(get_db)):
     """Отдаёт изображение товара из медиа-хранилища.
 
     Картинки приходят файлами в обмене CommerceML (см. exchange.py) и лежат в
@@ -201,12 +205,21 @@ def get_product_image(product_id: str, n: int = 0, db: Session = Depends(get_db)
     if not images or n < 0 or n >= len(images):
         raise HTTPException(status_code=404, detail="Изображение не найдено")
 
+    # ETag = имя файла картинки: меняется при замене фото в МойСклад. Если браузер
+    # прислал тот же If-None-Match — отдаём 304 без перекачки байтов.
+    etag = f'"{images[n]}"'
+    cache_headers = {
+        "Cache-Control": f"public, max-age={_IMG_TTL}, stale-while-revalidate={_IMG_SWR}",
+        "ETag": etag,
+    }
+    if request.headers.get("if-none-match") == etag:
+        return Response(status_code=304, headers=cache_headers)
+
     result = read_image(images[n])
     if result is None:
         raise HTTPException(status_code=404, detail="Изображение не найдено")
     data, content_type = result
-    return Response(content=data, media_type=content_type,
-                    headers={"Cache-Control": f"public, max-age={_IMG_TTL}"})
+    return Response(content=data, media_type=content_type, headers=cache_headers)
 
 
 @router.get("/{product_id}", response_model=ProductOut)
