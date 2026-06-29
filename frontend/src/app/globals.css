@@ -324,6 +324,10 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .
 .header__actions { margin-left: auto; display: flex; align-items: center; gap: var(--s-3); }
 .header__phone { font-weight: 600; font-size: var(--t-sm); color: var(--ink); text-decoration: none; white-space: nowrap; }
 .header__phone:hover { color: var(--accent); }
+.header__account { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; font-size: var(--t-sm); color: var(--ink); text-decoration: none; white-space: nowrap; }
+.header__account:hover { color: var(--accent); }
+.link { color: var(--accent); text-decoration: underline; text-underline-offset: 2px; }
+.link:hover { color: var(--accent-deep); }
 
 /* ---------- мобильное меню (бургер) ---------- */
 .mmenu-backdrop { position: fixed; inset: 0; z-index: 90; background: rgba(15,18,30,.5);

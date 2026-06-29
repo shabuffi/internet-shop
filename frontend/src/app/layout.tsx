@@ -3,6 +3,7 @@ import Link from "next/link";
 import "./globals.css";
 import { CartProvider } from "@/context/CartContext";
 import CartIcon from "@/components/CartIcon";
+import AccountNav from "@/components/AccountNav";
 import MainNav from "@/components/MainNav";
 import MobileMenu from "@/components/MobileMenu";
 import { SITE_URL, SITE_NAME, SITE_DESCRIPTION } from "@/lib/site";
@@ -107,6 +108,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                 {telHref && (
                   <a href={telHref} className="header__phone hide-mobile">{store.phone}</a>
                 )}
+                <AccountNav />
                 <CartIcon />
                 <MobileMenu phone={store.phone} />
               </div>
