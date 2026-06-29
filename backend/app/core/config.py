@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -32,6 +34,11 @@ class Settings(BaseSettings):
 
     # Минимальная сумма заказа (руб). Заказ ниже порога не оформляется (проверка в orders.py).
     MIN_ORDER_AMOUNT: int = 5000
+
+    # Наценка на цену МойСклад для незарегистрированных/не вошедших покупателей (в %).
+    # Вошедшие клиенты видят свою персональную скидку (см. User.discount_percent).
+    # Цена считается на бэкенде (services/pricing.py), округление до копеек.
+    DEFAULT_MARKUP_PERCENT: Decimal = Decimal("10")
 
     # Пароль страницы «Разработчик» (техническая настройка: обмен, ВК, SMTP).
     # Задаётся в .env.prod. Пустой — страница недоступна.

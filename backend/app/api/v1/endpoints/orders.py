@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import select, func
@@ -7,6 +9,7 @@ from app.db.session import get_db
 from app.db.models.order import Order, OrderItem
 from app.db.models.product import Product
 from app.schemas.order import OrderIn, OrderOut
+from app.services.pricing import adjusted_price
 
 router = APIRouter(prefix="/orders", tags=["Orders"])
 
@@ -57,18 +60,21 @@ def create_order(payload: OrderIn, db: Session = Depends(get_db)):
     # Остаток НЕ списываем и не считаем: количество на сайте не меняется от заказов.
     # Наличие товара управляется флагом `available` (вручную в админке), а не количеством.
 
-    # Считаем сумму и собираем позиции
+    # Считаем сумму и собираем позиции. Цена — витринная (с наценкой/скидкой), а не
+    # базовая из МойСклад: в заказ и в выгрузку идёт фактическая цена, которую платит
+    # клиент. Считается на бэке из БД (клиент её не передаёт и не может подделать).
     order_items = []
-    total = 0
+    total = Decimal("0")
     for item_in in payload.items:
         product = products[item_in.product_id]
-        subtotal = product.price * item_in.quantity
+        unit_price = adjusted_price(product.price)
+        subtotal = unit_price * item_in.quantity
         total += subtotal
         order_items.append(OrderItem(
             product_id=product.id,
             product_name=product.name,
             product_article=product.article,
-            price=product.price,
+            price=unit_price,
             quantity=item_in.quantity,
         ))
 

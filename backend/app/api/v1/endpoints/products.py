@@ -9,6 +9,7 @@ from app.db.session import get_db
 from app.db.models.product import Product, Category
 from app.schemas.product import ProductOut, ProductListOut, CategoryOut
 from app.services.media_storage import read_image
+from app.services.pricing import adjusted_price
 
 router = APIRouter(prefix="/products", tags=["Products"])
 
@@ -103,6 +104,17 @@ def list_categories(db: Session = Depends(get_db)):
     return out
 
 
+def _product_out(product: Product) -> ProductOut:
+    """Сериализует товар в :class:`ProductOut` с витринной ценой (наценка для гостей).
+
+    Цена в ответе = базовая цена МойСклад + наценка ``DEFAULT_MARKUP_PERCENT``.
+    Персональные цены для вошедших клиентов появятся отдельным этапом.
+    """
+    po = ProductOut.model_validate(product)
+    po.price = adjusted_price(po.price)
+    return po
+
+
 @router.get("", response_model=ProductListOut)
 def list_products(
     page: int = Query(1, ge=1),
@@ -167,7 +179,7 @@ def list_products(
     items = db.scalars(query.offset((page - 1) * page_size).limit(page_size)).all()
 
     return ProductListOut(
-        items=items,
+        items=[_product_out(p) for p in items],
         total=total,
         page=page,
         page_size=page_size,
@@ -243,4 +255,4 @@ def get_product(product_id: str, db: Session = Depends(get_db)):
     )
     if not product:
         raise HTTPException(status_code=404, detail="Товар не найден")
-    return product
+    return _product_out(product)
