@@ -3,7 +3,7 @@ import re
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import Response
 from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import select, func, or_
+from sqlalchemy import select, func, or_, case
 
 from app.db.session import get_db
 from app.db.models.product import Product, Category
@@ -155,24 +155,37 @@ def list_products(
         query = query.where(Product.category_id.in_(ids))
 
     if search:
-        # Учитываем неправильную раскладку: ищем по исходному запросу и его EN↔RU вариантам.
+        # Точный поиск: совпадение по НАЧАЛУ слова, а не подстрока внутри слова — чтобы
+        # «тёрка» не находила «стёрка», а «сорти» — «ассорти». Граница слова = начало строки
+        # или не-буква/цифра (а-яё включены явно, чтобы не зависеть от locale БД). Учитываем
+        # неправильную раскладку (EN↔RU). Артикул — короткий код: ищем с начала.
         conds = []
         for variant in _layout_variants(search):
-            pattern = f"%{variant}%"
-            conds.append(Product.name.ilike(pattern))
-            conds.append(Product.article.ilike(pattern))
+            v = re.escape(variant)
+            conds.append(Product.name.op("~*")(rf"(^|[^[:alnum:]а-яё]){v}"))
+            conds.append(Product.article.ilike(f"{variant}%"))
         if conds:
             query = query.where(or_(*conds))
 
     if with_photo:
         query = query.where(Product.image_url.isnot(None), Product.image_url != "")
 
+    # Имя без кода склада «с1/с2 …» — для сортировки и оценки релевантности.
+    clean_name = func.regexp_replace(Product.name, r"^[сcСC]\s?\d+[.\s]+\s*", "", "i")
     if sort == "price_asc":
         query = query.order_by(Product.price.asc())
     elif sort == "price_desc":
         query = query.order_by(Product.price.desc())
-    else:  # name (по умолчанию) — без кода склада «с1/с2 …» в начале
-        clean_name = func.regexp_replace(Product.name, r"^[сcСC]\s?\d+[.\s]+\s*", "", "i")
+    elif search:
+        # Релевантность: точное совпадение названия → название начинается с запроса → прочее.
+        q = search.strip()
+        relevance = case(
+            (func.lower(clean_name) == q.lower(), 0),
+            (clean_name.op("~*")(rf"^{re.escape(q)}"), 1),
+            else_=2,
+        )
+        query = query.order_by(relevance, clean_name.asc())
+    else:
         query = query.order_by(clean_name.asc())
 
     total = db.scalar(select(func.count()).select_from(query.order_by(None).subquery()))
