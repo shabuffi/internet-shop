@@ -75,3 +75,39 @@ export async function getMe(): Promise<UserProfile | null> {
     return null;
   }
 }
+
+export interface OrderHistoryItem {
+  product_name: string;
+  product_article: string | null;
+  price: string;
+  quantity: number;
+}
+
+export interface OrderHistory {
+  id: string;
+  number: string;
+  status: string;
+  total_amount: string;
+  items: OrderHistoryItem[];
+  created_at: string;
+}
+
+// Человекочитаемые статусы заказа (бэкенд хранит коды).
+export const ORDER_STATUS_LABEL: Record<string, string> = {
+  new: "Новый",
+  confirmed: "Подтверждён",
+  shipped: "Отгружен",
+  delivered: "Доставлен",
+  cancelled: "Отменён",
+};
+
+// История заказов текущего покупателя (пусто, если не авторизован).
+export async function getMyOrders(): Promise<OrderHistory[]> {
+  try {
+    const res = await fetch(`${API}/orders`, { credentials: "same-origin", cache: "no-store" });
+    if (!res.ok) return [];
+    return await res.json();
+  } catch {
+    return [];
+  }
+}

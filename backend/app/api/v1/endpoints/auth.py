@@ -15,7 +15,9 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.db.session import get_db
 from app.db.models.user import User
+from app.db.models.order import Order
 from app.schemas.auth import RegisterIn, LoginIn, UserOut
+from app.schemas.order import OrderOut
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
 
@@ -144,3 +146,15 @@ def logout(response: Response):
 def me(current: User = Depends(get_current_user)):
     """Профиль текущего покупателя (для фронта — проверка авторизации)."""
     return current
+
+
+@router.get("/orders", response_model=list[OrderOut])
+def my_orders(current: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """История заказов текущего покупателя — новые сверху.
+
+    Заказы привязываются к покупателю через ``Order.user_id`` при оформлении
+    из кабинета (см. ``orders.create_order``). Гостевые заказы сюда не попадают.
+    """
+    return db.scalars(
+        select(Order).where(Order.user_id == current.id).order_by(Order.created_at.desc())
+    ).all()
