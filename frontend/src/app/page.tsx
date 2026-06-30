@@ -39,6 +39,43 @@ const REGIONS = [
   "Новгородская область", "Владимирская область", "Ярославская область",
 ];
 
+function ArrowIcon({ size = 18 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M5 12h14" /><path d="M13 6l6 6-6 6" />
+    </svg>
+  );
+}
+
+function TruckIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M1 3h13v13H1z" /><path d="M14 8h4l3 3v5h-7" />
+      <circle cx="5.5" cy="18.5" r="2" /><circle cx="17.5" cy="18.5" r="2" />
+    </svg>
+  );
+}
+
+function RefreshIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M21 12a9 9 0 1 1-3-6.7" /><path d="M21 3v6h-6" />
+    </svg>
+  );
+}
+
+function ClockIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" />
+    </svg>
+  );
+}
+
 export default async function HomePage() {
   // Тянем категории, чтобы плитки вели в конкретный раздел каталога, а не в общий список.
   let categories: { id: string; name: string }[] = [];
@@ -71,46 +108,37 @@ export default async function HomePage() {
 
   return (
     <div className="page">
-      {/* Hero */}
-      <section style={{
-        position: "relative",
-        background: "linear-gradient(105deg, rgba(0,30,90,.92) 0%, rgba(0,51,153,.86) 45%, rgba(0,51,153,.55) 100%), url('/hero.jpg') center/cover no-repeat, var(--accent-deep)",
-        backgroundSize: "cover",
-        color: "#fff",
-        minHeight: "clamp(440px, 40vw, 600px)",
-        display: "flex",
-        alignItems: "center",
-      }}>
-        <div className="container" style={{ paddingTop: "var(--s-10)", paddingBottom: "var(--s-12)", width: "100%" }}>
-          <div style={{ display: "flex", alignItems: "flex-start", gap: "var(--s-8)", flexWrap: "wrap" }}>
-            <div className="hero-copy" style={{ flex: "1 1 400px", minWidth: 0, paddingLeft: "var(--s-6)" }}>
-              <div className="eyebrow" style={{ color: "rgba(255,255,255,.8)" }}>Оптовый поставщик</div>
-              <h1 style={{ fontFamily: "var(--font-display)", fontSize: "var(--t-display)", lineHeight: 1.07,
-                letterSpacing: "-.015em", margin: "var(--s-3) 0 0", color: "#fff" }}>
-                Хозтовары, бытовая химия и товары для дома и дачи — оптом
-              </h1>
-              <p style={{ fontSize: "var(--t-body-lg)", lineHeight: 1.6, margin: "var(--s-5) 0 0", color: "rgba(255,255,255,.9)", maxWidth: 600 }}>
-                Широкий ассортимент со склада с актуальными остатками. Заказы на сайте принимаем
-                круглосуточно, минимальная сумма заказа — 5 000 ₽. Удобный бланк заказа и быстрая
-                отгрузка для магазинов.
+      <section className="hero">
+        <div className="container">
+          <div className="hero__grid">
+            <div className="hero__content">
+              <span className="hero__eyebrow"><b />Оптовый поставщик со склада</span>
+              <h1>Хозтовары и бытовая химия <em>оптом</em> — со склада в наличии</h1>
+              <p className="hero__lead">
+                Тысячи позиций для дома, дачи и магазина с актуальными остатками. Приём заказов
+                на сайте круглосуточно, минимальная сумма — 5 000 ₽. Удобный бланк заказа и быстрая
+                отгрузка.
               </p>
-              <div style={{ display: "flex", gap: "var(--s-3)", marginTop: "var(--s-8)", flexWrap: "wrap" }}>
-                <Link href="/catalog" className="btn btn--lg" style={{ background: "var(--accent-2)", color: "#fff" }}>
+              <div className="hero__actions">
+                <Link href="/catalog" className="btn btn--lg btn--cta">
                   Перейти в каталог
+                  <ArrowIcon />
                 </Link>
               </div>
+              <div className="hero__facts">
+                <span className="hero__fact"><TruckIcon />Доставка своим транспортом</span>
+                <span className="hero__fact"><RefreshIcon />Остатки обновляются ежедневно</span>
+                <span className="hero__fact"><ClockIcon />Приём заказов 24/7</span>
+              </div>
             </div>
-            {/* Карта зоны доставки — вместо пустого синего пространства справа (скрыта на мобильных) */}
-            <div className="hide-mobile" style={{ flex: "1.4 1 620px", minWidth: 0 }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "var(--s-2)",
-                color: "rgba(255,255,255,.92)", fontWeight: 600, fontSize: "var(--t-sm)",
-                textTransform: "uppercase", letterSpacing: ".04em", marginBottom: "var(--s-3)" }}>
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M1 3h13v13H1z" /><path d="M14 8h4l3 3v5h-7" /><circle cx="5.5" cy="18.5" r="2" /><circle cx="17.5" cy="18.5" r="2" />
-                </svg>
+            <div className="mapcard hide-mobile">
+              <div className="mapcard__cap">
+                <TruckIcon />
                 Доставка собственным транспортом
               </div>
-              <DeliveryMap />
+              <div className="mapwrap">
+                <DeliveryMap />
+              </div>
             </div>
           </div>
         </div>
@@ -121,14 +149,13 @@ export default async function HomePage() {
 
       {/* Полоса доверия */}
       <div className="band">
-        <div className="container" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
-          gap: "var(--s-6)", paddingTop: "var(--s-12)", paddingBottom: "var(--s-12)" }}>
+        <div className="container trust">
           {TRUST.map((t, i) => (
             <Reveal key={t.small} delay={i * 80}>
               <div className="trust-item">
                 <span className="ic">{trustIcon[t.icon]}</span>
-                <div style={{ fontSize: 26, fontWeight: 700, letterSpacing: "-.01em", color: "var(--accent)" }}>{t.big}</div>
-                <div style={{ fontSize: "var(--t-sm)", color: "var(--charcoal)" }}>{t.small}</div>
+                <div className="big">{t.big}</div>
+                <div className="small">{t.small}</div>
               </div>
             </Reveal>
           ))}
@@ -136,23 +163,27 @@ export default async function HomePage() {
       </div>
 
       {/* Категории */}
-      <div className="container section" style={{ paddingTop: "var(--s-16)", paddingBottom: "var(--s-16)" }}>
-        <h2 className="section-title" style={{ marginBottom: "var(--s-8)" }}>Категории товаров</h2>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))", gap: "var(--s-7)" }}>
+      <div className="container section">
+        <div className="section-head">
+          <div>
+            <h2 className="section-title">Категории товаров</h2>
+            <p className="lead">Полный ассортимент для дома, дачи и магазина — выберите раздел и оформите заказ онлайн.</p>
+          </div>
+          <Link href="/catalog" className="see-all">
+            Все категории
+            <ArrowIcon size={16} />
+          </Link>
+        </div>
+        <div className="cat-grid">
           {TILES.map((t, i) => (
             <Reveal key={t.icon} delay={i * 70}>
-              <Link href={tileHref(t.title)} className="cat-tile" style={{ textDecoration: "none", color: "var(--ink)",
-                background: "var(--paper)", borderRadius: "var(--r-xl)", padding: "var(--s-12) var(--s-6)",
-                border: "1px solid var(--hairline)",
-                boxShadow: "0 4px 6px -1px rgba(0,0,0,.08), 0 2px 4px -1px rgba(0,0,0,.05)",
-                display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center",
-                gap: "var(--s-3)", transition: "transform .2s ease, box-shadow .2s ease" }}>
-                {/* фикс-высота: иконки с разными пропорциями (обувь широкая, носки высокие) выравниваются */}
-                <span style={{ height: 116, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: "var(--s-2)" }}>
-                  <img src={`/categories/${t.icon}.png`} alt={t.title}
-                    style={{ maxHeight: 116, maxWidth: 150, width: "auto", height: "auto", objectFit: "contain" }} />
+              <Link href={tileHref(t.title)} className="cat-tile">
+                <span className="cat-tile__media">
+                  <img src={`/categories/${t.icon}.png`} alt={t.title} />
                 </span>
-                <span style={{ fontWeight: 600, fontSize: "var(--t-h3)" }}>{t.title}</span>
+                <span className="cat-tile__body">
+                  <span className="cat-tile__name">{t.title}</span>
+                </span>
               </Link>
             </Reveal>
           ))}
