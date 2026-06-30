@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 
 // Выбор сортировки витрины. Сохраняет остальные фильтры и режим (плитка/список).
 const OPTIONS = [
-  { value: "name", label: "По названию" },
+  { value: "name", label: "По алфавиту (А–Я)" },
   { value: "price_asc", label: "Сначала дешевле" },
   { value: "price_desc", label: "Сначала дороже" },
 ];

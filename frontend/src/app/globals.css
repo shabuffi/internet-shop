@@ -165,6 +165,7 @@ button, input, textarea, select { font-family: inherit; }
 .hero__actions .btn--lg { height: 46px; min-height: 46px; padding: 0 var(--s-5); }
 .btn--light-outline { background: rgba(255,255,255,.08); color: #fff; border: 1.5px solid rgba(255,255,255,.5); }
 .btn--light-outline:hover { background: rgba(255,255,255,.16); border-color: #fff; }
+.hero__note { margin: var(--s-4) 0 0; font-size: var(--t-sm); color: rgba(255,255,255,.78); }
 .hero__facts { display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-5); margin-top: var(--s-6); }
 .hero__fact {
   display: inline-flex;
@@ -670,7 +671,7 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .
 .pdp__cat { color: var(--graphite); font-size: var(--t-sm); }
 .pdp__title { font-family: var(--font-display); font-size: var(--t-h1); font-weight: 600; letter-spacing: -.01em; margin: var(--s-2) 0; line-height: 1.1; }
 .pdp__sku { color: var(--graphite); font-size: var(--t-sm); font-variant-numeric: tabular-nums; }
-.pdp__price { font-family: var(--font-ui); font-size: 30px; font-weight: 700; letter-spacing: -.01em; margin: var(--s-5) 0; font-variant-numeric: tabular-nums; color: var(--accent-2); }
+.pdp__price { font-family: var(--font-ui); font-size: 30px; font-weight: 700; letter-spacing: -.01em; margin: var(--s-5) 0; font-variant-numeric: tabular-nums; color: var(--ink); }
 .pdp__desc { color: var(--charcoal); line-height: 1.65; font-size: var(--t-body); white-space: pre-line; }
 .pdp__divider { height: 1px; background: var(--hairline); margin: var(--s-6) 0; }
 .pdp__section-title { font-size: var(--t-h3); font-weight: 700; margin: 0 0 var(--s-3); }

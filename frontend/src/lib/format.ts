@@ -17,7 +17,7 @@ export function cleanCategoryName(name: string): string {
 export function formatPrice(value: string | number): string {
   const n = typeof value === "string" ? Number(value) : value;
   if (Number.isNaN(n)) return "—";
-  return n.toLocaleString("ru-RU", { maximumFractionDigits: 2 }) + " ₽";
+  return n.toLocaleString("ru-RU", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " ₽";
 }
 
 /** Дата-время по Москве. Бэкенд отдаёт наивный UTC (без зоны) — добавляем «Z»,

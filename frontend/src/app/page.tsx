@@ -112,7 +112,6 @@ export default async function HomePage() {
         <div className="container">
           <div className="hero__grid">
             <div className="hero__content">
-              <span className="hero__eyebrow"><b />После регистрации вы увидите свои цены</span>
               <h1>Хозтовары и бытовая химия <em>оптом</em> — со склада в наличии</h1>
               <p className="hero__lead">
                 Тысячи позиций для дома, дачи и магазина с актуальными остатками. Приём заказов
@@ -128,6 +127,7 @@ export default async function HomePage() {
                   Регистрация
                 </Link>
               </div>
+              <p className="hero__note">После регистрации вы увидите свои персональные цены</p>
               <div className="hero__facts">
                 <span className="hero__fact"><TruckIcon />Доставка своим транспортом</span>
                 <span className="hero__fact"><RefreshIcon />Остатки обновляются ежедневно</span>
