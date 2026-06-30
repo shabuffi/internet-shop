@@ -23,10 +23,11 @@ def _make_product(db, id="p-1", price=Decimal("100.00"), stock=5, active=True):
 
 
 def test_create_order_success(client, db_session, no_celery):
-    _make_product(db_session, id="p-1", price=Decimal("150.00"))
+    _make_product(db_session, id="p-1", price=Decimal("3000.00"))
     resp = client.post("/api/v1/orders", json={
         "customer_name": "Иван",
         "customer_phone": "+7 900 123-45-67",
+        "delivery_method": "pickup",
         "items": [{"product_id": "p-1", "quantity": 2}],
     })
     assert resp.status_code == 201
@@ -34,20 +35,22 @@ def test_create_order_success(client, db_session, no_celery):
     assert data["status"] == "new"
     assert data["number"].startswith("ORD-")
     assert len(data["items"]) == 1
-    # сумма посчитана по цене ИЗ БД (150 * 2), а не из запроса
-    assert float(data["total_amount"]) == 300.0
+    # сумма по цене ИЗ БД с витринной наценкой гостя +10% (3000 * 1.10 * 2), не из запроса
+    assert float(data["total_amount"]) == 6600.0
 
 
 def test_create_order_price_from_db_not_client(client, db_session, no_celery):
     """Даже если клиент пришлёт цену — она игнорируется, берётся из БД."""
-    _make_product(db_session, id="p-1", price=Decimal("999.00"))
+    _make_product(db_session, id="p-1", price=Decimal("6000.00"))
     resp = client.post("/api/v1/orders", json={
         "customer_name": "Иван",
         "customer_phone": "+79001234567",
+        "delivery_method": "pickup",
         "items": [{"product_id": "p-1", "quantity": 1, "price": "1"}],  # цена-подделка
     })
     assert resp.status_code == 201
-    assert float(resp.json()["total_amount"]) == 999.0
+    # цена клиента игнорируется: 6000 из БД + наценка гостя +10% = 6600
+    assert float(resp.json()["total_amount"]) == 6600.0
 
 
 def test_create_order_missing_product(client, db_session, no_celery):
@@ -82,9 +85,10 @@ def test_create_order_invalid_phone(client, db_session, no_celery):
 
 def test_create_order_does_not_change_stock(client, db_session, no_celery):
     """Заказ не меняет остаток (количество на сайте от заказов не зависит)."""
-    _make_product(db_session, id="p-1", stock=5)
+    _make_product(db_session, id="p-1", stock=5, price=Decimal("2600.00"))
     resp = client.post("/api/v1/orders", json={
         "customer_name": "Иван", "customer_phone": "+79001234567",
+        "delivery_method": "pickup",
         "items": [{"product_id": "p-1", "quantity": 2}],
     })
     assert resp.status_code == 201
@@ -94,12 +98,25 @@ def test_create_order_does_not_change_stock(client, db_session, no_celery):
 
 def test_create_order_succeeds_with_zero_stock(client, db_session, no_celery):
     """Заказ проходит даже при нулевом остатке (остаток больше не влияет)."""
-    _make_product(db_session, id="p-1", stock=0)
+    _make_product(db_session, id="p-1", stock=0, price=Decimal("2000.00"))
     resp = client.post("/api/v1/orders", json={
         "customer_name": "Иван", "customer_phone": "+79001234567",
+        "delivery_method": "pickup",
         "items": [{"product_id": "p-1", "quantity": 3}],
     })
     assert resp.status_code == 201
+
+
+def test_create_order_below_minimum_rejected(client, db_session, no_celery):
+    """Заказ дешевле минимальной суммы (5000 ₽) отклоняется с 422."""
+    _make_product(db_session, id="p-1", price=Decimal("100.00"))
+    resp = client.post("/api/v1/orders", json={
+        "customer_name": "Иван", "customer_phone": "+79001234567",
+        "delivery_method": "pickup",
+        "items": [{"product_id": "p-1", "quantity": 1}],  # 100 ₽ < 5000 ₽
+    })
+    assert resp.status_code == 422
+    assert "инимальная сумма" in resp.json()["detail"]
 
 
 def test_create_order_negative_quantity_rejected(client, db_session, no_celery):
@@ -116,9 +133,10 @@ def test_create_order_queues_notification(client, db_session, monkeypatch):
     import app.tasks.notify as notify_mod
     queued = []
     monkeypatch.setattr(notify_mod.notify_new_order, "delay", lambda oid: queued.append(oid))
-    _make_product(db_session, id="p-1", stock=5)
+    _make_product(db_session, id="p-1", stock=5, price=Decimal("5000.00"))
     resp = client.post("/api/v1/orders", json={
         "customer_name": "Иван", "customer_phone": "+79001234567",
+        "delivery_method": "pickup",
         "items": [{"product_id": "p-1", "quantity": 1}],
     })
     assert resp.status_code == 201
