@@ -163,6 +163,8 @@ button, input, textarea, select { font-family: inherit; }
 }
 .hero__actions { display: flex; gap: var(--s-3); margin-top: var(--s-6); flex-wrap: wrap; }
 .hero__actions .btn--lg { height: 46px; min-height: 46px; padding: 0 var(--s-5); }
+.btn--light-outline { background: rgba(255,255,255,.08); color: #fff; border: 1.5px solid rgba(255,255,255,.5); }
+.btn--light-outline:hover { background: rgba(255,255,255,.16); border-color: #fff; }
 .hero__facts { display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-5); margin-top: var(--s-6); }
 .hero__fact {
   display: inline-flex;
@@ -569,6 +571,7 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .
 .mmenu__link { padding: var(--s-4) 0; font-size: var(--t-h3); font-weight: 600; color: var(--ink);
   border-bottom: 1px solid var(--hairline); text-decoration: none; }
 .mmenu__link.active { color: var(--accent); }
+.mmenu__account { margin-top: var(--s-6); justify-content: center; }
 .mmenu__phone { margin-top: var(--s-5); font-weight: 600; color: var(--accent); text-decoration: none; }
 
 .search {

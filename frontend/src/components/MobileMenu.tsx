@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { getMe } from "@/lib/authApi";
 
 const LINKS = [
   { href: "/", label: "Главная" },
@@ -14,8 +15,14 @@ const LINKS = [
 // Бургер-меню для телефона: кнопка в шапке + выезжающая панель с навигацией.
 export default function MobileMenu({ phone }: { phone?: string }) {
   const [open, setOpen] = useState(false);
+  const [authed, setAuthed] = useState<boolean | null>(null);
   const path = usePathname() || "/";
   const tel = phone ? `tel:${phone.replace(/[^+\d]/g, "")}` : "";
+
+  // Узнаём статус входа при первом открытии меню (на мобильной шапке ссылки «Войти» нет).
+  useEffect(() => {
+    if (open && authed === null) getMe().then((u) => setAuthed(!!u));
+  }, [open, authed]);
 
   return (
     <>
@@ -41,6 +48,13 @@ export default function MobileMenu({ phone }: { phone?: string }) {
                 </Link>
               );
             })}
+            <Link
+              href={authed ? "/account" : "/login"}
+              className="btn btn--cta btn--block mmenu__account"
+              onClick={() => setOpen(false)}
+            >
+              {authed ? "Личный кабинет" : "Войти / Регистрация"}
+            </Link>
             {tel && <a href={tel} className="mmenu__phone">{phone}</a>}
           </nav>
         </div>
