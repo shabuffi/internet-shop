@@ -123,7 +123,7 @@ export default async function HomePage() {
                   Перейти в каталог
                   <ArrowIcon />
                 </Link>
-                <Link href="/register" className="btn btn--lg btn--light-outline">
+                <Link href="/register" className="btn btn--lg btn--light-outline btn--pulse">
                   Регистрация
                 </Link>
               </div>

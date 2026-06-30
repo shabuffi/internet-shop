@@ -904,6 +904,15 @@ textarea.form-input { height: auto; min-height: 90px; padding: var(--s-3) var(--
   .chat-fab__label { display: none; }
 }
 
+/* Пульсация кнопки «Регистрация» в баннере — привлекает внимание */
+@keyframes btn-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255,255,255,.55); transform: scale(1); }
+  50%      { box-shadow: 0 0 0 8px rgba(255,255,255,0); transform: scale(1.035); }
+}
+.btn--pulse { animation: btn-pulse 1.6s ease-in-out infinite; }
+.btn--pulse:hover { animation-play-state: paused; }
+@media (prefers-reduced-motion: reduce) { .btn--pulse { animation: none; } }
+
 /* Значок «Честный знак» (зелёный) + подсказка-карточка */
 :root { --cz-green:#1c8a4e; --cz-green-soft:#e7f6ec; }
 .cz-badge:hover, .cz-badge:focus-visible { background: color-mix(in srgb, var(--cz-green), #fff 84%); }
