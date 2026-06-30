@@ -1,0 +1,93 @@
+import { test, expect, type Page } from "@playwright/test";
+
+// Внешняя (браузерная) проверка регистрации покупателя против поднятого стека.
+// Каждый тест — свой изолированный контекст (куки не протекают между тестами).
+// Email уникален на прогон (метка времени + случайность), чтобы не натыкаться на
+// уже существующего пользователя; созданные e2e-аккаунты чистит global-teardown
+// (удаляет users с email вида e2e-reg-*@example.test).
+
+const uniqueEmail = () =>
+  `e2e-reg-${Date.now()}-${Math.floor(Math.random() * 1e6)}@example.test`;
+
+// Заполняет общие поля формы регистрации. Тип заказчика и ИНН — отдельно по месту.
+async function fillCommon(page: Page, email: string, password = "Passw0rd!23") {
+  await page.goto("/register");
+  // Ждём, пока форма отрисуется и прогидрируется (в dev первая компиляция страницы
+  // может занять секунды) — иначе fill полей иногда упирается в таймаут.
+  await expect(page.getByRole("button", { name: "Зарегистрироваться" })).toBeVisible();
+  await page.getByPlaceholder("you@example.ru").fill(email);
+  await page.getByPlaceholder("+7 999 000-00-00").fill("+7 900 123-45-67");
+  await page.locator('input[type="password"]').fill(password);
+  await page.locator('input[type="checkbox"]').check();
+}
+
+test.describe("Регистрация покупателя", () => {
+  test("физлицо: успешная регистрация → личный кабинет", async ({ page }) => {
+    const email = uniqueEmail();
+    await fillCommon(page, email);
+    // тип по умолчанию — «Физическое лицо»; ИНН не требуется
+    await page.getByPlaceholder("Иванов Иван Иванович").fill("Тестов Тест Тестович");
+    await page.getByRole("button", { name: "Зарегистрироваться" }).click();
+
+    // редирект в кабинет, профиль показывает email
+    await expect(page).toHaveURL(/\/account/);
+    await expect(page.getByRole("heading", { name: "Личный кабинет" })).toBeVisible();
+    await expect(page.getByText(email)).toBeVisible();
+  });
+
+  test("ООО: регистрация с корректным ИНН", async ({ page }) => {
+    const email = uniqueEmail();
+    await fillCommon(page, email);
+    await page.locator("select").selectOption("ooo");
+    await page.getByPlaceholder("ООО «Ромашка»").fill("ООО «Тест»");
+    await page.getByPlaceholder("10 цифр").fill("7707083893"); // 10 цифр — валидный ИНН ООО
+    await page.getByRole("button", { name: "Зарегистрироваться" }).click();
+
+    await expect(page).toHaveURL(/\/account/);
+    await expect(page.getByText(email)).toBeVisible();
+  });
+
+  test("дубликат email → понятная ошибка", async ({ page }) => {
+    const email = uniqueEmail();
+    // первая регистрация — успешна
+    await fillCommon(page, email);
+    await page.getByPlaceholder("Иванов Иван Иванович").fill("Первый Пользователь");
+    await page.getByRole("button", { name: "Зарегистрироваться" }).click();
+    await expect(page).toHaveURL(/\/account/);
+
+    // повторная с тем же email — сервер отвечает 409, форма показывает ошибку
+    await fillCommon(page, email);
+    await page.getByPlaceholder("Иванов Иван Иванович").fill("Второй Пользователь");
+    await page.getByRole("button", { name: "Зарегистрироваться" }).click();
+
+    await expect(page).toHaveURL(/\/register/);
+    await expect(page.locator(".form-error")).toContainText(/уже зарегистрирован/i);
+  });
+
+  test("ИП: некорректный ИНН отклоняется сервером", async ({ page }) => {
+    const email = uniqueEmail();
+    await fillCommon(page, email);
+    await page.locator("select").selectOption("ip");
+    await page.getByPlaceholder("ООО «Ромашка»").fill("ИП Тестов");
+    await page.getByPlaceholder("12 цифр").fill("123"); // слишком короткий — пройдёт HTML5, упрётся в сервер
+    await page.getByRole("button", { name: "Зарегистрироваться" }).click();
+
+    await expect(page).toHaveURL(/\/register/);
+    await expect(page.locator(".form-error")).toContainText(/ИНН/i);
+  });
+
+  test("без согласия на обработку ПД форма не отправляется", async ({ page }) => {
+    const email = uniqueEmail();
+    await page.goto("/register");
+    await page.getByPlaceholder("you@example.ru").fill(email);
+    await page.getByPlaceholder("+7 999 000-00-00").fill("+7 900 123-45-67");
+    await page.getByPlaceholder("Иванов Иван Иванович").fill("Без Согласия");
+    await page.locator('input[type="password"]').fill("Passw0rd!23");
+    // НЕ ставим галочку согласия
+    await page.getByRole("button", { name: "Зарегистрироваться" }).click();
+
+    // нативная валидация required не пускает — остаёмся на /register
+    await expect(page).toHaveURL(/\/register/);
+    await expect(page.locator('input[type="checkbox"]')).toBeFocused();
+  });
+});

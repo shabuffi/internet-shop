@@ -11,6 +11,7 @@ const CLEANUP = `
 from app.db.session import SessionLocal
 from app.db.models.product import Product
 from app.db.models.order import Order, OrderItem
+from app.db.models.user import User
 from sqlalchemy import select
 db = SessionLocal()
 order_ids = {i.order_id for i in db.scalars(select(OrderItem).where(OrderItem.product_id == 'e2e-test-product'))}
@@ -21,9 +22,14 @@ for oid in order_ids:
 p = db.get(Product, 'e2e-test-product')
 if p:
     db.delete(p)
+# Тестовые аккаунты регистрации (registration.spec.ts) — email вида e2e-reg-*@example.test.
+# Order.user_id -> ON DELETE SET NULL, поэтому удаление пользователей безопасно.
+reg_users = db.scalars(select(User).where(User.email.like('e2e-reg-%@example.test'))).all()
+for u in reg_users:
+    db.delete(u)
 db.commit()
 db.close()
-print(f'e2e: очистка — удалено заказов {len(order_ids)}, тестовый товар удалён')
+print(f'e2e: очистка — заказов {len(order_ids)}, товар удалён, аккаунтов регистрации {len(reg_users)}')
 `;
 
 export default async function globalTeardown() {
