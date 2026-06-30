@@ -894,3 +894,21 @@ textarea.form-input { height: auto; min-height: 90px; padding: var(--s-3) var(--
   .marquee__track { animation: none; }
   .marquee { overflow-x: auto; }
 }
+
+/* Плавающая кнопка «Чат с менеджером» */
+.chat-fab:hover { transform: translateY(-2px); box-shadow: 0 12px 30px rgba(0,0,0,.28); }
+.chat-fab:active { transform: translateY(0); }
+/* На узких экранах — компактная круглая кнопка-иконка (подпись прячем) */
+@media (max-width: 480px) {
+  .chat-fab { padding: 0 !important; width: 52px; justify-content: center; }
+  .chat-fab__label { display: none; }
+}
+
+/* Значок «Честный знак» (зелёный) + подсказка-карточка */
+:root { --cz-green:#1c8a4e; --cz-green-soft:#e7f6ec; }
+.cz-badge:hover, .cz-badge:focus-visible { background: color-mix(in srgb, var(--cz-green), #fff 84%); }
+.cz-tip {
+  background: #fff; border: 1px solid var(--hairline, #e7e9ee); border-radius: 10px;
+  padding: 12px 14px; box-shadow: 0 12px 32px rgba(0,0,0,.16); font-size: 13px; line-height: 1.5;
+  pointer-events: none;
+}

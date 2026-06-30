@@ -97,3 +97,46 @@ export function IconCart(p: SVGProps<SVGSVGElement>) {
     </svg>
   );
 }
+
+// Пузырь сообщения — кнопка «Чат с менеджером».
+export function IconChat(p: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base} width="1em" height="1em" {...p}>
+      <path d="M21 11.5a8.38 8.38 0 0 1-8.5 8.5 8.5 8.5 0 0 1-3.8-.9L3 21l1.9-5.7a8.5 8.5 0 0 1-.9-3.8A8.38 8.38 0 0 1 12.5 3 8.38 8.38 0 0 1 21 11.5z" />
+    </svg>
+  );
+}
+
+// Щит с галочкой — индикатор «Честный знак».
+export function IconShield(p: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base} width="1em" height="1em" {...p}>
+      <path d="M12 2.5 4.5 5.5v5.4c0 4.4 3 8.3 7.5 9.6 4.5-1.3 7.5-5.2 7.5-9.6V5.5L12 2.5z" />
+      <polyline points="8.8 12 11 14.2 15.4 9.8" />
+    </svg>
+  );
+}
+
+// Двое людей — раздел «Покупатели».
+export function IconUsers(p: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base} {...p}>
+      <path d="M16 19v-1.5a3.5 3.5 0 0 0-3.5-3.5h-5A3.5 3.5 0 0 0 4 17.5V19" />
+      <circle cx="10" cy="8" r="3.2" />
+      <path d="M20 19v-1.4a3.4 3.4 0 0 0-2.6-3.3" />
+      <path d="M15.5 5.2a3.2 3.2 0 0 1 0 5.6" />
+    </svg>
+  );
+}
+
+// Документ с текстом — раздел «Политика».
+export function IconDoc(p: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base} {...p}>
+      <path d="M6 3h7l5 5v13a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z" />
+      <polyline points="13 3 13 8 18 8" />
+      <line x1="8.5" y1="13" x2="15.5" y2="13" />
+      <line x1="8.5" y1="16.5" x2="15.5" y2="16.5" />
+    </svg>
+  );
+}

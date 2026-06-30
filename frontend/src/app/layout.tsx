@@ -6,16 +6,24 @@ import CartIcon from "@/components/CartIcon";
 import AccountNav from "@/components/AccountNav";
 import MainNav from "@/components/MainNav";
 import MobileMenu from "@/components/MobileMenu";
+import ChatWidget from "@/components/ChatWidget";
+import VkChatWidget from "@/components/VkChatWidget";
 import { SITE_URL, SITE_NAME, SITE_DESCRIPTION } from "@/lib/site";
+import { getStoreInfo } from "@/lib/api";
+import { chatConfigFromStore } from "@/lib/chat";
 
 // Метаданные (включая <title> вкладки) берут название из настройки магазина —
 // один источник правды с шапкой/футером. SITE_NAME — лишь фолбэк.
 export async function generateMetadata(): Promise<Metadata> {
-  const { name } = await getStoreInfo();
+  const store = await getStoreInfo().catch(() => null);
+  const name = store?.shop_name || SITE_NAME;
+  // SEO-поля задаются в админке (раздел «Сайт»); пусто → текущие фолбэки.
+  const title = store?.seo_title || `${name} — интернет-магазин`;
+  const description = store?.seo_description || SITE_DESCRIPTION;
   return {
     metadataBase: new URL(SITE_URL),
-    title: { default: `${name} — интернет-магазин`, template: `%s — ${name}` },
-    description: SITE_DESCRIPTION,
+    title: { default: title, template: `%s — ${name}` },
+    description,
     // Иконка вкладки (favicon): фирменная эмблема ТД ИНЖЕНЕР (набор из RealFaviconGenerator).
     icons: {
       icon: [
@@ -29,8 +37,8 @@ export async function generateMetadata(): Promise<Metadata> {
     openGraph: {
       type: "website",
       siteName: name,
-      title: `${name} — интернет-магазин`,
-      description: SITE_DESCRIPTION,
+      title: store?.seo_og_title || title,
+      description: store?.seo_og_description || description,
     },
     robots: { index: true, follow: true },
   };
@@ -45,38 +53,25 @@ function SearchIcon() {
   );
 }
 
-interface StoreInfo {
-  name: string; phone: string; email: string; hours: string;
-  legalName: string; address: string; logo: boolean;
-}
-
-async function getStoreInfo(): Promise<StoreInfo> {
-  try {
-    const res = await fetch("http://backend:8000/api/v1/admin/store-info", {
-      signal: AbortSignal.timeout(8000), // рендерится на КАЖДЫЙ запрос — без таймаута зависший fetch вешает весь сайт
-      next: { revalidate: 60 },
-    });
-    if (res.ok) {
-      const d = await res.json();
-      return {
-        name: d.shop_name || SITE_NAME,
-        phone: d.contact_phone || "",
-        email: d.contact_email || "",
-        hours: d.contact_hours || "",
-        legalName: d.company_legal_name || "",
-        address: d.warehouse_address || "",
-        logo: !!d.has_logo,
-      };
-    }
-  } catch {}
-  return { name: SITE_NAME, phone: "", email: "", hours: "", legalName: "", address: "", logo: false };
-}
-
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
-  const store = await getStoreInfo();
-  const shopName = store.name;
-  const telHref = store.phone ? `tel:${store.phone.replace(/[^+\d]/g, "")}` : "";
-  const hasContacts = Boolean(store.phone || store.email || store.hours || store.address);
+  const store = await getStoreInfo().catch(() => null);
+  const shopName = store?.shop_name || SITE_NAME;
+  const phone = store?.contact_phone || "";
+  const telHref = phone ? `tel:${phone.replace(/[^+\d]/g, "")}` : "";
+  const hasContacts = Boolean(phone || store?.contact_email || store?.contact_hours || store?.warehouse_address);
+  const chat = chatConfigFromStore(store);
+  const chatMode = store?.chat_mode || "button"; // off | button | vk_widget
+
+  // Соцсети — только заполненные (порядок фиксированный).
+  const socials = [
+    { label: "ВКонтакте", href: store?.social_vk || "" },
+    { label: "Telegram", href: store?.social_telegram || "" },
+    { label: "WhatsApp", href: store?.social_whatsapp || "" },
+    { label: "Instagram", href: store?.social_instagram || "" },
+  ].filter((s) => s.href);
+
+  // Цвет темы из админки — только валидный hex (защита от инъекции в <style>).
+  const themeColor = /^#[0-9a-fA-F]{3,8}$/.test(store?.theme_primary || "") ? store!.theme_primary! : "";
 
   return (
     <html lang="ru" suppressHydrationWarning>
@@ -87,13 +82,17 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700&display=swap"
           rel="stylesheet"
         />
+        {/* Цвет темы из админки: переопределяем --accent, производные (color-mix) подхватятся */}
+        {themeColor && (
+          <style dangerouslySetInnerHTML={{ __html: `:root{--accent:${themeColor};}` }} />
+        )}
       </head>
       <body suppressHydrationWarning>
         <CartProvider>
           <header className="header">
             <div className="container header__inner">
               <Link href="/" className="brand" aria-label={shopName}>
-                {store.logo
+                {store?.has_logo
                   ? <img src="/api/v1/admin/logo" alt={shopName} style={{ height: 38, width: "auto", display: "block" }} />
                   : <img src="/logo.svg" alt={shopName} style={{ height: 40, width: "auto", display: "block" }} />}
               </Link>
@@ -106,11 +105,11 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                   <input name="search" placeholder="Поиск товаров" aria-label="Поиск товаров" />
                 </form>
                 {telHref && (
-                  <a href={telHref} className="header__phone hide-mobile">{store.phone}</a>
+                  <a href={telHref} className="header__phone hide-mobile">{phone}</a>
                 )}
                 <AccountNav />
                 <CartIcon />
-                <MobileMenu phone={store.phone} />
+                <MobileMenu phone={phone} />
               </div>
             </div>
           </header>
@@ -142,19 +141,34 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                 {hasContacts && (
                   <div className="footer__col">
                     <h4>Контакты</h4>
-                    {store.phone && <a href={telHref}>{store.phone}</a>}
-                    {store.email && <a href={`mailto:${store.email}`}>{store.email}</a>}
-                    {store.address && <span>{store.address}</span>}
-                    {store.hours && <span>{store.hours}</span>}
+                    {phone && <a href={telHref}>{phone}</a>}
+                    {store?.contact_email && <a href={`mailto:${store.contact_email}`}>{store.contact_email}</a>}
+                    {store?.warehouse_address && <span>{store.warehouse_address}</span>}
+                    {store?.contact_hours && <span>{store.contact_hours}</span>}
+                  </div>
+                )}
+
+                {socials.length > 0 && (
+                  <div className="footer__col">
+                    <h4>Мы в соцсетях</h4>
+                    {socials.map((s) => (
+                      <a key={s.label} href={s.href} target="_blank" rel="noopener noreferrer">{s.label}</a>
+                    ))}
                   </div>
                 )}
               </div>
               <div className="footer__bottom">
-                <span>© {new Date().getFullYear()} {store.legalName || shopName}. Все права защищены.</span>
+                <span>© {new Date().getFullYear()} {store?.company_legal_name || shopName}. Все права защищены.</span>
                 <span>Produced by soffit</span>
               </div>
             </div>
           </footer>
+
+          {chatMode === "vk_widget"
+            ? <VkChatWidget apiId={store?.chat_vk_api_id || ""} groupId={store?.chat_vk_group_id || ""} />
+            : chatMode === "button"
+            ? <ChatWidget config={chat} />
+            : null}
         </CartProvider>
       </body>
     </html>

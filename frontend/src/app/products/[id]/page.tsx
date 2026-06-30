@@ -6,6 +6,9 @@ import { getProduct, getStoreInfo } from "@/lib/api";
 import { formatPrice } from "@/lib/format";
 import AddToCartButton from "@/components/AddToCartButton";
 import ProductGallery from "@/components/ProductGallery";
+import ChestnyZnakBadge from "@/components/ChestnyZnakBadge";
+import { chatConfigFromStore, buildChatUrl, isChatReady } from "@/lib/chat";
+import { IconChat } from "@/components/icons";
 import type { Metadata } from "next";
 
 interface Props {
@@ -47,6 +50,11 @@ export default async function ProductPage({ params }: Props) {
   }
 
   const store = await getStoreInfo().catch(() => null);
+  const chat = chatConfigFromStore(store);
+  // Инлайн-ссылку «Спросить менеджера» показываем только в режиме кнопки-ссылки
+  // (во встроенном VK-виджете чат и так висит на странице).
+  const chatUrl = (store?.chat_mode || "button") === "button" && isChatReady(chat)
+    ? buildChatUrl(chat.service, chat.value) : "";
   const inStock = product.available;
   const stockLabel = product.stock > 0 ? `${product.stock} шт.` : "Нет на складе";
   // Характеристики = модификации/реквизиты из МойСклад + базовые поля товара в одной таблице.
@@ -79,7 +87,10 @@ export default async function ProductPage({ params }: Props) {
 
           <div className="pdp__info">
             {product.category && <div className="pdp__cat">{product.category.name}</div>}
-            <h1 className="pdp__title">{product.name}</h1>
+            <h1 className="pdp__title">
+              {product.chestnyZnak && <><ChestnyZnakBadge size={20} /> </>}
+              {product.name}
+            </h1>
             <div className="row" style={{ gap: "var(--s-4)" }}>
               {product.article && <span className="pdp__sku">Арт. {product.article}</span>}
               {inStock
@@ -91,6 +102,14 @@ export default async function ProductPage({ params }: Props) {
             <div className="pdp__price">{formatPrice(product.price)}</div>
 
             <AddToCartButton product={product} />
+
+            {chatUrl && (
+              <a href={chatUrl} target="_blank" rel="noopener noreferrer"
+                style={{ display: "inline-flex", alignItems: "center", gap: 8, marginTop: "var(--s-3)",
+                  color: "var(--accent)", fontWeight: 600, fontSize: "var(--t-sm)", textDecoration: "none" }}>
+                <IconChat style={{ width: 18, height: 18 }} /> {chat.label}
+              </a>
+            )}
 
             {product.description && (
               <>
