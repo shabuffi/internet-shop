@@ -21,7 +21,53 @@ const card: React.CSSProperties = {
 };
 const field: React.CSSProperties = { display: "flex", flexDirection: "column", gap: 6, marginBottom: 16 };
 
+type Tab = "integration" | "site" | "diag" | "danger";
+const TABS: { id: Tab; label: string }[] = [
+  { id: "integration", label: "Интеграция" },
+  { id: "site", label: "Настройки сайта" },
+  { id: "diag", label: "Диагностика" },
+  { id: "danger", label: "Опасная зона" },
+];
+
+// Необратимое действие с защитой от случайного нажатия: кнопка активна только после
+// того, как пользователь вручную ввёл точную фразу-подтверждение.
+function DangerAction({
+  title, desc, phrase, button, onRun, result, danger = true,
+}: {
+  title: string; desc: string; phrase: string; button: string;
+  onRun: () => void | Promise<void>; result?: string; danger?: boolean;
+}) {
+  const [val, setVal] = useState("");
+  const [busy, setBusy] = useState(false);
+  const armed = val.trim() === phrase;
+  const color = danger ? "var(--danger, #c0392b)" : "var(--ink)";
+  return (
+    <div style={{ marginBottom: 28 }}>
+      <p style={{ fontWeight: 600, fontSize: 14, marginBottom: 4 }}>{title}</p>
+      <p style={{ fontSize: 13, color: "var(--ink-secondary)", marginBottom: 12 }}>{desc}</p>
+      <div style={field}>
+        <label className="form-label" style={{ fontSize: 12 }}>
+          Чтобы подтвердить, введите <b style={{ color }}>{phrase}</b>
+        </label>
+        <input className="form-input" value={val} onChange={(e) => setVal(e.target.value)}
+          placeholder={phrase} autoComplete="off" spellCheck={false} />
+      </div>
+      <button type="button" disabled={!armed || busy}
+        onClick={async () => { setBusy(true); try { await onRun(); setVal(""); } finally { setBusy(false); } }}
+        style={{ padding: "0 16px", height: 38, borderRadius: "var(--radius-md)",
+          cursor: armed && !busy ? "pointer" : "not-allowed",
+          border: `1px solid ${color}`, background: armed ? color : "transparent",
+          color: armed ? "#fff" : color, fontWeight: 600, fontSize: 14,
+          opacity: armed && !busy ? 1 : 0.5, transition: "background .15s, opacity .15s" }}>
+        {busy ? "Выполняется…" : button}
+      </button>
+      {result && <p style={{ marginTop: 10, fontSize: 13, color: "var(--ink-secondary)" }}>{result}</p>}
+    </div>
+  );
+}
+
 export default function DevPage() {
+  const [tab, setTab] = useState<Tab>("integration");
   const [enabled, setEnabled] = useState<boolean | null>(null);
   const [authed, setAuthed] = useState(false);
   const [password, setPassword] = useState("");
@@ -85,7 +131,6 @@ export default function DevPage() {
 
   const [ordersMsg, setOrdersMsg] = useState("");
   async function handleWipeOrders() {
-    if (!confirm("Удалить ВСЕ заказы? Действие необратимо. Обычно нужно только для очистки тестовых данных.")) return;
     setOrdersMsg("");
     try {
       const r = await devFetch<{ orders: number }>("/dev/orders", { method: "DELETE" });
@@ -97,7 +142,6 @@ export default function DevPage() {
 
   const [wipeMsg, setWipeMsg] = useState("");
   async function handleWipe() {
-    if (!confirm("Удалить ВСЕ товары и категории? Заказы сохранятся. Нужно при смене склада — потом запустите обмен заново.")) return;
     setWipeMsg("");
     try {
       const r = await devFetch<{ products: number; categories: number; files: number }>("/dev/catalog", { method: "DELETE" });
@@ -112,12 +156,21 @@ export default function DevPage() {
 
   return (
     <div style={{ minHeight: "100vh", background: "var(--cloud)", padding: "48px 20px" }}>
-      <div style={{ maxWidth: 520, margin: "0 auto 20px" }}>
-        <div style={{ fontSize: 12, color: "var(--ink-tertiary)", letterSpacing: ".06em", textTransform: "uppercase" }}>Служебное</div>
-        <h1 style={{ fontSize: 24, fontWeight: 700, letterSpacing: -0.3 }}>Разработчик</h1>
-        <p style={{ fontSize: 13, color: "var(--ink-secondary)", marginTop: 4 }}>
-          Техническая настройка интеграции. Эта страница защищена отдельным паролем — владельцу магазина сюда не нужно.
-        </p>
+      <div style={{ maxWidth: 520, margin: "0 auto 20px", display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16 }}>
+        <div>
+          <div style={{ fontSize: 12, color: "var(--ink-tertiary)", letterSpacing: ".06em", textTransform: "uppercase" }}>Служебное</div>
+          <h1 style={{ fontSize: 24, fontWeight: 700, letterSpacing: -0.3 }}>Разработчик</h1>
+          <p style={{ fontSize: 13, color: "var(--ink-secondary)", marginTop: 4 }}>
+            Техническая настройка интеграции. Эта страница защищена отдельным паролем — владельцу магазина сюда не нужно.
+          </p>
+        </div>
+        {authed && (
+          <button type="button" onClick={handleLogout}
+            style={{ flexShrink: 0, padding: "0 16px", height: 38, borderRadius: "var(--radius-md)", cursor: "pointer",
+              border: "1px solid var(--graphite)", background: "transparent", color: "var(--ink)", fontWeight: 600, fontSize: 14 }}>
+            Выйти
+          </button>
+        )}
       </div>
 
       {enabled === false && !authed ? (
@@ -140,9 +193,27 @@ export default function DevPage() {
         </div>
       ) : (
         <>
+        {/* Вкладки */}
+        <div style={{ maxWidth: 520, margin: "0 auto 16px", display: "flex", gap: 6, flexWrap: "wrap" }}>
+          {TABS.map((t) => {
+            const active = tab === t.id;
+            return (
+              <button key={t.id} type="button" onClick={() => setTab(t.id)}
+                style={{ padding: "8px 14px", borderRadius: "var(--radius-md)", cursor: "pointer", fontSize: 14,
+                  fontWeight: active ? 700 : 500, transition: "background .15s, color .15s",
+                  border: `1px solid ${active ? "var(--ink)" : "var(--hairline-soft)"}`,
+                  background: active ? "var(--ink)" : "var(--canvas)",
+                  color: active ? "#fff" : (t.id === "danger" ? "var(--danger, #c0392b)" : "var(--ink)") }}>
+                {t.label}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Интеграция: ключ ВК + SMTP */}
+        {tab === "integration" && (
         <div style={card}>
           <form onSubmit={handleSave}>
-            {/* ВК — ключ сообщества (peer_id владелец вводит у себя в Настройках) */}
             <p style={{ fontWeight: 600, fontSize: 16, marginBottom: 6 }}>ВКонтакте — ключ сообщества</p>
             <p style={{ fontSize: 13, color: "var(--ink-secondary)", marginBottom: 16 }}>
               Ключ доступа сообщества (бот). Свой id (peer_id) владелец вводит сам в Настройках.
@@ -160,7 +231,6 @@ export default function DevPage() {
 
             <div style={{ height: 1, background: "var(--hairline-soft)", margin: "20px 0" }} />
 
-            {/* Email / SMTP (адрес получателя владелец вводит в Настройках) */}
             <p style={{ fontWeight: 600, fontSize: 16, marginBottom: 6 }}>Почтовый сервер (SMTP)</p>
             <p style={{ fontSize: 13, color: "var(--ink-secondary)", marginBottom: 16 }}>
               Через какой ящик отправлять письма. Адрес получателя (email владельца) задаётся в Настройках.
@@ -198,69 +268,57 @@ export default function DevPage() {
                 <span>✓</span> Сохранено
               </div>
             )}
-            <div style={{ display: "flex", gap: 12, marginTop: 8 }}>
-              <button className="btn btn-primary" type="submit" disabled={loading}>
-                {loading ? "Сохраняем…" : "Сохранить"}
-              </button>
-              <button type="button" onClick={handleLogout}
-                style={{ padding: "0 18px", height: 40, borderRadius: "var(--radius-md)", cursor: "pointer",
-                  border: "1px solid var(--graphite)", background: "transparent", color: "var(--ink)", fontWeight: 600, fontSize: 14 }}>
-                Выйти
-              </button>
-            </div>
+            <button className="btn btn-primary" type="submit" disabled={loading} style={{ marginTop: 8 }}>
+              {loading ? "Сохраняем…" : "Сохранить"}
+            </button>
             <p style={{ fontSize: 12, color: "var(--ink-secondary)", marginTop: 14 }}>
               Проверить отправку (ВК / Email) можно у владельца в Настройках — кнопками «Отправить тест».
             </p>
           </form>
-
-          {/* Диагностика обмена — что прислал склад в последнем import.xml */}
-          <div style={{ marginTop: 28, paddingTop: 20, borderTop: "1px solid var(--hairline-soft)" }}>
-            <p style={{ fontWeight: 600, fontSize: 14, marginBottom: 4 }}>Диагностика обмена</p>
-            <p style={{ fontSize: 13, color: "var(--ink-secondary)", marginBottom: 12 }}>
-              Показывает, что прислал склад в последнем обмене (есть ли описание/артикул/картинки и в каких тегах).
-              Сначала запустите обмен в МойСклад, потом нажмите.
-            </p>
-            <button type="button" onClick={handleDiagnose}
-              style={{ padding: "0 16px", height: 38, borderRadius: "var(--radius-md)", cursor: "pointer",
-                border: "1px solid var(--graphite)", background: "transparent", color: "var(--ink)", fontWeight: 600, fontSize: 14 }}>
-              Показать диагностику
-            </button>
-            {diag && (
-              <pre style={{ marginTop: 12, padding: 14, background: "var(--cloud)", borderRadius: "var(--radius-md)",
-                border: "1px solid var(--hairline-soft)", fontSize: 12, lineHeight: 1.5, overflow: "auto", maxHeight: 360,
-                whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{diag}</pre>
-            )}
-          </div>
-
-          {/* Опасная зона — очистка каталога (при смене склада) */}
-          <div style={{ marginTop: 28, paddingTop: 20, borderTop: "1px solid var(--hairline-soft)" }}>
-            <p style={{ fontWeight: 600, fontSize: 14, marginBottom: 4 }}>Очистить каталог</p>
-            <p style={{ fontSize: 13, color: "var(--ink-secondary)", marginBottom: 12 }}>
-              Удаляет все товары и категории (заказы сохраняются). Нужно при подключении другого
-              склада — старые товары исчезнут, затем запустите обмен заново.
-            </p>
-            <button type="button" onClick={handleWipe}
-              style={{ padding: "0 16px", height: 38, borderRadius: "var(--radius-md)", cursor: "pointer",
-                border: "1px solid var(--danger, #c0392b)", background: "transparent",
-                color: "var(--danger, #c0392b)", fontWeight: 600, fontSize: 14 }}>
-              Очистить каталог
-            </button>
-            {wipeMsg && <p style={{ marginTop: 10, fontSize: 13, color: "var(--ink-secondary)" }}>{wipeMsg}</p>}
-
-            <p style={{ fontWeight: 600, fontSize: 14, margin: "20px 0 4px" }}>Удалить все заказы</p>
-            <p style={{ fontSize: 13, color: "var(--ink-secondary)", marginBottom: 12 }}>
-              Полностью удаляет все заказы и их позиции. Для очистки тестовых данных.
-            </p>
-            <button type="button" onClick={handleWipeOrders}
-              style={{ padding: "0 16px", height: 38, borderRadius: "var(--radius-md)", cursor: "pointer",
-                border: "1px solid var(--danger, #c0392b)", background: "transparent",
-                color: "var(--danger, #c0392b)", fontWeight: 600, fontSize: 14 }}>
-              Удалить все заказы
-            </button>
-            {ordersMsg && <p style={{ marginTop: 10, fontSize: 13, color: "var(--ink-secondary)" }}>{ordersMsg}</p>}
-          </div>
         </div>
-        <SiteSettingsCard />
+        )}
+
+        {/* Настройки сайта */}
+        {tab === "site" && <SiteSettingsCard />}
+
+        {/* Диагностика обмена */}
+        {tab === "diag" && (
+        <div style={card}>
+          <p style={{ fontWeight: 600, fontSize: 16, marginBottom: 6 }}>Диагностика обмена</p>
+          <p style={{ fontSize: 13, color: "var(--ink-secondary)", marginBottom: 12 }}>
+            Показывает, что прислал склад в последнем обмене (есть ли описание/артикул/картинки и в каких тегах).
+            Сначала запустите обмен в МойСклад, потом нажмите.
+          </p>
+          <button type="button" onClick={handleDiagnose}
+            style={{ padding: "0 16px", height: 38, borderRadius: "var(--radius-md)", cursor: "pointer",
+              border: "1px solid var(--graphite)", background: "transparent", color: "var(--ink)", fontWeight: 600, fontSize: 14 }}>
+            Показать диагностику
+          </button>
+          {diag && (
+            <pre style={{ marginTop: 12, padding: 14, background: "var(--cloud)", borderRadius: "var(--radius-md)",
+              border: "1px solid var(--hairline-soft)", fontSize: 12, lineHeight: 1.5, overflow: "auto", maxHeight: 360,
+              whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{diag}</pre>
+          )}
+        </div>
+        )}
+
+        {/* Опасная зона — необратимые действия с подтверждением вводом фразы */}
+        {tab === "danger" && (
+        <div style={card}>
+          <p style={{ fontWeight: 700, fontSize: 16, marginBottom: 4, color: "var(--danger, #c0392b)" }}>Опасная зона</p>
+          <p style={{ fontSize: 13, color: "var(--ink-secondary)", marginBottom: 22 }}>
+            Необратимые действия. Кнопка активируется только после того, как вы вручную введёте фразу-подтверждение.
+          </p>
+          <DangerAction
+            title="Очистить каталог"
+            desc="Удаляет все товары и категории (заказы сохраняются). Нужно при подключении другого склада — старые товары исчезнут, затем запустите обмен заново."
+            phrase="ОЧИСТИТЬ КАТАЛОГ" button="Очистить каталог" onRun={handleWipe} result={wipeMsg} />
+          <DangerAction
+            title="Удалить все заказы"
+            desc="Полностью удаляет все заказы и их позиции. Для очистки тестовых данных."
+            phrase="УДАЛИТЬ ЗАКАЗЫ" button="Удалить все заказы" onRun={handleWipeOrders} result={ordersMsg} />
+        </div>
+        )}
         </>
       )}
     </div>
