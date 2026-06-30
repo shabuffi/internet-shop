@@ -8,6 +8,8 @@ export interface CartItem {
   article: string | null;
   price: string;
   quantity: number;
+  // Товар с маркировкой «Честный знак» (снимок на момент добавления — для бейджа в корзине).
+  chestnyZnak?: boolean;
 }
 
 interface CartContextValue {

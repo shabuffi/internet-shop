@@ -6,6 +6,7 @@ import { CATEGORY_GROUPS } from "@/lib/categoryGroups";
 import type { Category } from "@/types/product";
 import { formatPrice } from "@/lib/format";
 import AddToCartCard from "@/components/AddToCartCard";
+import ChestnyZnakBadge from "@/components/ChestnyZnakBadge";
 import CatalogList from "@/components/CatalogList";
 import CartBar from "@/components/CartBar";
 import CategorySelect from "@/components/CategorySelect";
@@ -173,7 +174,10 @@ export default async function CatalogPage({ searchParams }: Props) {
                     </Link>
                     <div className="pcard__body">
                       <div className="pcard__cat">{p.category?.name ?? " "}</div>
-                      <Link href={`/products/${p.id}`} className="pcard__name">{p.name}</Link>
+                      <div style={{ display: "flex", alignItems: "flex-start", gap: 6 }}>
+                        {p.chestnyZnak && <ChestnyZnakBadge size={15} />}
+                        <Link href={`/products/${p.id}`} className="pcard__name">{p.name}</Link>
+                      </div>
                       <div className="pcard__sku">{p.article ? `Арт. ${p.article}` : " "}</div>
                       <div className="pcard__foot">
                         <span className="price">{Number(p.price) > 0 ? formatPrice(p.price) : "—"}</span>

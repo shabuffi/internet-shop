@@ -7,6 +7,7 @@ import { useCart } from "@/context/CartContext";
 import { formatPrice } from "@/lib/format";
 import { MIN_ORDER_AMOUNT } from "@/lib/site";
 import { IconImage, IconCart } from "@/components/icons";
+import ChestnyZnakBadge from "@/components/ChestnyZnakBadge";
 import { getMe, type UserProfile } from "@/lib/authApi";
 
 const DELIVERY = [
@@ -170,7 +171,7 @@ export default function CheckoutPage() {
                   <img src={`/api/v1/products/${it.id}/image`} alt={it.name} style={{ position: "relative", zIndex: 1 }}
                     onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
                 </div>
-                <div><div className="nm">{it.name}</div><div className="qt">{it.quantity} шт{it.article ? ` · ${it.article}` : ""}</div></div>
+                <div><div className="nm" style={{ display: "inline-flex", alignItems: "center", gap: 5, flexWrap: "wrap" }}>{it.chestnyZnak && <ChestnyZnakBadge size={13} />}{it.name}</div><div className="qt">{it.quantity} шт{it.article ? ` · ${it.article}` : ""}</div></div>
                 <div className="pr">{formatPrice(Number(it.price) * it.quantity)}</div>
               </div>
             ))}

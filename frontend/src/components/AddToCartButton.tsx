@@ -13,7 +13,8 @@ export default function AddToCartButton({ product }: { product: Product }) {
 
   function handleAdd() {
     for (let i = 0; i < qty; i++) {
-      addItem({ id: product.id, name: product.name, article: product.article, price: product.price });
+      addItem({ id: product.id, name: product.name, article: product.article, price: product.price,
+        chestnyZnak: product.chestnyZnak });
     }
     setAdded(true);
     setTimeout(() => setAdded(false), 1500);

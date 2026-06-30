@@ -18,7 +18,8 @@ export default function AddToCartCard({ product }: { product: Product }) {
   function handleAdd() {
     const existing = items.find((i) => i.id === product.id)?.quantity ?? 0;
     setItemQuantity(
-      { id: product.id, name: product.name, article: product.article, price: product.price },
+      { id: product.id, name: product.name, article: product.article, price: product.price,
+        chestnyZnak: product.chestnyZnak },
       existing + qty,
     );
     setAdded(true);

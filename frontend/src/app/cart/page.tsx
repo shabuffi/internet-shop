@@ -5,6 +5,7 @@ import { useCart } from "@/context/CartContext";
 import { formatPrice } from "@/lib/format";
 import { MIN_ORDER_AMOUNT } from "@/lib/site";
 import { IconImage, IconCart } from "@/components/icons";
+import ChestnyZnakBadge from "@/components/ChestnyZnakBadge";
 
 export default function CartPage() {
   const { items, totalItems, totalAmount, removeItem, updateQuantity, clearCart } = useCart();
@@ -49,7 +50,10 @@ export default function CartPage() {
               </Link>
 
               <div>
-                <div className="lineitem__name">{item.name}</div>
+                <div className="lineitem__name" style={{ display: "inline-flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                  {item.chestnyZnak && <ChestnyZnakBadge size={14} />}
+                  {item.name}
+                </div>
                 {item.article && <div className="lineitem__sku">Арт. {item.article}</div>}
                 <div className="lineitem__controls">
                   <div className="qty qty--sm">

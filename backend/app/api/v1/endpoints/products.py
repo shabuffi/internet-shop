@@ -178,8 +178,10 @@ def list_products(
     if with_photo:
         query = query.where(Product.image_url.isnot(None), Product.image_url != "")
 
-    # Имя без кода склада «с1/с2 …» — для сортировки и оценки релевантности.
+    # Имя без кода склада «с1/с2 …» и без префикса «ЧЗ» (Честный знак) —
+    # для сортировки и оценки релевантности (товар «ЧЗ Апельсины» сортируется под «А»).
     clean_name = func.regexp_replace(Product.name, r"^[сcСC]\s?\d+[.\s]+\s*", "", "i")
+    clean_name = func.regexp_replace(clean_name, r"^\s*ЧЗ[\s.:\-]*", "", "i")
     if sort == "price_asc":
         query = query.order_by(Product.price.asc())
     elif sort == "price_desc":

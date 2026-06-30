@@ -19,6 +19,8 @@ export interface Product {
   is_active: boolean;
   category: Category | null;
   updated_at: string;
+  // Товар с обязательной маркировкой «Честный знак» (вычисляется на границе API).
+  chestnyZnak?: boolean;
 }
 
 export interface ProductListResponse {

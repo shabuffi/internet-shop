@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useCart } from "@/context/CartContext";
 import { formatPrice } from "@/lib/format";
 import { IconImage } from "@/components/icons";
+import ChestnyZnakBadge from "@/components/ChestnyZnakBadge";
 import type { Product } from "@/types/product";
 
 // Мини-фото с превью по наведению (большое фото рядом, не обрезанное).
@@ -102,7 +103,10 @@ export default function CatalogList({ products }: { products: Product[] }) {
               <tr key={p.id}>
                 <td style={td}><ProductThumb product={p} /></td>
                 <td style={td}>
-                  <Link href={`/products/${p.id}`} style={{ fontWeight: 600, color: "var(--ink)", textDecoration: "none" }}>{p.name}</Link>
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                    {p.chestnyZnak && <ChestnyZnakBadge size={15} />}
+                    <Link href={`/products/${p.id}`} style={{ fontWeight: 600, color: "var(--ink)", textDecoration: "none" }}>{p.name}</Link>
+                  </span>
                   {p.category?.name && <div style={{ fontSize: 12, color: "var(--ink-tertiary)" }}>{p.category.name}</div>}
                 </td>
                 <td style={{ ...td, color: "var(--ink-secondary)", fontVariantNumeric: "tabular-nums" }}>{p.article || "—"}</td>
@@ -127,8 +131,11 @@ export default function CatalogList({ products }: { products: Product[] }) {
           <div key={p.id} style={{ display: "flex", flexDirection: "column", gap: 10, padding: "12px 14px",
             borderTop: i === 0 ? "none" : "1px solid var(--hairline-soft)" }}>
             <div style={{ display: "flex", gap: 12, alignItems: "flex-start", justifyContent: "space-between" }}>
-              <Link href={`/products/${p.id}`} style={{ fontWeight: 600, color: "var(--ink)", textDecoration: "none",
-                fontSize: 14, lineHeight: 1.35 }}>{p.name}</Link>
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 6, minWidth: 0 }}>
+                {p.chestnyZnak && <ChestnyZnakBadge size={14} />}
+                <Link href={`/products/${p.id}`} style={{ fontWeight: 600, color: "var(--ink)", textDecoration: "none",
+                  fontSize: 14, lineHeight: 1.35 }}>{p.name}</Link>
+              </span>
               <span style={{ fontWeight: 700, whiteSpace: "nowrap", fontSize: 14 }}>
                 {Number(p.price) > 0 ? formatPrice(p.price) : "—"}
               </span>

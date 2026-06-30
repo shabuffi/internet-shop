@@ -1,5 +1,5 @@
 import type { Product, ProductListResponse, Category } from "@/types/product";
-import { cleanProductName, cleanCategoryName } from "@/lib/format";
+import { cleanProductName, cleanCategoryName, isChestnyZnak } from "@/lib/format";
 
 // Чистим отображаемые имена в одной точке — на границе API, чтобы префиксы
 // (код склада в товаре, числовой код в категории) исчезли везде: плитка, список,
@@ -9,7 +9,13 @@ function cleanCategory<T extends { name: string } | null>(c: T): T {
   return c ? { ...c, name: cleanCategoryName(c.name) } : c;
 }
 function cleanProduct(p: Product): Product {
-  return { ...p, name: cleanProductName(p.name), category: cleanCategory(p.category) };
+  // Флаг «Честный знак» определяем по СЫРОМУ имени (до очистки префикса).
+  return {
+    ...p,
+    chestnyZnak: isChestnyZnak(p.name),
+    name: cleanProductName(p.name),
+    category: cleanCategory(p.category),
+  };
 }
 
 // Внутри Docker-сети frontend обращается к backend по имени сервиса.
@@ -85,6 +91,18 @@ export interface StoreInfo {
   shop_name: string; contact_phone: string; contact_email: string; contact_hours: string;
   company_legal_name: string; company_inn: string; company_ogrn: string; warehouse_address: string;
   delivery_info: string;
+  has_logo?: boolean;
+  // Чат с менеджером
+  chat_mode?: string; // off | button | vk_widget
+  chat_enabled?: boolean; chat_service?: string; chat_value?: string; chat_label?: string;
+  chat_vk_api_id?: string; chat_vk_group_id?: string;
+  // Соцсети
+  social_vk?: string; social_telegram?: string; social_whatsapp?: string; social_instagram?: string;
+  // SEO
+  seo_title?: string; seo_description?: string; seo_og_title?: string; seo_og_description?: string;
+  seo_robots_index?: boolean;
+  // Тема
+  theme_primary?: string;
 }
 
 export async function getStoreInfo(): Promise<StoreInfo> {
