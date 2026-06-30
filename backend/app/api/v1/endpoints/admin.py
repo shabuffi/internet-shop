@@ -513,6 +513,38 @@ def save_settings(body: dict, db: Session = Depends(get_db), _=Depends(_get_curr
     return {"message": "Настройки сохранены"}
 
 
+# ─── Политика обработки ПД (редактор + реквизиты) ──────────────────
+
+@router.get("/policy")
+def get_policy(db: Session = Depends(get_db), _=Depends(_get_current_admin)):
+    """Текущая политика для редактора админки: тело, дата редакции, реквизиты."""
+    from app.services.legal_content import get_privacy
+    return get_privacy(db)
+
+
+@router.post("/policy")
+def save_policy(body: dict, db: Session = Depends(get_db), _=Depends(_get_current_admin)):
+    """Сохраняет политику: тело + дату редакции + реквизиты оператора.
+
+    Реквизиты пишутся в те же ключи настроек магазина (``company_legal_name`` и т.п.),
+    что и страница настроек, — данные едины для всего сайта.
+
+    Args:
+        body: ``{body, revision, operator: {name, inn, ogrn, address, email, phone}}``.
+    """
+    from app.services.legal_content import OPERATOR_KEYS
+    if "body" in body:
+        _set_setting(db, "privacy_body", str(body["body"]))
+    if "revision" in body:
+        _set_setting(db, "privacy_revision", str(body["revision"]))
+    operator = body.get("operator") or {}
+    for field, key in OPERATOR_KEYS.items():
+        if field in operator:
+            _set_setting(db, key, str(operator[field]))
+    db.commit()
+    return {"message": "Политика сохранена"}
+
+
 @router.post("/test-notification")
 def test_notification(channel: str | None = None, db: Session = Depends(get_db), _=Depends(_get_current_admin)):
     """Шлёт пробное уведомление в канал(ы) — Telegram / ВК / Email.
