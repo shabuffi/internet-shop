@@ -260,7 +260,7 @@ def dev_logout(response: Response):
 
 @router.get("/dev/settings")
 def get_dev_settings(db: Session = Depends(get_db), _=Depends(_get_current_dev)):
-    """Технические настройки: ключ сообщества ВК + SMTP-сервер. Секреты маскируем."""
+    """Технические настройки: ключ сообщества ВК + SMTP + настройки сайта. Секреты маскируем."""
     return {
         "vk_group_token":     "***" if _get_setting(db, "vk_group_token") else "",
         "vk_env":             bool(settings.VK_GROUP_TOKEN and settings.VK_PEER_ID),
@@ -269,6 +269,24 @@ def get_dev_settings(db: Session = Depends(get_db), _=Depends(_get_current_dev))
         "smtp_user":          _get_setting(db, "smtp_user"),
         "smtp_password":      "***" if _get_setting(db, "smtp_password") else "",
         "smtp_from":          _get_setting(db, "smtp_from"),
+        # ── Настройки сайта (раздел перенесён сюда, под пароль разработчика) ──
+        "chat_mode":          _get_setting(db, "chat_mode", "button"),
+        "chat_enabled":       _get_setting(db, "chat_enabled") == "1",
+        "chat_service":       _get_setting(db, "chat_service", "vk"),
+        "chat_value":         _get_setting(db, "chat_value"),
+        "chat_label":         _get_setting(db, "chat_label", "Чат с менеджером"),
+        "chat_vk_api_id":     _get_setting(db, "chat_vk_api_id"),
+        "chat_vk_group_id":   _get_setting(db, "chat_vk_group_id"),
+        "social_vk":          _get_setting(db, "social_vk"),
+        "social_telegram":    _get_setting(db, "social_telegram"),
+        "social_whatsapp":    _get_setting(db, "social_whatsapp"),
+        "social_instagram":   _get_setting(db, "social_instagram"),
+        "seo_title":          _get_setting(db, "seo_title"),
+        "seo_description":    _get_setting(db, "seo_description"),
+        "seo_og_title":       _get_setting(db, "seo_og_title"),
+        "seo_og_description": _get_setting(db, "seo_og_description"),
+        "seo_robots_index":   _get_setting(db, "seo_robots_index", "1") != "0",
+        "theme_primary":      _get_setting(db, "theme_primary"),
     }
 
 
@@ -391,15 +409,25 @@ def wipe_orders(db: Session = Depends(get_db), _=Depends(_get_current_dev)):
 
 @router.post("/dev/settings")
 def save_dev_settings(body: dict, db: Session = Depends(get_db), _=Depends(_get_current_dev)):
-    """Сохраняет технические настройки (ключ ВК + SMTP). Поля ``***`` пропускаются."""
+    """Сохраняет технические настройки (ключ ВК + SMTP + настройки сайта). ``***`` пропускаются."""
     allowed = {
         "vk_group_token",
         "smtp_host", "smtp_port", "smtp_user", "smtp_password", "smtp_from",
+        # Настройки сайта (перенесены на dev-страницу)
+        "chat_mode", "chat_enabled", "chat_service", "chat_value", "chat_label",
+        "chat_vk_api_id", "chat_vk_group_id",
+        "social_vk", "social_telegram", "social_whatsapp", "social_instagram",
+        "seo_title", "seo_description", "seo_og_title", "seo_og_description", "seo_robots_index",
+        "theme_primary",
     }
+    bool_keys = {"chat_enabled", "seo_robots_index"}
     for key, value in body.items():
         if key not in allowed or value == "***":
             continue
-        _set_setting(db, key, str(value))
+        if key in bool_keys:
+            _set_setting(db, key, "1" if value in (True, "1", "true", "on") else "0")
+        else:
+            _set_setting(db, key, str(value))
     db.commit()
     return {"message": "Настройки сохранены"}
 
@@ -501,6 +529,7 @@ def save_settings(body: dict, db: Session = Depends(get_db), _=Depends(_get_curr
         "exchange_login", "exchange_password",
         "vk_peer_id", "notify_email",
     }
+    # Настройки сайта (чат/соцсети/SEO/тема) перенесены на dev-страницу — см. save_dev_settings.
     for key, value in body.items():
         if key not in allowed or value == "***":
             continue
@@ -892,7 +921,7 @@ def delete_product_image(
 
 @router.get("/store-info")
 def store_info_public(db: Session = Depends(get_db)):
-    """Публичный эндпойнт — название магазина для фронтенда."""
+    """Публичный эндпойнт — настройки сайта для фронтенда (шапка/футер/чат/SEO/тема)."""
     return {
         "shop_name":          _get_setting(db, "shop_name", "Магазин"),
         "contact_phone":      _get_setting(db, "contact_phone"),
@@ -904,6 +933,28 @@ def store_info_public(db: Session = Depends(get_db)):
         "warehouse_address":  _get_setting(db, "warehouse_address"),
         "delivery_info":      _get_setting(db, "delivery_info"),
         "has_logo":           bool(_get_setting(db, "logo_file")),
+        # Чат с менеджером
+        "chat_mode":          _get_setting(db, "chat_mode", "button"),
+        "chat_enabled":       _get_setting(db, "chat_enabled") == "1",
+        "chat_service":       _get_setting(db, "chat_service", "vk"),
+        "chat_value":         _get_setting(db, "chat_value"),
+        "chat_label":         _get_setting(db, "chat_label", "Чат с менеджером"),
+        "chat_vk_api_id":     _get_setting(db, "chat_vk_api_id"),
+        "chat_vk_group_id":   _get_setting(db, "chat_vk_group_id"),
+        # Соцсети
+        "social_vk":          _get_setting(db, "social_vk"),
+        "social_telegram":    _get_setting(db, "social_telegram"),
+        "social_whatsapp":    _get_setting(db, "social_whatsapp"),
+        "social_instagram":   _get_setting(db, "social_instagram"),
+        # SEO (пустые → фронт берёт свои фолбэки)
+        "seo_title":          _get_setting(db, "seo_title"),
+        "seo_description":    _get_setting(db, "seo_description"),
+        "seo_og_title":       _get_setting(db, "seo_og_title"),
+        "seo_og_description": _get_setting(db, "seo_og_description"),
+        # Индексация по умолчанию включена; "0" — выключить
+        "seo_robots_index":   _get_setting(db, "seo_robots_index", "1") != "0",
+        # Тема
+        "theme_primary":      _get_setting(db, "theme_primary"),
     }
 
 

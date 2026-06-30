@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { devFetch } from "@/lib/adminApi";
+import SiteSettingsCard from "@/components/SiteSettingsCard";
 
 // Техническая форма (обмен / ВК / SMTP). Поля приходят с /dev/settings.
 interface DevForm {
@@ -32,7 +33,14 @@ export default function DevPage() {
   async function loadSettings(): Promise<boolean> {
     try {
       const d = await devFetch<DevForm>("/dev/settings");
-      setForm(d); setAuthed(true); return true;
+      // Берём только vk/smtp-поля: настройки сайта живут в отдельной карточке
+      // (SiteSettingsCard) со своим сохранением — иначе эта форма их перезатрёт.
+      setForm({
+        vk_group_token: d.vk_group_token, vk_env: d.vk_env,
+        smtp_host: d.smtp_host, smtp_port: d.smtp_port, smtp_user: d.smtp_user,
+        smtp_password: d.smtp_password, smtp_from: d.smtp_from,
+      });
+      setAuthed(true); return true;
     } catch { return false; }
   }
 
@@ -131,6 +139,7 @@ export default function DevPage() {
           </form>
         </div>
       ) : (
+        <>
         <div style={card}>
           <form onSubmit={handleSave}>
             {/* ВК — ключ сообщества (peer_id владелец вводит у себя в Настройках) */}
@@ -251,6 +260,8 @@ export default function DevPage() {
             {ordersMsg && <p style={{ marginTop: 10, fontSize: 13, color: "var(--ink-secondary)" }}>{ordersMsg}</p>}
           </div>
         </div>
+        <SiteSettingsCard />
+        </>
       )}
     </div>
   );
