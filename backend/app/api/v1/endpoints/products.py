@@ -91,18 +91,37 @@ def list_categories(db: Session = Depends(get_db)):
                 d += 1
         return d
 
-    # Категории с кодом — в порядке кода (дети идут за родителем); без кода — по имени в конце.
+    def sort_key(name: str) -> str:
+        # Ключ = отображаемое имя без числового код-префикса (как cleanCategoryName на фронте),
+        # в нижнем регистре, ё→е — для стабильной алфавитной сортировки по-русски.
+        cleaned = re.sub(r"^\d[\d.]*\.[\d.]*\s+", "", name).strip() or name
+        return cleaned.casefold().replace("ё", "е")
+
+    # parent_id / depth для каждой категории (иерархия — из кода; без кода — корень)
+    info: dict[str, tuple[str | None, int, str, Category]] = {}
+    for c in cats:
+        code = code_of(c.name)
+        if code:
+            pc = parent_code(code)
+            info[c.id] = (by_code[pc].id if pc else None, depth_of(code), sort_key(c.name), c)
+        else:
+            info[c.id] = (None, 0, sort_key(c.name), c)
+
+    children: dict[str | None, list[str]] = {}
+    for cid, (pid, _d, _k, _c) in info.items():
+        children.setdefault(pid, []).append(cid)
+
+    # Обход в глубину: на каждом уровне сортируем детей по алфавиту (Python sort стабилен),
+    # дети идут сразу за родителем — дерево сохраняется, но упорядочено по алфавиту.
     out: list[CategoryOut] = []
-    for code in sorted(by_code.keys()):
-        c = by_code[code]
-        pc = parent_code(code)
-        out.append(CategoryOut(
-            id=c.id, name=c.name,
-            parent_id=by_code[pc].id if pc else None,
-            depth=depth_of(code),
-        ))
-    for c in sorted((c for c in cats if code_of(c.name) is None), key=lambda c: c.name):
-        out.append(CategoryOut(id=c.id, name=c.name, parent_id=None, depth=0))
+
+    def emit(pid: str | None) -> None:
+        for cid in sorted(children.get(pid, []), key=lambda x: info[x][2]):
+            pid2, depth, _k, c = info[cid]
+            out.append(CategoryOut(id=c.id, name=c.name, parent_id=pid2, depth=depth))
+            emit(cid)
+
+    emit(None)
     return out
 
 

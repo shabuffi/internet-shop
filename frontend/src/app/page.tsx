@@ -17,7 +17,7 @@ const TILES = [
   { icon: "cat-stationery", title: "Канцтовары" },
   { icon: "cat-shoes", title: "Обувь" },
   { icon: "cat-socks", title: "Носки" },
-  { icon: "cat-jewelry", title: "Бижутерия" },
+  { icon: "cat-hair", title: "Аксессуары для волос" },
 ];
 
 const trustIcon: Record<string, React.ReactNode> = {
@@ -169,7 +169,7 @@ export default async function HomePage() {
       <div className="container section">
         <div className="section-head">
           <div>
-            <h2 className="section-title">Категории товаров</h2>
+            <h2 className="section-title section-title--caps">Популярные разделы</h2>
             <p className="lead">Полный ассортимент для дома, дачи и магазина — выберите раздел и оформите заказ онлайн.</p>
           </div>
           <Link href="/catalog" className="see-all">
