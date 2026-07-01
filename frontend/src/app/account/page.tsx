@@ -4,18 +4,24 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
-  getMe, logoutUser, getMyOrders, CUSTOMER_TYPE_LABEL, ORDER_STATUS_LABEL,
+  getMe, logoutUser, getMyOrders, CUSTOMER_TYPE_LABEL,
   type UserProfile, type OrderHistory,
 } from "@/lib/authApi";
 import { formatPrice, formatMsk } from "@/lib/format";
 
-function formatAdjustment(percent: string): string {
-  const n = parseFloat(percent);
-  if (Number.isNaN(n)) return "—";
-  if (n < 0) return `скидка ${Math.abs(n)}%`;
-  if (n > 0) return `наценка +${n}%`;
-  return "базовая цена";
-}
+// Статусы для покупателя. МойСклад не возвращает статусы исполнения обратно на сайт
+// (обмен заказами — односторонний, вверх), поэтому «new» показываем как «Принят»
+// (заказ получен), а не как техническое «Новый». «cancelled» ставит админ.
+const BUYER_ORDER_STATUS: Record<string, string> = {
+  new: "Принят",
+  confirmed: "Подтверждён",
+  shipped: "Отгружен",
+  delivered: "Доставлен",
+  cancelled: "Отменён",
+};
+
+// Сколько позиций заказа показывать до нажатия «Показать полностью».
+const ORDER_ITEMS_PREVIEW = 3;
 
 export default function AccountPage() {
   const router = useRouter();
@@ -48,7 +54,6 @@ export default function AccountPage() {
     ["Тип заказчика", CUSTOMER_TYPE_LABEL[user.customer_type] ?? user.customer_type],
     ["Наименование", user.customer_name],
     ...(user.inn ? [["ИНН", user.inn] as [string, string]] : []),
-    ["Цена для вас", formatAdjustment(user.discount_percent)],
   ];
 
   return (
@@ -84,26 +89,44 @@ export default function AccountPage() {
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: "var(--s-4)" }}>
           {orders.map((o) => (
-            <div key={o.id} style={{ background: "var(--paper)", border: "1px solid var(--hairline, #eee)", borderRadius: "var(--r-xl)", padding: "var(--s-5)", boxShadow: "var(--shadow-1)" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: "var(--s-3)", marginBottom: "var(--s-3)" }}>
-                <span style={{ fontWeight: 700 }}>{o.number}</span>
-                <span style={{ fontSize: "var(--t-sm)", color: "var(--charcoal)" }}>{formatMsk(o.created_at)}</span>
-              </div>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: "var(--s-3)", marginBottom: "var(--s-3)" }}>
-                <span style={{ fontSize: "var(--t-sm)", fontWeight: 600, color: o.status === "cancelled" ? "var(--charcoal)" : "var(--primary, #003399)", background: "var(--surface, #f5f6f8)", padding: "2px 10px", borderRadius: 999 }}>{ORDER_STATUS_LABEL[o.status] ?? o.status}</span>
-                <span style={{ fontWeight: 700 }}>{formatPrice(o.total_amount)}</span>
-              </div>
-              <ul style={{ listStyle: "none", margin: 0, padding: 0, fontSize: "var(--t-sm)", color: "var(--ink)" }}>
-                {o.items.map((it, i) => (
-                  <li key={i} style={{ display: "flex", justifyContent: "space-between", gap: "var(--s-3)", padding: "var(--s-1) 0", borderTop: i ? "1px solid var(--hairline, #f0f0f0)" : "none" }}>
-                    <span>{it.product_name} <span style={{ color: "var(--charcoal)" }}>× {it.quantity}</span></span>
-                    <span style={{ whiteSpace: "nowrap" }}>{formatPrice(it.price)}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
+            <OrderCard key={o.id} order={o} />
           ))}
         </div>
+      )}
+    </div>
+  );
+}
+
+// Карточка заказа с компактной историей: длинный список позиций сворачивается.
+function OrderCard({ order }: { order: OrderHistory }) {
+  const [expanded, setExpanded] = useState(false);
+  const hiddenCount = order.items.length - ORDER_ITEMS_PREVIEW;
+  const shown = expanded ? order.items : order.items.slice(0, ORDER_ITEMS_PREVIEW);
+
+  return (
+    <div style={{ background: "var(--paper)", border: "1px solid var(--hairline, #eee)", borderRadius: "var(--r-xl)", padding: "var(--s-5)", boxShadow: "var(--shadow-1)" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: "var(--s-3)", marginBottom: "var(--s-3)" }}>
+        <span style={{ fontWeight: 700 }}>{order.number}</span>
+        <span style={{ fontSize: "var(--t-sm)", color: "var(--charcoal)" }}>{formatMsk(order.created_at)}</span>
+      </div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: "var(--s-3)", marginBottom: "var(--s-3)" }}>
+        <span style={{ fontSize: "var(--t-sm)", fontWeight: 600, color: order.status === "cancelled" ? "var(--charcoal)" : "var(--primary, #003399)", background: "var(--surface, #f5f6f8)", padding: "2px 10px", borderRadius: 999 }}>{BUYER_ORDER_STATUS[order.status] ?? order.status}</span>
+        <span style={{ fontWeight: 700 }}>{formatPrice(order.total_amount)}</span>
+      </div>
+      <ul style={{ listStyle: "none", margin: 0, padding: 0, fontSize: "var(--t-sm)", color: "var(--ink)" }}>
+        {shown.map((it, i) => (
+          <li key={i} style={{ display: "flex", justifyContent: "space-between", gap: "var(--s-3)", padding: "var(--s-1) 0", borderTop: i ? "1px solid var(--hairline, #f0f0f0)" : "none" }}>
+            <span>{it.product_name} <span style={{ color: "var(--charcoal)" }}>× {it.quantity}</span></span>
+            <span style={{ whiteSpace: "nowrap" }}>{formatPrice(it.price)}</span>
+          </li>
+        ))}
+      </ul>
+      {hiddenCount > 0 && (
+        <button type="button" onClick={() => setExpanded((e) => !e)} className="link"
+          style={{ marginTop: "var(--s-3)", background: "none", border: "none", padding: 0, cursor: "pointer",
+            color: "var(--primary, #003399)", fontSize: "var(--t-sm)", fontWeight: 600 }}>
+          {expanded ? "Свернуть" : `Показать полностью (ещё ${hiddenCount})`}
+        </button>
       )}
     </div>
   );
