@@ -287,6 +287,8 @@ def get_dev_settings(db: Session = Depends(get_db), _=Depends(_get_current_dev))
         "seo_og_description": _get_setting(db, "seo_og_description"),
         "seo_robots_index":   _get_setting(db, "seo_robots_index", "1") != "0",
         "theme_primary":      _get_setting(db, "theme_primary"),
+        "banners_enabled":    _get_setting(db, "banners_enabled", "0") == "1",
+        "home_banners":       _get_setting(db, "home_banners"),
     }
 
 
@@ -418,9 +420,9 @@ def save_dev_settings(body: dict, db: Session = Depends(get_db), _=Depends(_get_
         "chat_vk_api_id", "chat_vk_group_id",
         "social_vk", "social_telegram", "social_whatsapp", "social_instagram",
         "seo_title", "seo_description", "seo_og_title", "seo_og_description", "seo_robots_index",
-        "theme_primary",
+        "theme_primary", "home_banners", "banners_enabled",
     }
-    bool_keys = {"chat_enabled", "seo_robots_index"}
+    bool_keys = {"chat_enabled", "seo_robots_index", "banners_enabled"}
     for key, value in body.items():
         if key not in allowed or value == "***":
             continue
@@ -955,6 +957,9 @@ def store_info_public(db: Session = Depends(get_db)):
         "seo_robots_index":   _get_setting(db, "seo_robots_index", "1") != "0",
         # Тема
         "theme_primary":      _get_setting(db, "theme_primary"),
+        # Баннеры слайдера (в каталоге): включён ли показ + JSON-массив (по умолчанию выкл.)
+        "banners_enabled":    _get_setting(db, "banners_enabled", "0") == "1",
+        "home_banners":       _get_setting(db, "home_banners"),
     }
 
 
@@ -998,6 +1003,34 @@ def get_logo(db: Session = Depends(get_db)):
     result = media_storage.read_image(name) if name else None
     if result is None:
         raise HTTPException(status_code=404, detail="Логотип не задан")
+    data, content_type = result
+    return Response(content=data, media_type=content_type,
+                    headers={"Cache-Control": "public, max-age=300"})
+
+
+# ─── Загрузка изображений (баннеры и т.п.) ─────────────────────────
+
+@router.post("/dev/upload-image")
+async def dev_upload_image(file: UploadFile = File(...), _=Depends(_get_current_dev)):
+    """Загружает изображение (для баннеров) и возвращает URL его отдачи.
+
+    Файл кладётся в общее медиа-хранилище; ссылка вида ``/api/v1/admin/media/<name>``
+    подставляется в поле картинки баннера. Только для разработчика.
+    """
+    data = await file.read()
+    try:
+        name = media_storage.save_upload(file.filename or "banner.jpg", data)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Можно загружать только изображения")
+    return {"name": name, "url": f"/api/v1/admin/media/{name}"}
+
+
+@router.get("/media/{name}")
+def get_media(name: str):
+    """Публичная отдача загруженного изображения по имени файла."""
+    result = media_storage.read_image(name)
+    if result is None:
+        raise HTTPException(status_code=404, detail="Файл не найден")
     data, content_type = result
     return Response(content=data, media_type=content_type,
                     headers={"Cache-Control": "public, max-age=300"})
@@ -1066,3 +1099,24 @@ def set_user_discount(
     db.commit()
     db.refresh(user)
     return user
+
+
+@router.delete("/users/{user_id}")
+def delete_user(user_id: str, db: Session = Depends(get_db), _=Depends(_get_current_admin)):
+    """Удаляет покупателя (только для админа).
+
+    Заказы покупателя сохраняются: ссылка ``orders.user_id`` обнуляется явно
+    (заказ становится «гостевым»), затем удаляется сам аккаунт.
+
+    Raises:
+        HTTPException: 404, если покупатель не найден.
+    """
+    user = db.get(Customer, user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="Покупатель не найден")
+    # Отвязываем заказы (не удаляем их) — история заказов остаётся в системе
+    for o in db.scalars(select(Order).where(Order.user_id == user_id)):
+        o.user_id = None
+    db.delete(user)
+    db.commit()
+    return {"message": "Покупатель удалён", "id": user_id}

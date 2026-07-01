@@ -65,3 +65,15 @@ export async function devFetch<T>(path: string, init?: RequestInit): Promise<T> 
   }
   return res.json();
 }
+
+// Загрузка файла на dev-эндпоинт (multipart). Content-Type не ставим — браузер сам.
+export async function devUpload<T>(path: string, formData: FormData): Promise<T> {
+  const res = await fetch(`${API}${path}`, {
+    method: "POST", body: formData, credentials: "same-origin", cache: "no-store",
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: res.statusText }));
+    throw Object.assign(new Error(err.detail ?? "Ошибка загрузки"), { status: res.status });
+  }
+  return res.json();
+}

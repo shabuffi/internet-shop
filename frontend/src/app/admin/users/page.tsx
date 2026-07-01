@@ -15,6 +15,7 @@ const TYPE_LABEL: Record<string, string> = { individual: "Физлицо", ip: "
 export default function AdminUsersPage() {
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [savingId, setSavingId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [error, setError] = useState("");
 
   function load() {
@@ -44,6 +45,20 @@ export default function AdminUsersPage() {
     }
   }
 
+  async function deleteUser(id: string, name: string) {
+    if (!confirm(`Удалить покупателя «${name}»? Аккаунт будет удалён безвозвратно. Его заказы сохранятся (станут гостевыми).`)) return;
+    setError("");
+    setDeletingId(id);
+    try {
+      await adminFetch(`/users/${id}`, { method: "DELETE" });
+      setUsers((us) => us.filter((u) => u.id !== id));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Не удалось удалить");
+    } finally {
+      setDeletingId(null);
+    }
+  }
+
   return (
     <AdminShell>
       <div style={{ display: "flex", alignItems: "baseline", gap: 12, marginBottom: 32 }}>
@@ -64,8 +79,8 @@ export default function AdminUsersPage() {
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
             <thead>
               <tr style={{ borderBottom: "1px solid var(--hairline-soft)" }}>
-                {["Наименование", "Тип", "ИНН", "Email", "Телефон", "Скидка %", "Регистрация"].map((h) => (
-                  <th key={h} style={{ padding: "12px 16px", textAlign: "left", fontWeight: 600, color: "var(--ink-secondary)", fontSize: 12 }}>{h}</th>
+                {["Наименование", "Тип", "ИНН", "Email", "Телефон", "Скидка %", "Регистрация", ""].map((h, i) => (
+                  <th key={h || i} style={{ padding: "12px 16px", textAlign: "left", fontWeight: 600, color: "var(--ink-secondary)", fontSize: 12 }}>{h}</th>
                 ))}
               </tr>
             </thead>
@@ -90,6 +105,15 @@ export default function AdminUsersPage() {
                     />
                   </td>
                   <td style={{ padding: "14px 16px", color: "var(--ink-secondary)" }}>{formatMsk(u.created_at)}</td>
+                  <td style={{ padding: "14px 16px", textAlign: "right" }}>
+                    <button type="button" onClick={() => deleteUser(u.id, u.customer_name)} disabled={deletingId === u.id}
+                      title="Удалить покупателя"
+                      style={{ padding: "6px 12px", borderRadius: 8, cursor: deletingId === u.id ? "default" : "pointer",
+                        border: "1px solid var(--danger, #c0392b)", background: "transparent",
+                        color: "var(--danger, #c0392b)", fontSize: 13, fontWeight: 600, opacity: deletingId === u.id ? 0.5 : 1 }}>
+                      {deletingId === u.id ? "Удаление…" : "Удалить"}
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>
