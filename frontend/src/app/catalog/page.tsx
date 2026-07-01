@@ -1,10 +1,12 @@
 export const dynamic = 'force-dynamic';
 
 import Link from "next/link";
-import { getProducts, getCategories } from "@/lib/api";
+import { getProducts, getCategories, getStoreInfo } from "@/lib/api";
 import { CATEGORY_GROUPS } from "@/lib/categoryGroups";
+import { parseBanners } from "@/lib/banners";
 import type { Category } from "@/types/product";
 import { formatPrice } from "@/lib/format";
+import Slider from "@/components/Slider";
 import AddToCartCard from "@/components/AddToCartCard";
 import ChestnyZnakBadge from "@/components/ChestnyZnakBadge";
 import CatalogList from "@/components/CatalogList";
@@ -70,13 +72,17 @@ export default async function CatalogPage({ searchParams }: Props) {
   const sort = params.sort === "price_asc" || params.sort === "price_desc" ? params.sort : "name";
   const withPhoto = params.photo === "1";
 
-  const [data, categories] = await Promise.all([
+  const [data, categories, store] = await Promise.all([
     // В списке («бланк заказа») показываем больше товаров на странице
     getProducts({ category_id: categoryId, search, page, sort, with_photo: withPhoto, page_size: listView ? 100 : undefined }),
     getCategories(),
+    getStoreInfo().catch(() => null),
   ]);
 
   const categoryLabel = resolveCategoryLabel(categoryId, categories);
+  // Слайдер баннеров — на общем каталоге (без выбранной категории/поиска), только если явно включён.
+  const showBanners = !categoryId && !search && store?.banners_enabled === true;
+  const banners = showBanners ? parseBanners(store?.home_banners) : [];
 
   const toggle = (active: boolean): React.CSSProperties => ({
     display: "flex", alignItems: "center", justifyContent: "center", padding: "7px 12px", textDecoration: "none",
@@ -113,7 +119,14 @@ export default async function CatalogPage({ searchParams }: Props) {
         </div>
       </div>
 
-      <div className="container section" style={{ paddingTop: "var(--s-12)" }}>
+      {/* Слайдер баннеров — под заголовком каталога, на белом фоне (без шва) */}
+      {banners.length > 0 && (
+        <div className="container" style={{ marginTop: "var(--s-8)" }}>
+          <Slider banners={banners} />
+        </div>
+      )}
+
+      <div className="container section" style={{ paddingTop: banners.length > 0 ? "var(--s-8)" : "var(--s-16)" }}>
         {/* Поиск — на мобильных (в шапке он скрыт) */}
         <form action="/catalog" method="get" className="search only-mobile" style={{ width: "100%", marginBottom: "var(--s-5)" }}>
           {categoryId && <input type="hidden" name="category_id" value={categoryId} />}

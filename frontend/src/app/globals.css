@@ -746,7 +746,10 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .
 .breadcrumb { display: flex; align-items: center; gap: var(--s-2); color: var(--graphite); font-size: var(--t-sm); padding: var(--s-6) 0 0; flex-wrap: wrap; }
 .breadcrumb a { cursor: pointer; }
 .breadcrumb a:hover { color: var(--ink); }
-.section-title { font-family: var(--font-display); font-size: var(--t-h2); font-weight: 600; letter-spacing: -.01em; margin: 0 0 var(--s-6); }
+/* Заголовки секций — капсом (короткие заголовки, не абзацы) */
+.section-title { font-family: var(--font-display); font-size: var(--t-h2); font-weight: 700; text-transform: uppercase; letter-spacing: .02em; margin: 0 0 var(--s-6); }
+/* Модификатор оставлен для совместимости (доп. разрядка на акцентных секциях) */
+.section-title--caps { letter-spacing: .04em; }
 .notice { background: var(--accent-soft); color: var(--accent-deep); border-radius: var(--r-md); padding: var(--s-3) var(--s-4); font-size: var(--t-sm); display: flex; gap: var(--s-3); align-items: center; }
 .form-error { color: var(--error); font-size: var(--t-sm); }
 
@@ -903,6 +906,12 @@ textarea.form-input { height: auto; min-height: 90px; padding: var(--s-3) var(--
   .chat-fab { padding: 0 !important; width: 52px; justify-content: center; }
   .chat-fab__label { display: none; }
 }
+
+/* Слайдер баннеров на главной — адаптивная высота */
+.slider { height: clamp(190px, 30vw, 340px); }
+.slider__slide { transition: none; }
+.slider__cta { transition: transform .15s, box-shadow .15s; }
+.slider__slide:hover .slider__cta { transform: translateY(-1px); box-shadow: 0 8px 22px rgba(0,0,0,.22); }
 
 /* Пульсация кнопки «Регистрация» в баннере — привлекает внимание */
 @keyframes btn-pulse {

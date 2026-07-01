@@ -103,6 +103,9 @@ export interface StoreInfo {
   seo_robots_index?: boolean;
   // Тема
   theme_primary?: string;
+  // Баннеры слайдера (в каталоге) — редактируется в dev-настройках
+  banners_enabled?: boolean;
+  home_banners?: string;
 }
 
 export async function getStoreInfo(): Promise<StoreInfo> {
