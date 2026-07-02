@@ -2,7 +2,7 @@ export const dynamic = 'force-dynamic';
 
 import Link from "next/link";
 import { getProducts, getCategories, getStoreInfo } from "@/lib/api";
-import { CATEGORY_GROUPS } from "@/lib/categoryGroups";
+import { CATEGORY_GROUPS, normCatName } from "@/lib/categoryGroups";
 import { parseBanners } from "@/lib/banners";
 import type { Category } from "@/types/product";
 import { formatPrice } from "@/lib/format";
@@ -41,11 +41,11 @@ function resolveCategoryLabel(categoryId: string | undefined, categories: Catego
   if (ids.length === 1) {
     return categories.find((c) => c.id === ids[0])?.name ?? null;
   }
-  const norm = (s: string) => s.trim().toLowerCase();
-  const byName = new Map(categories.map((c) => [norm(c.name), c.id]));
+  // Та же нормализация, что и в плитке на главной (normCatName) — иначе набор id не совпадёт.
+  const byName = new Map(categories.map((c) => [normCatName(c.name), c.id]));
   const urlSet = new Set(ids);
   for (const [label, names] of Object.entries(CATEGORY_GROUPS)) {
-    const gids = names.map((n) => byName.get(norm(n))).filter(Boolean) as string[];
+    const gids = names.map((n) => byName.get(normCatName(n))).filter(Boolean) as string[];
     if (gids.length === urlSet.size && gids.every((id) => urlSet.has(id))) return label;
   }
   return null;

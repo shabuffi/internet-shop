@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useCart } from "@/context/CartContext";
+import QtyField from "@/components/QtyField";
 import type { Product } from "@/types/product";
 
 /** Кнопка «В корзину» для карточки каталога с выбором количества (− n +). */
@@ -31,9 +32,7 @@ export default function AddToCartCard({ product }: { product: Product }) {
     <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "stretch" }}>
       <div className="qty qty--sm" style={{ alignSelf: "flex-end" }}>
         <button onClick={() => setQty((q) => Math.max(1, q - 1))} disabled={qty <= 1} aria-label="Меньше">−</button>
-        <input type="text" inputMode="numeric" value={qty} aria-label="Количество"
-          onChange={(e) => { const n = parseInt(e.target.value.replace(/\D/g, ""), 10); setQty(Number.isNaN(n) ? 1 : Math.max(1, Math.min(9999, n))); }}
-          onFocus={(e) => e.target.select()} />
+        <QtyField value={qty} onCommit={setQty} />
         <button onClick={() => setQty((q) => q + 1)} aria-label="Больше">+</button>
       </div>
       <button className="btn btn--sm btn--primary btn--block" onClick={handleAdd}>

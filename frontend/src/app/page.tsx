@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 
 import Link from "next/link";
 import { getCategories } from "@/lib/api";
-import { CATEGORY_GROUPS } from "@/lib/categoryGroups";
+import { CATEGORY_GROUPS, normCatName } from "@/lib/categoryGroups";
 import DeliveryMap from "@/components/DeliveryMap";
 import RegionsMarquee from "@/components/RegionsMarquee";
 import Reveal from "@/components/Reveal";
@@ -89,19 +89,10 @@ export default async function HomePage() {
   // Имена группы резолвим в реальные category_id и склеиваем через запятую (бэкенд понимает
   // список). Если ни одна категория группы не нашлась — fallback на поиск по названию плитки.
   function tileHref(title: string): string {
-    // Устойчивая нормализация: регистр, ё→е, латиница-двойники (c→с, o→о…), затем
-    // выкидываем всё кроме кириллицы/цифр. Так точки/пробелы/«C» латиницей в названиях
-    // МойСклад не ломают сопоставление с группой (см. categoryGroups.ts).
-    const LOOK: Record<string, string> = {
-      c: "с", a: "а", e: "е", o: "о", p: "р", x: "х", y: "у", k: "к",
-      m: "м", t: "т", h: "н", b: "в", n: "н",
-    };
-    const norm = (s: string) =>
-      s.toLowerCase().replace(/ё/g, "е")
-        .split("").map((ch) => LOOK[ch] ?? ch).join("")
-        .replace(/[^а-я0-9]/g, "");
-    const names = new Set((CATEGORY_GROUPS[title] ?? []).map(norm));
-    const ids = categories.filter((c) => names.has(norm(c.name))).map((c) => c.id);
+    // Единая нормализация имён (см. categoryGroups.normCatName) — тот же набор id, что и
+    // распознаёт каталог в заголовок раздела.
+    const names = new Set((CATEGORY_GROUPS[title] ?? []).map(normCatName));
+    const ids = categories.filter((c) => names.has(normCatName(c.name))).map((c) => c.id);
     if (ids.length) return `/catalog?category_id=${ids.join(",")}`;
     return `/catalog?search=${encodeURIComponent(title)}`;
   }
