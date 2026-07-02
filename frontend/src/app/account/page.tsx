@@ -48,6 +48,23 @@ export default function AccountPage() {
     return <div className="container" style={{ padding: "var(--s-8) var(--s-4)", color: "var(--charcoal)" }}>Загрузка…</div>;
   }
 
+  // Новый аккаунт ждёт активации сотрудником ТД — доступа к ЛК пока нет.
+  if (!user.is_active) {
+    return (
+      <div className="container" style={{ maxWidth: 520, margin: "0 auto", padding: "var(--s-12) var(--s-4)", textAlign: "center" }}>
+        <h1 style={{ fontFamily: "var(--font-display)", fontSize: "var(--t-h1)", margin: "0 0 var(--s-3)" }}>
+          Ожидайте активации учётной записи
+        </h1>
+        <p style={{ color: "var(--charcoal)", lineHeight: 1.6, margin: "0 0 var(--s-6)" }}>
+          Спасибо за регистрацию! Ваш аккаунт проверяет сотрудник ТД «Инженер». После активации
+          вы получите доступ к личному кабинету и персональным ценам. Обычно это занимает
+          немного времени.
+        </p>
+        <button type="button" className="btn btn--ghost" onClick={handleLogout}>Выйти</button>
+      </div>
+    );
+  }
+
   const rows: [string, string][] = [
     ["Email", user.email],
     ["Телефон", user.phone],

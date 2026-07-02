@@ -140,3 +140,33 @@ export function IconDoc(p: SVGProps<SVGSVGElement>) {
     </svg>
   );
 }
+
+// Галочка в кружке — статус «Активен».
+export function IconCheckCircle(p: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base} width="1em" height="1em" {...p}>
+      <circle cx="12" cy="12" r="9" />
+      <polyline points="8.5 12 11 14.5 15.5 9" />
+    </svg>
+  );
+}
+
+// Часы — статус «Ожидает активации».
+export function IconClock(p: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base} width="1em" height="1em" {...p}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 7.5V12l3 1.8" />
+    </svg>
+  );
+}
+
+// Карандаш — редактировать.
+export function IconPencil(p: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base} width="1em" height="1em" {...p}>
+      <path d="M12 20h9" />
+      <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z" />
+    </svg>
+  );
+}

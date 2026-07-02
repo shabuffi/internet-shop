@@ -22,17 +22,16 @@ async function fillCommon(page: Page, email: string, password = "Passw0rd!23") {
 }
 
 test.describe("Регистрация покупателя", () => {
-  test("физлицо: успешная регистрация → личный кабинет", async ({ page }) => {
+  test("физлицо: успешная регистрация → ожидание активации", async ({ page }) => {
     const email = uniqueEmail();
     await fillCommon(page, email);
     // тип по умолчанию — «Физическое лицо»; ИНН не требуется
     await page.getByPlaceholder("Иванов Иван Иванович").fill("Тестов Тест Тестович");
     await page.getByRole("button", { name: "Зарегистрироваться" }).click();
 
-    // редирект в кабинет, профиль показывает email
+    // новый аккаунт создаётся неактивным → редирект в кабинет с заглушкой активации
     await expect(page).toHaveURL(/\/account/);
-    await expect(page.getByRole("heading", { name: "Личный кабинет" })).toBeVisible();
-    await expect(page.getByText(email)).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Ожидайте активации учётной записи" })).toBeVisible();
   });
 
   test("ООО: регистрация с корректным ИНН", async ({ page }) => {
@@ -44,7 +43,7 @@ test.describe("Регистрация покупателя", () => {
     await page.getByRole("button", { name: "Зарегистрироваться" }).click();
 
     await expect(page).toHaveURL(/\/account/);
-    await expect(page.getByText(email)).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Ожидайте активации учётной записи" })).toBeVisible();
   });
 
   test("дубликат email → понятная ошибка", async ({ page }) => {
