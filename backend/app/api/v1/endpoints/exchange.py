@@ -40,6 +40,17 @@ _SESSION_KEY = "exchange:session_token"
 _FILE_KEY = "exchange:file:{name}"          # сырой XML текущей сессии
 _TTL = 3600                                  # 1 час — сессия обмена не длится дольше
 
+# Метка последнего контакта МойСклад — для мониторинга простоя обмена (без TTL, переживает паузы)
+_LAST_SEEN_KEY = "exchange:last_seen"
+
+
+def _touch_exchange_seen() -> None:
+    """Отмечает момент последнего обращения МойСклад к обмену (для алерта о простое)."""
+    try:
+        redis_client.set(_LAST_SEEN_KEY, datetime.now(timezone.utc).isoformat())
+    except Exception:
+        pass
+
 
 def _file_key(name: str) -> str:
     """Формирует Redis-ключ для сырого XML-файла обмена.
@@ -234,6 +245,7 @@ async def exchange_get(
     # Временное логирование протокола (Этап 0 миграции на CommerceML): видеть, какие
     # mode/type шлёт МойСклад — особенно запрос заказов (type=sale&mode=query).
     logger.info("EXCHANGE GET mode=%s type=%s filename=%s", mode, type, filename)
+    _touch_exchange_seen()   # МойСклад на связи (checkauth идёт в начале каждой сессии)
 
     # ── Шаг 1: checkauth ──────────────────────────────────────────────────────
     # Стандарт 1С требует ровно три строки: "success", имя куки, значение куки

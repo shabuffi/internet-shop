@@ -183,3 +183,80 @@ def notify_new_registration(user_id: str):
         return {"sent": sent}
     finally:
         db.close()
+
+
+@celery_app.task(name="app.tasks.notify.check_exchange_health")
+def check_exchange_health():
+    """Beat-задача: следит, что МойСклад выходит на обмен. Алерт владельцу при простое.
+
+    «Последний контакт» пишется в Redis при каждом заходе МойСклад (``exchange.py``).
+    Если контакта не было дольше ``EXCHANGE_STALE_HOURS`` — шлём предупреждение владельцу
+    (ВК/email), но не чаще раза в тот же период (флаг-кулдаун в Redis). Как только обмен
+    возобновится — флаг сбрасывается, и следующий простой снова даст алерт.
+
+    Returns:
+        Словарь со статусом проверки (``ok`` / ``stale`` / ``no_data``).
+    """
+    from datetime import datetime, timezone
+    from app.core.config import settings
+    from app.core.redis_client import redis_client
+    from app.db.session import SessionLocal
+    from app.db.models.admin import ShopSettings
+    from app.integrations.notify import get_notify_config, send_vk
+    from app.integrations.email import send_email
+
+    LAST_SEEN_KEY = "exchange:last_seen"
+    ALERTED_KEY = "exchange:stale_alerted"
+    threshold_h = settings.EXCHANGE_STALE_HOURS
+
+    raw = redis_client.get(LAST_SEEN_KEY)
+    if not raw:
+        # Обмена ещё не было ни разу (свежая установка) — не шумим.
+        return {"status": "no_data"}
+
+    try:
+        last = datetime.fromisoformat(raw.decode() if isinstance(raw, bytes) else raw)
+        if last.tzinfo is None:
+            last = last.replace(tzinfo=timezone.utc)
+    except Exception:
+        return {"status": "no_data"}
+
+    age_h = (datetime.now(timezone.utc) - last).total_seconds() / 3600
+
+    # Обмен свежий → снимаем флаг, чтобы следующий простой снова дал алерт.
+    if age_h < threshold_h:
+        redis_client.delete(ALERTED_KEY)
+        return {"status": "ok", "age_hours": round(age_h, 1)}
+
+    # Простой. Алертим не чаще раза в период (кулдаун = порог).
+    if redis_client.get(ALERTED_KEY):
+        return {"status": "stale", "age_hours": round(age_h, 1), "alerted": False}
+
+    db = SessionLocal()
+    try:
+        name_row = db.get(ShopSettings, "shop_name")
+        shop_name = name_row.value if name_row and name_row.value else "Магазин"
+        text = (f"⚠️ МойСклад: обмена не было ~{int(age_h)} ч "
+                f"(последний контакт {last.astimezone().strftime('%d.%m %H:%M')}).\n"
+                f"Проверьте выгрузку в МойСклад (Онлайн-торговля) и адрес магазина.")
+
+        cfg = get_notify_config()
+        sent = []
+        if cfg["vk_token"] and cfg["vk_peer"]:
+            if send_vk(cfg["vk_token"], cfg["vk_peer"], text):
+                sent.append("vk")
+        owner_row = db.get(ShopSettings, "notify_email")
+        owner_email = owner_row.value if owner_row and owner_row.value else None
+        if not owner_email:
+            smtp_row = db.get(ShopSettings, "smtp_user")
+            owner_email = smtp_row.value if smtp_row and smtp_row.value else None
+        if owner_email:
+            if send_email(owner_email, f"МойСклад: обмен остановился — {shop_name}", text, from_name=shop_name):
+                sent.append("email")
+
+        # Ставим кулдаун (в секундах), чтобы не спамить каждый час.
+        redis_client.set(ALERTED_KEY, "1", ex=threshold_h * 3600)
+        print(f"check_exchange_health: простой {int(age_h)}ч → алерт {sent or 'каналы не настроены'}", flush=True)
+        return {"status": "stale", "age_hours": round(age_h, 1), "alerted": True, "sent": sent}
+    finally:
+        db.close()

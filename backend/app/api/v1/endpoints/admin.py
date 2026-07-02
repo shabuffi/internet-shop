@@ -479,7 +479,17 @@ def get_settings(db: Session = Depends(get_db), _=Depends(_get_current_admin)):
     from app.integrations.email import get_smtp_config
     vk = get_notify_config()
     smtp = get_smtp_config()
+    # Статус обмена: когда МойСклад последний раз выходил на связь (мониторинг простоя)
+    exchange_last_seen = None
+    try:
+        from app.core.redis_client import redis_client
+        raw = redis_client.get("exchange:last_seen")
+        if raw:
+            exchange_last_seen = raw.decode() if isinstance(raw, bytes) else raw
+    except Exception:
+        pass
     return {
+        "exchange_last_seen": exchange_last_seen,
         "shop_name":          _get_setting(db, "shop_name", "Магазин"),
         # Контакты в футере сайта (видны покупателям)
         "contact_phone":      _get_setting(db, "contact_phone"),

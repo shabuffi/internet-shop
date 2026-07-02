@@ -17,7 +17,13 @@ celery_app.conf.update(
     result_serializer="json",
     accept_content=["json"],
     timezone="Europe/Moscow",
-    # Запланированных задач нет: каталог/остатки/картинки приходят push-моделью
-    # (CommerceML от МойСклад), заказы МойСклад забирает сам через обмен. beat простаивает.
-    beat_schedule={},
+    # Каталог/остатки/картинки приходят push-моделью (CommerceML от МойСклад), заказы
+    # МойСклад забирает сам. Единственная периодическая задача — мониторинг простоя обмена:
+    # раз в час проверяем, что МойСклад выходит на связь, иначе алерт владельцу.
+    beat_schedule={
+        "check-exchange-health": {
+            "task": "app.tasks.notify.check_exchange_health",
+            "schedule": 3600.0,   # каждый час
+        },
+    },
 )
