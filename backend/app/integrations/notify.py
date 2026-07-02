@@ -70,23 +70,6 @@ def build_order_message(order) -> str:
     return "\n".join(lines)
 
 
-def build_customer_order_message(order, shop_name: str = "Магазин") -> str:
-    """Текст письма-подтверждения ПОКУПАТЕЛЮ (тон — для клиента, а не владельца)."""
-    lines = [f"Здравствуйте, {order.customer_name}!", ""]
-    lines.append(f"Спасибо за заказ в «{shop_name}». Мы получили ваш заказ {order.number} и скоро свяжемся с вами.")
-    lines.append("")
-    lines.append("Состав заказа:")
-    for it in order.items:
-        lines.append(f"• {it.product_name} — {it.quantity} × {it.price:.0f} ₽")
-    lines.append("")
-    lines.append(f"Итого: {order.total_amount:.0f} ₽")
-    if order.delivery_address:
-        lines.append(f"Адрес доставки: {order.delivery_address}")
-    lines.append("")
-    lines.append("Если заказ оформлен по ошибке или нужно что-то изменить — просто ответьте на это письмо.")
-    return "\n".join(lines)
-
-
 def send_vk(token: str, peer_id: str, text: str) -> bool:
     """Отправляет сообщение в ВКонтакте от имени сообщества (``messages.send``).
 
