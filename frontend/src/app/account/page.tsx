@@ -75,46 +75,69 @@ export default function AccountPage() {
     );
   }
 
-  const rows: [string, string][] = [
+  // Персональная скидка показывается, только если это реально скидка (discount_percent < 0).
+  const discount = Math.max(0, -Number(user.discount_percent || 0));
+  // Контакты (без наименования — оно в шапке; без типа — он чипом).
+  const infoItems: [string, string][] = [
     ["Email", user.email],
     ["Телефон", user.phone],
-    ["Тип заказчика", CUSTOMER_TYPE_LABEL[user.customer_type] ?? user.customer_type],
-    ["Наименование", user.customer_name],
     ...(user.inn ? [["ИНН", user.inn] as [string, string]] : []),
   ];
 
+  const chip = (accent = false): React.CSSProperties => ({
+    display: "inline-flex", alignItems: "center", fontSize: "var(--t-sm)", fontWeight: 600,
+    padding: "4px 12px", borderRadius: 999,
+    background: accent ? "var(--accent-soft, #e7edff)" : "var(--surface, #f5f6f8)",
+    color: accent ? "var(--accent, #003399)" : "var(--charcoal)",
+  });
+  const sectionTitle: React.CSSProperties = {
+    fontFamily: "var(--font-display)", fontSize: "var(--t-h3)", margin: "var(--s-8) 0 var(--s-4)",
+  };
+
   return (
-    <div className="container" style={{ maxWidth: 560, margin: "0 auto", padding: "var(--s-8) var(--s-4)" }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "var(--s-6)" }}>
-        <h1 style={{ fontFamily: "var(--font-display)", fontSize: "var(--t-h1)", margin: 0 }}>Личный кабинет</h1>
-        <button type="button" className="btn btn--ghost" onClick={handleLogout}>Выйти</button>
+    <div className="container" style={{ maxWidth: 680, margin: "0 auto", padding: "var(--s-8) var(--s-4)" }}>
+      {/* Шапка: приветствие + чипы + выход */}
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "var(--s-4)", marginBottom: "var(--s-6)" }}>
+        <div style={{ minWidth: 0 }}>
+          <div style={{ fontSize: "var(--t-sm)", color: "var(--charcoal)", marginBottom: 4 }}>Личный кабинет</div>
+          <h1 style={{ fontFamily: "var(--font-display)", fontSize: "var(--t-h1)", margin: 0, lineHeight: 1.1, wordBreak: "break-word" }}>
+            {user.customer_name}
+          </h1>
+          <div style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap" }}>
+            <span style={chip()}>{CUSTOMER_TYPE_LABEL[user.customer_type] ?? user.customer_type}</span>
+            {discount > 0 && <span style={chip(true)}>Персональная скидка {discount}%</span>}
+          </div>
+        </div>
+        <button type="button" className="btn btn--ghost" onClick={handleLogout} style={{ flexShrink: 0 }}>Выйти</button>
       </div>
 
+      {/* Профиль — контакты сеткой */}
+      <h2 style={{ ...sectionTitle, marginTop: 0 }}>Профиль</h2>
       <div style={{ background: "var(--paper)", border: "1px solid var(--hairline, #eee)", borderRadius: "var(--r-xl)", padding: "var(--s-6)", boxShadow: "var(--shadow-1)" }}>
-        <table style={{ width: "100%", borderCollapse: "collapse" }}>
-          <tbody>
-            {rows.map(([k, v]) => (
-              <tr key={k}>
-                <td style={{ padding: "var(--s-2) 0", color: "var(--charcoal)", verticalAlign: "top", width: "40%" }}>{k}</td>
-                <td style={{ padding: "var(--s-2) 0", fontWeight: 600 }}>{v}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "var(--s-5)" }}>
+          {infoItems.map(([k, v]) => (
+            <div key={k} style={{ minWidth: 0 }}>
+              <div style={{ fontSize: "var(--t-xs)", color: "var(--charcoal)", textTransform: "uppercase", letterSpacing: ".04em", marginBottom: 4 }}>{k}</div>
+              <div style={{ fontWeight: 600, wordBreak: "break-word" }}>{v}</div>
+            </div>
+          ))}
+        </div>
       </div>
 
+      {/* Безопасность */}
+      <h2 style={sectionTitle}>Безопасность</h2>
       <ChangePasswordForm />
 
-      <h2 style={{ fontFamily: "var(--font-display)", fontSize: "var(--t-h3)", margin: "var(--s-8) 0 var(--s-4)" }}>
-        История заказов
-      </h2>
-
+      {/* Заказы */}
+      <h2 style={sectionTitle}>История заказов</h2>
       {orders === null ? (
         <p style={{ color: "var(--charcoal)", fontSize: "var(--t-sm)" }}>Загрузка…</p>
       ) : orders.length === 0 ? (
-        <p style={{ color: "var(--charcoal)", fontSize: "var(--t-sm)" }}>
-          У вас пока нет заказов. Перейдите в <Link href="/catalog" className="link">каталог</Link>, чтобы оформить первый.
-        </p>
+        <div style={{ background: "var(--paper)", border: "1px dashed var(--hairline, #ddd)", borderRadius: "var(--r-xl)",
+          padding: "var(--s-8)", textAlign: "center", color: "var(--charcoal)" }}>
+          <p style={{ margin: "0 0 var(--s-4)", fontSize: "var(--t-sm)" }}>У вас пока нет заказов.</p>
+          <Link href="/catalog" className="btn btn--primary">Перейти в каталог</Link>
+        </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: "var(--s-4)" }}>
           {orders.map((o) => (
