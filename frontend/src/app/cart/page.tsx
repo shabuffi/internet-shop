@@ -58,7 +58,9 @@ export default function CartPage() {
                 <div className="lineitem__controls">
                   <div className="qty qty--sm">
                     <button onClick={() => updateQuantity(item.id, item.quantity - 1)} disabled={item.quantity <= 1} aria-label="Меньше">−</button>
-                    <span>{item.quantity}</span>
+                    <input type="text" inputMode="numeric" value={item.quantity} aria-label="Количество"
+                      onChange={(e) => { const n = parseInt(e.target.value.replace(/\D/g, ""), 10); updateQuantity(item.id, Number.isNaN(n) ? 1 : Math.max(1, Math.min(9999, n))); }}
+                      onFocus={(e) => e.target.select()} />
                     <button onClick={() => updateQuantity(item.id, item.quantity + 1)} aria-label="Больше">+</button>
                   </div>
                   <button className="linkbtn" onClick={() => removeItem(item.id)}>Удалить</button>

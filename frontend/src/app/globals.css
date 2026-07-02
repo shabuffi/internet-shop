@@ -686,6 +686,10 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .
 .qty button:hover { background: var(--cloud); }
 .qty button:disabled { color: var(--steel); cursor: not-allowed; }
 .qty span { min-width: 36px; text-align: center; font-weight: 600; font-variant-numeric: tabular-nums; }
+/* ввод количества с клавиатуры: выглядит как прежний span, но редактируется */
+.qty input { width: 48px; height: 100%; border: none; background: transparent; text-align: center; font-weight: 600; font-variant-numeric: tabular-nums; font-size: inherit; color: var(--ink); padding: 0; }
+.qty input:focus { outline: none; background: var(--cloud); }
+.qty--sm input { width: 40px; }
 
 /* ---------- корзина ---------- */
 .cart { display: grid; grid-template-columns: 1fr 380px; gap: var(--s-12); align-items: start; }
