@@ -2,7 +2,7 @@ import { test, expect } from "@playwright/test";
 
 test.describe("Карточка товара", () => {
   test("переход из каталога в карточку товара", async ({ page }) => {
-    await page.goto("/");
+    await page.goto("/catalog");
     const firstName = await page.locator(".pcard__name").first().innerText();
     await page.locator(".pcard__name").first().click();
 
