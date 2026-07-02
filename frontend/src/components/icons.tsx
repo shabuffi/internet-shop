@@ -161,6 +161,17 @@ export function IconClock(p: SVGProps<SVGSVGElement>) {
   );
 }
 
+// Восклицательный знак в кружке — пояснение/подсказка.
+export function IconInfo(p: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base} width="1em" height="1em" {...p}>
+      <circle cx="12" cy="12" r="9" />
+      <line x1="12" y1="7.5" x2="12" y2="13" />
+      <line x1="12" y1="16.5" x2="12" y2="16.5" />
+    </svg>
+  );
+}
+
 // Карандаш — редактировать.
 export function IconPencil(p: SVGProps<SVGSVGElement>) {
   return (

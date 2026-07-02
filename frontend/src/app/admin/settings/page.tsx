@@ -9,7 +9,6 @@ interface OwnerSettings {
   company_legal_name: string; company_inn: string; company_ogrn: string; warehouse_address: string;
   delivery_info: string;
   exchange_login: string; exchange_password: string;
-  guest_moysklad_ext_code: string;
   vk_peer_id: string; notify_email: string;
   vk_ready?: boolean; email_ready?: boolean; has_logo?: boolean;
 }
@@ -18,7 +17,7 @@ const EMPTY: OwnerSettings = {
   shop_name: "", contact_phone: "", contact_email: "", contact_hours: "",
   company_legal_name: "", company_inn: "", company_ogrn: "", warehouse_address: "",
   delivery_info: "",
-  exchange_login: "", exchange_password: "", guest_moysklad_ext_code: "", vk_peer_id: "", notify_email: "",
+  exchange_login: "", exchange_password: "", vk_peer_id: "", notify_email: "",
 };
 const CH_LABEL: Record<string, string> = { vk: "ВКонтакте", email: "Email" };
 
@@ -255,22 +254,6 @@ export default function SettingsPage() {
           <input className="form-input" type="password" value={form.exchange_password} onChange={set("exchange_password")} placeholder="новый пароль или оставьте ***" autoComplete="off" />
         </div>
         {saveRow("exchange")}
-      </form>
-
-      {/* Контрагент для гостевых заказов */}
-      <form style={cardStyle} onSubmit={e => saveSection(e, "guest", ["guest_moysklad_ext_code"])}>
-        <p style={{ fontWeight: 600, fontSize: 16, marginBottom: 6 }}>Гостевые заказы (без регистрации)</p>
-        <p style={{ fontSize: 13, color: "var(--ink-secondary)", marginBottom: 16 }}>
-          Заведите в МойСклад одного контрагента (например «Заказы с сайта») и впишите сюда его
-          <b> «Внешний код»</b>. Тогда все заказы <b>без регистрации</b> будут привязываться к нему,
-          а не плодить новых контрагентов. Пусто — гостевой заказ уходит по телефону (как раньше).
-        </p>
-        <div style={inputStyle}>
-          <label className="form-label">Внешний код контрагента для гостей</label>
-          <input className="form-input" value={form.guest_moysklad_ext_code} onChange={set("guest_moysklad_ext_code")}
-            placeholder="Внешний код из МойСклад" autoComplete="off" style={{ fontFamily: "ui-monospace, monospace" }} />
-        </div>
-        {saveRow("guest")}
       </form>
 
       {/* ВКонтакте */}

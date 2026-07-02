@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import AdminShell from "@/components/AdminShell";
 import { adminFetch } from "@/lib/adminApi";
 import { formatMsk } from "@/lib/format";
-import { IconCheckCircle, IconClock, IconPencil } from "@/components/icons";
+import { IconCheckCircle, IconClock, IconPencil, IconInfo } from "@/components/icons";
 
 interface AdminUser {
   id: string; email: string; phone: string; customer_type: string;
@@ -34,6 +34,25 @@ const codeInputStyle: React.CSSProperties = {
   width: 150, fontSize: 13, padding: "6px 10px", borderRadius: 8, fontFamily: "ui-monospace, monospace",
   border: "1px solid var(--hairline-soft)", background: "var(--canvas)", color: "var(--ink)",
 };
+
+// Иконка «!» с всплывающим пояснением при наведении (кастомный тултип — надёжнее нативного title).
+function InfoTooltip({ text }: { text: string }) {
+  const [show, setShow] = useState(false);
+  return (
+    <span style={{ position: "relative", display: "inline-flex" }}
+      onMouseEnter={() => setShow(true)} onMouseLeave={() => setShow(false)}>
+      <IconInfo style={{ width: 16, height: 16, color: "var(--accent, #003399)", cursor: "help", flexShrink: 0 }} />
+      {show && (
+        <span role="tooltip" style={{
+          position: "absolute", bottom: "calc(100% + 8px)", left: 0, width: 300,
+          background: "#1f2937", color: "#fff", fontSize: 12, fontWeight: 400, lineHeight: 1.45,
+          padding: "9px 11px", borderRadius: 8, boxShadow: "0 6px 20px rgba(0,0,0,.18)",
+          zIndex: 20, whiteSpace: "normal", textAlign: "left", pointerEvents: "none",
+        }}>{text}</span>
+      )}
+    </span>
+  );
+}
 
 // Одна строка покупателя: активация (как новый / как существующий) + редактирование кода (через карандаш).
 function UserRow({ u, busy, onPatch, onSaveDiscount, onDelete }: {
@@ -202,11 +221,29 @@ export default function AdminUsersPage() {
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState("");
+  // Единый контрагент для гостевых заказов (глобальная настройка ShopSettings)
+  const [guestCode, setGuestCode] = useState("");
+  const [guestSaving, setGuestSaving] = useState(false);
+  const [guestSaved, setGuestSaved] = useState(false);
 
   function load() {
     adminFetch<AdminUser[]>("/users").then(setUsers).catch(() => {});
   }
   useEffect(() => { load(); }, []);
+  useEffect(() => {
+    adminFetch<{ guest_moysklad_ext_code?: string }>("/settings")
+      .then((s) => setGuestCode(s.guest_moysklad_ext_code ?? "")).catch(() => {});
+  }, []);
+
+  async function saveGuest() {
+    setGuestSaving(true); setError("");
+    try {
+      await adminFetch("/settings", { method: "POST", body: JSON.stringify({ guest_moysklad_ext_code: guestCode.trim() }) });
+      setGuestSaved(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Не удалось сохранить");
+    } finally { setGuestSaving(false); }
+  }
 
   async function patchUser(id: string, patch: Record<string, unknown>) {
     setError(""); setBusyId(id);
@@ -252,6 +289,23 @@ export default function AdminUsersPage() {
         заказе. «Как существующего» — впишите «Внешний код» контрагента из МойСклад, и заказы привяжутся к нему.
         Внешний код меняется кнопкой-карандашом.
       </p>
+
+      {/* Единый контрагент для гостевых заказов — компактная строка */}
+      <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 20 }}>
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+          <InfoTooltip text="Все заказы без регистрации привязываются к этому контрагенту в МойСклад. В заказ добавляется «Гость: имя, телефон», чтобы под общим контрагентом было видно, кто заказал. Пусто → заказ уходит по телефону." />
+          <label htmlFor="guest-code" style={{ fontSize: 13, fontWeight: 600, color: "var(--ink)" }}>
+            Гостевой контрагент МойСклад
+          </label>
+        </span>
+        <input id="guest-code" value={guestCode} placeholder="Внешний код (пусто → по телефону)"
+          onChange={(e) => { setGuestCode(e.target.value); setGuestSaved(false); }}
+          style={{ ...codeInputStyle, width: 240 }} />
+        <button type="button" onClick={saveGuest} disabled={guestSaving} style={{ ...btnOutline, fontWeight: 700 }}>
+          {guestSaving ? "Сохраняем…" : "Сохранить"}
+        </button>
+        {guestSaved && <span style={{ fontSize: 13, color: "var(--stock, #16794a)", fontWeight: 600 }}>✓ Сохранено</span>}
+      </div>
 
       <div style={{ background: "var(--canvas)", borderRadius: "var(--radius-lg)", border: "1px solid var(--hairline-soft)", overflowX: "auto" }}>
         {users.length === 0 ? (
