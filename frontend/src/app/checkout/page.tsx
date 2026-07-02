@@ -12,7 +12,7 @@ import { getMe, type UserProfile } from "@/lib/authApi";
 
 const DELIVERY = [
   { value: "pickup", label: "Самовывоз", hint: "забрать со склада" },
-  { value: "shop_transport", label: "Доставка транспортом ООО «Инженер»", hint: "по областям доставки" },
+  { value: "shop_transport", label: "Доставка транспортом ТД «Инженер»", hint: "по областям доставки" },
   { value: "tk", label: "Транспортной компанией", hint: "до терминала ТК" },
 ] as const;
 
