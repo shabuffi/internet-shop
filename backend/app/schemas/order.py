@@ -4,6 +4,8 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 import re
 
+from app.schemas.auth import normalize_ru_phone
+
 
 class OrderItemIn(BaseModel):
     product_id: str
@@ -25,10 +27,9 @@ class OrderIn(BaseModel):
     @field_validator("customer_phone")
     @classmethod
     def validate_phone(cls, v: str) -> str:
-        digits = re.sub(r"\D", "", v)
-        if len(digits) < 10:
-            raise ValueError("Телефон должен содержать минимум 10 цифр")
-        return v
+        # Нормализация к +7XXXXXXXXXX (принимает 8/7/+7/без кода). Единый формат важен:
+        # история гостевых заказов в админке группируется по точному совпадению телефона.
+        return normalize_ru_phone(v)
 
     @field_validator("items")
     @classmethod

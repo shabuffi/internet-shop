@@ -10,6 +10,35 @@ from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 _EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 # Длина ИНН: ИП — 12 цифр, ООО (юрлицо) — 10 цифр
 _INN_LEN = {"ip": 12, "ooo": 10}
+# Почтовые домены Google: приём регистраций приостановлен (см. валидатор email)
+_GOOGLE_MAIL_DOMAINS = {"gmail.com", "googlemail.com"}
+
+
+def normalize_ru_phone(v: str) -> str:
+    """Приводит российский номер к виду ``+7XXXXXXXXXX``.
+
+    Принимает вариативность ввода: ``+7 999 000-00-00``, ``89990000000``,
+    ``79990000000``, ``9990000000``. Иное — ``ValueError``.
+    """
+    digits = re.sub(r"\D", "", v)
+    if len(digits) == 11 and digits[0] in "78":
+        digits = digits[1:]
+    if len(digits) != 10 or digits[0] != "9":
+        raise ValueError("Укажите телефон в формате +7 9XX XXX-XX-XX или 8 9XX XXX-XX-XX")
+    return f"+7{digits}"
+
+
+def validate_password_strength(v: str) -> str:
+    """Пароль: минимум 8 символов, строчные и ЗАГЛАВНЫЕ буквы, цифра."""
+    if len(v) < 8:
+        raise ValueError("Пароль не короче 8 символов")
+    if not re.search(r"[a-zа-яё]", v):
+        raise ValueError("Пароль должен содержать строчную букву")
+    if not re.search(r"[A-ZА-ЯЁ]", v):
+        raise ValueError("Пароль должен содержать заглавную букву")
+    if not re.search(r"\d", v):
+        raise ValueError("Пароль должен содержать цифру")
+    return v
 
 
 class RegisterIn(BaseModel):
@@ -27,15 +56,18 @@ class RegisterIn(BaseModel):
         v = v.strip().lower()
         if not _EMAIL_RE.match(v):
             raise ValueError("Некорректный email")
+        if v.rsplit("@", 1)[-1] in _GOOGLE_MAIL_DOMAINS:
+            raise ValueError(
+                "Использование почты Google на российских сервисах приостанавливается "
+                "с 1 сентября 2026 года — укажите, пожалуйста, другой email "
+                "(например, Яндекс или Mail.ru)"
+            )
         return v
 
     @field_validator("phone")
     @classmethod
     def _phone(cls, v: str) -> str:
-        v = v.strip()
-        if len(re.sub(r"\D", "", v)) < 10:
-            raise ValueError("Некорректный номер телефона")
-        return v
+        return normalize_ru_phone(v)
 
     @field_validator("customer_name")
     @classmethod
@@ -48,9 +80,7 @@ class RegisterIn(BaseModel):
     @field_validator("password")
     @classmethod
     def _password(cls, v: str) -> str:
-        if len(v) < 8:
-            raise ValueError("Пароль не короче 8 символов")
-        return v
+        return validate_password_strength(v)
 
     @field_validator("consent")
     @classmethod

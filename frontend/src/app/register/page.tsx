@@ -11,6 +11,28 @@ const TYPES: { value: CustomerType; label: string }[] = [
   { value: "ooo", label: "ООО" },
 ];
 
+// Российский номер: принимаем +7/8/7/без кода, нормализуем к +7XXXXXXXXXX (как на бэкенде)
+function normalizeRuPhone(v: string): string | null {
+  let digits = v.replace(/\D/g, "");
+  if (digits.length === 11 && (digits[0] === "7" || digits[0] === "8")) digits = digits.slice(1);
+  if (digits.length !== 10 || digits[0] !== "9") return null;
+  return `+7${digits}`;
+}
+
+function isGoogleMail(email: string): boolean {
+  const domain = email.trim().toLowerCase().split("@").pop() ?? "";
+  return domain === "gmail.com" || domain === "googlemail.com";
+}
+
+// Пароль: ≥8 символов, строчная + заглавная буква, цифра (совпадает с бэкендом)
+function passwordIssue(p: string): string | null {
+  if (p.length < 8) return "Пароль не короче 8 символов";
+  if (!/[a-zа-яё]/.test(p)) return "Добавьте в пароль строчную букву";
+  if (!/[A-ZА-ЯЁ]/.test(p)) return "Добавьте в пароль заглавную букву";
+  if (!/\d/.test(p)) return "Добавьте в пароль цифру";
+  return null;
+}
+
 export default function RegisterPage() {
   const router = useRouter();
   const [form, setForm] = useState({
@@ -19,6 +41,7 @@ export default function RegisterPage() {
   });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const gmailBlocked = isGoogleMail(form.email);
 
   const setField = (k: keyof typeof form) =>
     (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
@@ -31,11 +54,22 @@ export default function RegisterPage() {
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
+    if (gmailBlocked) return;   // окно-предупреждение уже показано под полем email
+    const phone = normalizeRuPhone(form.phone);
+    if (!phone) {
+      setError("Укажите телефон в формате +7 9XX XXX-XX-XX или 8 9XX XXX-XX-XX");
+      return;
+    }
+    const pwIssue = passwordIssue(form.password);
+    if (pwIssue) {
+      setError(pwIssue);
+      return;
+    }
     setLoading(true);
     try {
       await registerUser({
         email: form.email,
-        phone: form.phone,
+        phone,
         customer_type: form.customer_type,
         customer_name: form.customer_name,
         inn: needInn ? form.inn : undefined,
@@ -62,6 +96,16 @@ export default function RegisterPage() {
         <div className="field" style={{ marginBottom: "var(--s-3)" }}>
           <label>Email <span className="req">*</span></label>
           <input className="input" type="email" required value={form.email} onChange={setField("email")} placeholder="you@example.ru" autoFocus />
+          {gmailBlocked && (
+            <div role="alert" style={{ marginTop: "var(--s-2)", padding: "10px 14px", borderRadius: "var(--r-md)",
+              background: "var(--accent-2-soft, #fdeaea)", border: "1px solid var(--accent-2, #E02424)",
+              fontSize: "var(--t-sm)", lineHeight: 1.5, color: "var(--ink)" }}>
+              <b>Почта Google недоступна для регистрации.</b> В связи с постановлением о работе
+              иностранных почтовых сервисов использование почты Google на российских сервисах
+              приостанавливается с 1 сентября 2026 года. Укажите, пожалуйста, другой email —
+              например, Яндекс или Mail.ru.
+            </div>
+          )}
         </div>
         <div className="field" style={{ marginBottom: "var(--s-3)" }}>
           <label>Телефон <span className="req">*</span></label>
@@ -88,7 +132,10 @@ export default function RegisterPage() {
         <div className="field" style={{ marginBottom: "var(--s-4)" }}>
           <label>Пароль <span className="req">*</span></label>
           <input className="input" type="password" required minLength={8} value={form.password} onChange={setField("password")}
-            placeholder="не короче 8 символов" />
+            placeholder="минимум 8 символов, буквы и цифры" />
+          <p style={{ margin: "var(--s-1) 0 0", fontSize: "var(--t-xs)", color: form.password && passwordIssue(form.password) ? "var(--accent-2, #E02424)" : "var(--graphite)" }}>
+            {form.password ? (passwordIssue(form.password) ?? "✓ Надёжный пароль") : "Не короче 8 символов, со строчной и заглавной буквой и цифрой"}
+          </p>
         </div>
 
         <label style={{ display: "flex", gap: "var(--s-2)", alignItems: "flex-start", marginBottom: "var(--s-5)", fontSize: "var(--t-sm)", color: "var(--charcoal)" }}>
@@ -101,7 +148,7 @@ export default function RegisterPage() {
 
         {error && <p className="form-error" style={{ marginBottom: "var(--s-3)" }}>{error}</p>}
 
-        <button type="submit" className="btn btn--cta btn--lg btn--block" disabled={loading}>
+        <button type="submit" className="btn btn--cta btn--lg btn--block" disabled={loading || gmailBlocked}>
           {loading ? "Регистрируем…" : "Зарегистрироваться"}
         </button>
       </form>
