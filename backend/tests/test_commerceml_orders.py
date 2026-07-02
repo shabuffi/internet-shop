@@ -111,3 +111,44 @@ def test_exchange_query_excludes_exported_and_cancelled(client, db_session):
     numbers = [d.find("Номер").text for d in root.findall("Документ")]
     assert "ORD-EXP" not in numbers     # уже выгружен
     assert "ORD-CAN" not in numbers     # отменён
+
+
+# ─── контрагент: код пользователя / гостевой код / телефон + пометка гостя ───
+
+def _one_item_order(**kw):
+    return _order(items=[OrderItem(product_id="p-int", product_name="Т",
+                                   price=Decimal("10"), quantity=1)], **kw)
+
+
+def _comment(root):
+    for r in root.findall("Документ/ЗначенияРеквизитов/ЗначениеРеквизита"):
+        if r.find("Наименование").text == "Комментарий":
+            return r.find("Значение").text
+    return None
+
+
+def test_guest_order_uses_guest_ext_code_and_tags_comment():
+    """Гость + единый контрагент → <Ид>=гостевой код, а в комментарий добавлен «Гость: …»."""
+    order = _one_item_order()
+    root = etree.fromstring(build_orders_xml([order], {"p-int": "ms-1"}, guest_ext_code="GUEST-1"))
+    assert root.find("Документ/Контрагенты/Контрагент/Ид").text == "GUEST-1"
+    assert _comment(root).startswith("Гость:")
+
+
+def test_guest_order_without_code_uses_phone_no_tag():
+    """Гость без единого контрагента → <Ид>=телефон (свой контрагент), пометки нет."""
+    order = _one_item_order()
+    root = etree.fromstring(build_orders_xml([order], {"p-int": "ms-1"}))
+    assert root.find("Документ/Контрагенты/Контрагент/Ид").text == order.customer_phone
+    assert _comment(root) is None
+
+
+def test_registered_user_uses_own_ext_code_no_tag():
+    """Зарегистрированный → <Ид>=его код контрагента; пометка «Гость» не ставится."""
+    from app.db.models.user import User
+    u = User(email="u@ya.ru", phone="+79001234567", customer_type="individual",
+             customer_name="К", password_hash="x", moysklad_ext_code="USER-CODE")
+    order = _one_item_order(user=u)
+    root = etree.fromstring(build_orders_xml([order], {"p-int": "ms-1"}, guest_ext_code="GUEST-1"))
+    assert root.find("Документ/Контрагенты/Контрагент/Ид").text == "USER-CODE"
+    assert _comment(root) is None

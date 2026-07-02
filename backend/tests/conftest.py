@@ -17,6 +17,7 @@ from app.db.session import Base, get_db
 import app.db.models.product  # noqa: F401
 import app.db.models.order     # noqa: F401
 import app.db.models.admin     # noqa: F401
+import app.db.models.user      # noqa: F401
 
 from app.main import app
 
