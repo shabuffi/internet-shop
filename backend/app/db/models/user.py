@@ -1,7 +1,9 @@
 """Покупатель (клиент магазина) — самостоятельная регистрация и личный кабинет.
 
 Отдельно от ``AdminUser`` (это сотрудники). У клиента есть персональная скидка
-(``discount_percent``) от базовой цены МойСклад: диапазон −30…+9, по умолчанию +5.
+(``discount_percent``) от базовой цены МойСклад: диапазон −30…+9, по умолчанию 0
+(зарегистрированный платит базовую цену X; гость — X+наценка). Владелец может дать
+клиенту персональную скидку.
 """
 
 import uuid
@@ -27,9 +29,10 @@ class User(Base):
     # ИНН — обязателен для ИП (12 цифр) и ООО (10 цифр); для физлица не используется
     inn: Mapped[str | None] = mapped_column(String, nullable=True)
     password_hash: Mapped[str] = mapped_column(String, nullable=False)
-    # Персональная корректировка цены в %: −30…+9, дефолт +5 (меняется в админке)
+    # Персональная корректировка цены в %: −30…+9, дефолт 0 (регистрация = базовая цена X).
+    # Отрицательное — скидка, положительное — наценка; меняется владельцем в админке.
     discount_percent: Mapped[Decimal] = mapped_column(
-        Numeric(5, 2), nullable=False, default=Decimal("5"), server_default="5"
+        Numeric(5, 2), nullable=False, default=Decimal("0"), server_default="0"
     )
     # Момент согласия на обработку персональных данных (152-ФЗ)
     consent_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
