@@ -14,6 +14,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
+from app.core.rate_limit import rate_limit, client_ip
 from app.db.session import get_db
 from app.db.models.user import User
 from app.db.models.order import Order
@@ -88,19 +89,20 @@ def _set_cookie(response: Response, token: str) -> None:
         value=token,
         httponly=True,        # недоступно JS — защита от XSS
         samesite="lax",
-        secure=False,         # ⚠️ включить True после переезда на HTTPS
+        secure=settings.COOKIE_SECURE,  # True на HTTPS-проде (COOKIE_SECURE в .env.prod)
         max_age=COOKIE_MAX_AGE,
         path="/",
     )
 
 
 @router.post("/register", response_model=UserOut, status_code=201)
-def register(body: RegisterIn, response: Response, db: Session = Depends(get_db)):
+def register(body: RegisterIn, request: Request, response: Response, db: Session = Depends(get_db)):
     """Регистрирует покупателя и сразу авторизует (без подтверждения email).
 
     Raises:
-        HTTPException: 409, если email уже зарегистрирован.
+        HTTPException: 409, если email уже зарегистрирован; 429 при частых попытках.
     """
+    rate_limit(f"rl:register:{client_ip(request)}", limit=5, window_sec=3600)
     if db.scalar(select(User).where(User.email == body.email)):
         raise HTTPException(status_code=409, detail="Пользователь с таким email уже зарегистрирован")
 
@@ -133,12 +135,14 @@ def register(body: RegisterIn, response: Response, db: Session = Depends(get_db)
 
 
 @router.post("/login", response_model=UserOut)
-def login(body: LoginIn, response: Response, db: Session = Depends(get_db)):
+def login(body: LoginIn, request: Request, response: Response, db: Session = Depends(get_db)):
     """Вход покупателя; ставит JWT в httpOnly-куку.
 
     Raises:
-        HTTPException: 401, если email/пароль не совпали.
+        HTTPException: 401, если email/пароль не совпали; 429 при частых попытках.
     """
+    # Защита от перебора паролей: не более 10 попыток за 5 минут с одного IP.
+    rate_limit(f"rl:login:{client_ip(request)}", limit=10, window_sec=300)
     user = db.scalar(select(User).where(User.email == body.email))
     if not user or not _verify_password(body.password, user.password_hash):
         raise HTTPException(status_code=401, detail="Неверный email или пароль")

@@ -33,6 +33,19 @@ $COMPOSE up -d
 echo "Waiting for DB..."
 sleep 5
 
+# Бэкап БД ПЕРЕД миграциями — чтобы можно было откатиться. Храним последние 10.
+echo "Backing up DB before migrations..."
+mkdir -p backups
+BACKUP="backups/backup_$(date +%F_%H%M%S).sql"
+if $COMPOSE exec -T db sh -c 'pg_dump -U "$POSTGRES_USER" "$POSTGRES_DB"' > "$BACKUP" 2>/dev/null && [ -s "$BACKUP" ]; then
+    echo "Backup saved: $BACKUP ($(du -h "$BACKUP" | cut -f1))"
+    ls -1t backups/*.sql 2>/dev/null | tail -n +11 | xargs -r rm -f
+else
+    echo "ERROR: backup failed — aborting deploy (migrations NOT run)"
+    rm -f "$BACKUP"
+    exit 1
+fi
+
 echo "Running migrations..."
 $COMPOSE exec -T backend alembic upgrade head
 

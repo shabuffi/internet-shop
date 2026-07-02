@@ -20,6 +20,7 @@ def notify_new_order(order_id: str):
     from app.integrations.notify import (
         get_notify_config,
         build_order_message,
+        build_customer_order_message,
         send_vk,
     )
     from app.integrations.email import send_email
@@ -55,6 +56,13 @@ def notify_new_order(order_id: str):
             configured.append("email")
             if send_email(owner_email, f"Новый заказ {order.number} — {shop_name}", text, from_name=shop_name):
                 sent.append("email")
+
+        # ── Покупателю: письмо-подтверждение (если оставил email и SMTP настроен) ──
+        if order.customer_email:
+            cust_text = build_customer_order_message(order, shop_name)
+            if send_email(order.customer_email, f"Заказ {order.number} принят — {shop_name}",
+                          cust_text, from_name=shop_name):
+                sent.append("customer_email")
 
         if sent:
             print(f"notify_new_order: {order.number} → отправлено: {', '.join(sent)}", flush=True)

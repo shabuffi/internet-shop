@@ -134,7 +134,7 @@ def login(body: dict, response: Response, db: Session = Depends(get_db)):
         value=token,
         httponly=True,           # недоступно JS — защита от XSS
         samesite="lax",
-        secure=False,            # ⚠️ включить True, когда сайт переедет на HTTPS
+        secure=settings.COOKIE_SECURE,  # True на HTTPS-проде (COOKIE_SECURE в .env.prod)
         max_age=COOKIE_MAX_AGE,
         path="/",
     )
@@ -247,7 +247,7 @@ def dev_login(body: dict, response: Response):
     if not hmac.compare_digest(str(body.get("password", "")), settings.DEV_PASSWORD):
         raise HTTPException(status_code=401, detail="Неверный пароль")
     response.set_cookie(DEV_COOKIE_NAME, _create_dev_token(), httponly=True,
-                        samesite="lax", secure=False, max_age=COOKIE_MAX_AGE, path="/")
+                        samesite="lax", secure=settings.COOKIE_SECURE, max_age=COOKIE_MAX_AGE, path="/")
     return {"ok": True}
 
 

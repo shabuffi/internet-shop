@@ -32,6 +32,10 @@ class Settings(BaseSettings):
     DEBUG: bool = False
     ALLOWED_ORIGINS: list[str] = ["http://localhost:3000"]
 
+    # Куки авторизации только по HTTPS. False — для HTTP-прода; после переезда на домен
+    # с TLS выставить COOKIE_SECURE=True в .env.prod (тогда куки не уйдут по открытому HTTP).
+    COOKIE_SECURE: bool = False
+
     # Минимальная сумма заказа (руб). Заказ ниже порога не оформляется (проверка в orders.py).
     MIN_ORDER_AMOUNT: int = 5000
 
