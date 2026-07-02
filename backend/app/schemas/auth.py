@@ -95,3 +95,5 @@ class UserOut(BaseModel):
     inn: str | None = None
     discount_percent: Decimal
     created_at: datetime
+    is_active: bool = True
+    moysklad_ext_code: str | None = None

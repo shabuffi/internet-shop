@@ -83,7 +83,13 @@ def _orders_query_response(db: Session) -> Response:
         for p in db.scalars(select(Product).where(Product.id.in_(product_ids))):
             ms_id_by_product[p.id] = p.moysklad_id
 
-    xml = build_orders_xml(orders, ms_id_by_product)
+    # «Внешний код» единого контрагента для гостевых заказов (без регистрации), если задан
+    # владельцем в настройках — чтобы гости не плодили новых контрагентов в МойСклад.
+    from app.db.models.admin import ShopSettings
+    guest_row = db.get(ShopSettings, "guest_moysklad_ext_code")
+    guest_ext_code = guest_row.value.strip() if guest_row and guest_row.value else None
+
+    xml = build_orders_xml(orders, ms_id_by_product, guest_ext_code=guest_ext_code)
 
     # Запоминаем, какие заказы отдали — чтобы пометить выгруженными на mode=success
     if orders:

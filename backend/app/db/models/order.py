@@ -46,6 +46,8 @@ class Order(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
 
     items: Mapped[list["OrderItem"]] = relationship("OrderItem", back_populates="order", cascade="all, delete-orphan")
+    # Покупатель (для выгрузки «Внешнего кода» контрагента в МойСклад). Только ORM-связь.
+    user: Mapped["User | None"] = relationship("User")  # noqa: F821
 
 
 class OrderItem(Base):

@@ -4,6 +4,7 @@
 (``customer_token``), недоступной JS — защита от XSS. Отдельно от админских токенов.
 """
 
+import uuid
 from datetime import datetime, timedelta, timezone
 
 import bcrypt
@@ -111,10 +112,21 @@ def register(body: RegisterIn, response: Response, db: Session = Depends(get_db)
         inn=body.inn,
         password_hash=_hash_password(body.password),
         consent_at=_utcnow_naive(),
+        # Новый аккаунт ждёт активации сотрудником ТД; генерируем стабильный «Внешний код»
+        # контрагента для МойСклад (уходит в заказе как <Ид> → «Внешний код»).
+        is_active=False,
+        moysklad_ext_code=uuid.uuid4().hex[:16],
     )
     db.add(user)
     db.commit()
     db.refresh(user)
+
+    # Уведомляем владельца о новой регистрации (ВК/Email). Сбой очереди не должен ломать регистрацию.
+    try:
+        from app.tasks.notify import notify_new_registration
+        notify_new_registration.delay(user.id)
+    except Exception:
+        pass
 
     _set_cookie(response, _create_token(user.id))
     return user

@@ -497,6 +497,8 @@ def get_settings(db: Session = Depends(get_db), _=Depends(_get_current_admin)):
         # Обмен с МойСклад — выдуманная пара логин/пароль (не от аккаунта МойСклад)
         "exchange_login":     _get_setting(db, "exchange_login"),
         "exchange_password":  "***" if _get_setting(db, "exchange_password") else "",
+        # «Внешний код» единого контрагента для гостевых заказов (без регистрации)
+        "guest_moysklad_ext_code": _get_setting(db, "guest_moysklad_ext_code"),
         # Владелец вводит свой id ВК и email; ключ сообщества/SMTP — на странице разработчика
         "vk_peer_id":         _get_setting(db, "vk_peer_id"),
         "notify_email":       _get_setting(db, "notify_email"),
@@ -528,6 +530,8 @@ def save_settings(body: dict, db: Session = Depends(get_db), _=Depends(_get_curr
         # обмен с МойСклад + личные идентификаторы получателя (id ВК, email)
         "exchange_login", "exchange_password",
         "vk_peer_id", "notify_email",
+        # единый контрагент для гостевых заказов (внешний код из МойСклад)
+        "guest_moysklad_ext_code",
     }
     # Настройки сайта (чат/соцсети/SEO/тема) перенесены на dev-страницу — см. save_dev_settings.
     for key, value in body.items():
@@ -1105,29 +1109,42 @@ def list_users(db: Session = Depends(get_db), _=Depends(_get_current_admin)):
 
 
 @router.patch("/users/{user_id}", response_model=UserOut)
-def set_user_discount(
+def update_user(
     user_id: str,
     body: dict,
     db: Session = Depends(get_db),
     _=Depends(_get_current_admin),
 ):
-    """Назначает покупателю персональную корректировку цены ``discount_percent``.
+    """Частичное обновление покупателя: скидка / активация / внешний код МойСклад.
 
-    Диапазон −30…+9 (% от базовой цены МойСклад). Отрицательное — скидка, положительное — наценка.
+    Обновляются только переданные поля:
+    - ``discount_percent`` — корректировка цены −30…+9 (% от базовой МойСклад);
+    - ``is_active`` — активация аккаунта (доступ к ЛК);
+    - ``moysklad_ext_code`` — «Внешний код» контрагента (привязка к существующему в МойСклад).
 
     Raises:
-        HTTPException: 404, если покупатель не найден; 422, если значение вне диапазона.
+        HTTPException: 404, если покупатель не найден; 422, если скидка вне диапазона.
     """
     user = db.scalar(select(Customer).where(Customer.id == user_id))
     if not user:
         raise HTTPException(status_code=404, detail="Покупатель не найден")
-    try:
-        pct = Decimal(str(body.get("discount_percent"))).quantize(Decimal("0.01"))
-    except (InvalidOperation, TypeError):
-        raise HTTPException(status_code=422, detail="Неверное значение скидки")
-    if pct < DISCOUNT_MIN or pct > DISCOUNT_MAX:
-        raise HTTPException(status_code=422, detail="Скидка должна быть от −30% до +9%")
-    user.discount_percent = pct
+
+    if "discount_percent" in body:
+        try:
+            pct = Decimal(str(body.get("discount_percent"))).quantize(Decimal("0.01"))
+        except (InvalidOperation, TypeError):
+            raise HTTPException(status_code=422, detail="Неверное значение скидки")
+        if pct < DISCOUNT_MIN or pct > DISCOUNT_MAX:
+            raise HTTPException(status_code=422, detail="Скидка должна быть от −30% до +9%")
+        user.discount_percent = pct
+
+    if "is_active" in body:
+        user.is_active = bool(body["is_active"])
+
+    if "moysklad_ext_code" in body:
+        code = (str(body["moysklad_ext_code"]) or "").strip()
+        user.moysklad_ext_code = code or None
+
     db.commit()
     db.refresh(user)
     return user

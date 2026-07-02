@@ -125,3 +125,61 @@ def notify_new_lead(lead_id: str):
         return {"sent": sent}
     finally:
         db.close()
+
+
+@celery_app.task(name="app.tasks.notify.notify_new_registration")
+def notify_new_registration(user_id: str):
+    """Celery-задача: уведомление владельцу о новой регистрации покупателя — ВК / Email.
+
+    По образцу :func:`notify_new_lead`. Ошибки отправки не пробрасываются.
+
+    Args:
+        user_id: ID покупателя в нашей БД.
+
+    Returns:
+        Словарь ``{"sent": [...]}`` — в какие каналы ушло уведомление.
+    """
+    from app.db.session import SessionLocal
+    from app.db.models.user import User
+    from app.db.models.admin import ShopSettings
+    from app.integrations.notify import get_notify_config, send_vk
+    from app.integrations.email import send_email
+
+    db = SessionLocal()
+    try:
+        user = db.get(User, user_id)
+        if not user:
+            print(f"notify_new_registration: покупатель {user_id} не найден", flush=True)
+            return {"sent": []}
+
+        name_row = db.get(ShopSettings, "shop_name")
+        shop_name = name_row.value if name_row and name_row.value else "Магазин"
+
+        types = {"individual": "Физлицо", "ip": "ИП", "ooo": "ООО"}
+        lines = [f"🆕 Новая регистрация — {shop_name}", "",
+                 f"Наименование: {user.customer_name}",
+                 f"Тип: {types.get(user.customer_type, user.customer_type)}",
+                 f"Телефон: {user.phone}",
+                 f"Email: {user.email}"]
+        if user.inn:
+            lines.append(f"ИНН: {user.inn}")
+        text = "\n".join(lines)
+
+        cfg = get_notify_config()
+        sent = []
+        if cfg["vk_token"] and cfg["vk_peer"]:
+            if send_vk(cfg["vk_token"], cfg["vk_peer"], text):
+                sent.append("vk")
+        owner_row = db.get(ShopSettings, "notify_email")
+        owner_email = owner_row.value if owner_row and owner_row.value else None
+        if not owner_email:
+            smtp_row = db.get(ShopSettings, "smtp_user")
+            owner_email = smtp_row.value if smtp_row and smtp_row.value else None
+        if owner_email:
+            if send_email(owner_email, f"Новая регистрация — {shop_name}", text, from_name=shop_name):
+                sent.append("email")
+
+        print(f"notify_new_registration: {user.id} → {sent or 'каналы не настроены'}", flush=True)
+        return {"sent": sent}
+    finally:
+        db.close()

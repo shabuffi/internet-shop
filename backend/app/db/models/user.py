@@ -8,7 +8,7 @@ import uuid
 from datetime import datetime
 from decimal import Decimal
 
-from sqlalchemy import String, Numeric, DateTime, func
+from sqlalchemy import String, Numeric, DateTime, Boolean, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.session import Base
@@ -34,3 +34,10 @@ class User(Base):
     # Момент согласия на обработку персональных данных (152-ФЗ)
     consent_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    # Активирован ли аккаунт сотрудником ТД. Новые регистрации — False (ждут активации);
+    # server_default true — чтобы уже существующие покупатели не потеряли доступ при миграции.
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="true")
+    # «Внешний код» контрагента для МойСклад: генерируется при регистрации (новый контрагент)
+    # либо сотрудник вписывает код существующего контрагента (привязка старого клиента).
+    # В заказе уходит как <Ид> контрагента → попадает во «Внешний код» в МойСклад.
+    moysklad_ext_code: Mapped[str | None] = mapped_column(String, nullable=True)

@@ -29,13 +29,15 @@ def _sub(parent, tag: str, text=None):
     return el
 
 
-def build_orders_xml(orders, ms_id_by_product: dict[str, str]) -> bytes:
+def build_orders_xml(orders, ms_id_by_product: dict[str, str], guest_ext_code: str | None = None) -> bytes:
     """Строит CommerceML-XML с заказами для выгрузки в МойСклад.
 
     Args:
         orders: Список ORM-заказов (:class:`Order`) с подгруженными ``items``.
         ms_id_by_product: отображение ``product_id`` (наш internal) → ``moysklad_id``
             (id товара из каталога обмена) для сопоставления позиций.
+        guest_ext_code: «Внешний код» единого контрагента для гостевых заказов (без
+            регистрации). Если задан — все гости привязываются к нему, а не плодят новых.
 
     Returns:
         Байты XML (UTF-8, с XML-декларацией).
@@ -60,7 +62,20 @@ def build_orders_xml(orders, ms_id_by_product: dict[str, str]) -> bytes:
         # ─── Контрагент (покупатель) ───
         cps = _sub(doc, "Контрагенты")
         cp = _sub(cps, "Контрагент")
-        _sub(cp, "Ид", order.customer_phone)            # телефон как стабильный ключ
+        # <Ид> контрагента → попадает во «Внешний код» в МойСклад (ключ сопоставления).
+        # Приоритет: код пользователя (стабильный/привязка к существующему контрагенту);
+        # иначе телефон (гость или аккаунт без кода) — прежнее поведение.
+        ext_code = None
+        try:
+            if order.user is not None and order.user.moysklad_ext_code:
+                ext_code = order.user.moysklad_ext_code
+        except Exception:
+            ext_code = None
+        # Гостевой заказ (без пользователя): единый контрагент «Заказы с сайта», если задан,
+        # чтобы не плодить нового контрагента на каждый заказ гостя.
+        if not ext_code and guest_ext_code:
+            ext_code = guest_ext_code
+        _sub(cp, "Ид", ext_code or order.customer_phone)
         _sub(cp, "Наименование", order.customer_name)
         _sub(cp, "ПолноеНаименование", order.customer_name)
         if order.customer_inn:                          # ИП/ООО — ИНН для контрагента
