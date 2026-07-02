@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { devUpload } from "@/lib/adminApi";
+import { adminUpload } from "@/lib/adminApi";
 import type { Banner } from "@/lib/banners";
 
 // Редактор баннеров слайдера: список карточек с полями + загрузкой картинки.
@@ -39,7 +39,7 @@ export default function BannersEditor({ value, onChange }: { value: string; onCh
     try {
       const fd = new FormData();
       fd.append("file", file);
-      const { url } = await devUpload<{ url: string }>("/dev/upload-image", fd);
+      const { url } = await adminUpload<{ url: string }>("/banner-image", fd);
       update(i, { image: url });
     } catch { /* ignore */ } finally {
       setUploading(null);

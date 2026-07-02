@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import { devFetch } from "@/lib/adminApi";
 import { CHAT_SERVICE_LABEL, buildChatUrl, type ChatService } from "@/lib/chat";
-import BannersEditor from "@/components/BannersEditor";
 
 // Настройки сайта (чат / соцсети / SEO / тема). Живут на dev-странице (под паролем
 // разработчика) и сохраняются через /dev/settings. Карточка самодостаточна:
@@ -29,8 +28,6 @@ interface SiteSettings {
   seo_og_description: string;
   seo_robots_index: boolean;
   theme_primary: string;
-  banners_enabled: boolean;
-  home_banners: string;
 }
 
 const EMPTY: SiteSettings = {
@@ -39,7 +36,7 @@ const EMPTY: SiteSettings = {
   chat_vk_api_id: "", chat_vk_group_id: "",
   social_vk: "", social_telegram: "", social_whatsapp: "", social_instagram: "",
   seo_title: "", seo_description: "", seo_og_title: "", seo_og_description: "",
-  seo_robots_index: true, theme_primary: "", banners_enabled: false, home_banners: "",
+  seo_robots_index: true, theme_primary: "",
 };
 
 const KEYS = Object.keys(EMPTY) as (keyof SiteSettings)[];
@@ -209,20 +206,6 @@ export default function SiteSettingsCard() {
           <input className="form-input" style={{ maxWidth: 160 }} value={form.theme_primary} onChange={(e) => set("theme_primary", e.target.value)} placeholder="#003399 (пусто → по умолч.)" />
         </span>
       </div>
-
-      <div style={hr} />
-
-      {/* ── Баннеры слайдера (в каталоге) ── */}
-      <p style={sub}>Баннеры слайдера (в каталоге)</p>
-      <label style={{ ...field, flexDirection: "row", alignItems: "center", gap: 10 }}>
-        <input type="checkbox" checked={form.banners_enabled} onChange={(e) => set("banners_enabled", e.target.checked)} />
-        <span className="form-label" style={{ margin: 0 }}>Показывать слайдер на сайте</span>
-      </label>
-      <p style={{ fontSize: 12, color: "var(--ink-tertiary)", margin: "0 0 14px", lineHeight: 1.5 }}>
-        Слайдер показывается вверху каталога. Загрузите картинку для каждого баннера
-        (без картинки — заглушка-градиент). Пусто → встроенные Новинки/Акции.
-      </p>
-      <BannersEditor value={form.home_banners} onChange={(v) => set("home_banners", v)} />
 
       <div style={{ display: "flex", alignItems: "center", gap: 16, marginTop: 8 }}>
         <button className="btn btn-primary" onClick={save} disabled={saving} type="button">

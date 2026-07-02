@@ -287,8 +287,6 @@ def get_dev_settings(db: Session = Depends(get_db), _=Depends(_get_current_dev))
         "seo_og_description": _get_setting(db, "seo_og_description"),
         "seo_robots_index":   _get_setting(db, "seo_robots_index", "1") != "0",
         "theme_primary":      _get_setting(db, "theme_primary"),
-        "banners_enabled":    _get_setting(db, "banners_enabled", "0") == "1",
-        "home_banners":       _get_setting(db, "home_banners"),
     }
 
 
@@ -420,9 +418,9 @@ def save_dev_settings(body: dict, db: Session = Depends(get_db), _=Depends(_get_
         "chat_vk_api_id", "chat_vk_group_id",
         "social_vk", "social_telegram", "social_whatsapp", "social_instagram",
         "seo_title", "seo_description", "seo_og_title", "seo_og_description", "seo_robots_index",
-        "theme_primary", "home_banners", "banners_enabled",
+        "theme_primary",
     }
-    bool_keys = {"chat_enabled", "seo_robots_index", "banners_enabled"}
+    bool_keys = {"chat_enabled", "seo_robots_index"}
     for key, value in body.items():
         if key not in allowed or value == "***":
             continue
@@ -1034,6 +1032,40 @@ def get_media(name: str):
     data, content_type = result
     return Response(content=data, media_type=content_type,
                     headers={"Cache-Control": "public, max-age=300"})
+
+
+# ─── Баннеры слайдера (управляет владелец из обычной админки) ───────
+
+@router.get("/banners")
+def get_banners(db: Session = Depends(get_db), _=Depends(_get_current_admin)):
+    """Настройки слайдера баннеров для владельца: вкл/выкл + JSON-массив баннеров."""
+    return {
+        "banners_enabled": _get_setting(db, "banners_enabled", "0") == "1",
+        "home_banners":    _get_setting(db, "home_banners"),
+    }
+
+
+@router.post("/banners")
+def save_banners(body: dict, db: Session = Depends(get_db), _=Depends(_get_current_admin)):
+    """Сохраняет настройки слайдера (владелец)."""
+    if "banners_enabled" in body:
+        _set_setting(db, "banners_enabled",
+                     "1" if body["banners_enabled"] in (True, "1", "true", "on") else "0")
+    if "home_banners" in body:
+        _set_setting(db, "home_banners", str(body["home_banners"]))
+    db.commit()
+    return {"message": "Баннеры сохранены"}
+
+
+@router.post("/banner-image")
+async def upload_banner_image(file: UploadFile = File(...), _=Depends(_get_current_admin)):
+    """Загрузка картинки баннера владельцем; возвращает URL отдачи."""
+    data = await file.read()
+    try:
+        name = media_storage.save_upload(file.filename or "banner.jpg", data)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Можно загружать только изображения")
+    return {"name": name, "url": f"/api/v1/admin/media/{name}"}
 
 
 @router.get("/sync-logs")
