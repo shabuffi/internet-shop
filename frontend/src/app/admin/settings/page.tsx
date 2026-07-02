@@ -9,22 +9,34 @@ interface OwnerSettings {
   company_legal_name: string; company_inn: string; company_ogrn: string; warehouse_address: string;
   delivery_info: string;
   exchange_login: string; exchange_password: string;
-  vk_peer_id: string; notify_email: string;
+  vk_peer_id: string; notify_email: string; social_vk: string;
   vk_ready?: boolean; email_ready?: boolean; has_logo?: boolean;
+  exchange_last_seen?: string | null;
 }
 
 const EMPTY: OwnerSettings = {
   shop_name: "", contact_phone: "", contact_email: "", contact_hours: "",
   company_legal_name: "", company_inn: "", company_ogrn: "", warehouse_address: "",
   delivery_info: "",
-  exchange_login: "", exchange_password: "", vk_peer_id: "", notify_email: "",
+  exchange_login: "", exchange_password: "", vk_peer_id: "", notify_email: "", social_vk: "",
 };
 const CH_LABEL: Record<string, string> = { vk: "ВКонтакте", email: "Email" };
 
 const cardStyle: React.CSSProperties = {
   background: "var(--canvas)", borderRadius: "var(--radius-lg)", border: "1px solid var(--hairline-soft)",
-  padding: "28px 32px", maxWidth: 520, marginBottom: 24,
+  padding: "28px 32px", maxWidth: 680, marginBottom: 24,
 };
+
+// Статус обмена по метке «последний контакт МойСклад» (порог простоя — 24ч, как в бэкенде).
+function exchangeStatus(iso?: string | null): { text: string; color: string } {
+  if (!iso) return { text: "обмена ещё не было", color: "var(--ink-tertiary)" };
+  const ageH = (Date.now() - new Date(iso).getTime()) / 3_600_000;
+  if (ageH < 24) {
+    const ago = ageH < 1 ? "менее часа назад" : `${Math.round(ageH)} ч назад`;
+    return { text: `на связи · ${ago}`, color: "var(--stock, #16794a)" };
+  }
+  return { text: `обмена не было ${Math.round(ageH)} ч`, color: "var(--accent-2, #E02424)" };
+}
 const inputStyle = { display: "flex", flexDirection: "column" as const, gap: 6, marginBottom: 16 };
 
 export default function SettingsPage() {
@@ -240,7 +252,15 @@ export default function SettingsPage() {
 
       {/* Обмен с МойСклад */}
       <form style={cardStyle} onSubmit={e => saveSection(e, "exchange", ["exchange_login", "exchange_password"])}>
-        <p style={{ fontWeight: 600, fontSize: 16, marginBottom: 6 }}>Обмен с МойСклад</p>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 6, flexWrap: "wrap" }}>
+          <p style={{ fontWeight: 600, fontSize: 16, margin: 0 }}>Обмен с МойСклад</p>
+          {(() => { const s = exchangeStatus(form.exchange_last_seen); return (
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 7, fontSize: 13, fontWeight: 600, color: s.color }}>
+              <span style={{ width: 8, height: 8, borderRadius: 999, background: "currentColor", flexShrink: 0 }} />
+              {s.text}
+            </span>
+          ); })()}
+        </div>
         <p style={{ fontSize: 13, color: "var(--ink-secondary)", marginBottom: 16 }}>
           Придумайте пару логин/пароль и впишите её сюда <b>и</b> в МойСклад (Адрес магазина).
           Это пароль обмена, а не от аккаунта МойСклад.
@@ -257,13 +277,18 @@ export default function SettingsPage() {
       </form>
 
       {/* ВКонтакте */}
-      <form style={cardStyle} onSubmit={e => saveSection(e, "vk", ["vk_peer_id"])}>
+      <form style={cardStyle} onSubmit={e => saveSection(e, "vk", ["vk_peer_id", "social_vk"])}>
         <p style={{ fontWeight: 600, fontSize: 16, marginBottom: 6 }}>ВКонтакте</p>
         <p style={{ fontSize: 13, color: "var(--ink-secondary)", marginBottom: 12 }}>
-          Куда вам приходят оповещения о новых заказах в ВК.
+          Ссылка на сообщество (показывается покупателям в футере сайта) и куда вам
+          приходят оповещения о новых заказах.
         </p>
         <div style={inputStyle}>
-          <label className="form-label">Ваш id ВКонтакте (peer_id)</label>
+          <label className="form-label">Ссылка на сообщество ВК</label>
+          <input className="form-input" value={form.social_vk} onChange={set("social_vk")} placeholder="https://vk.com/club239539981" autoComplete="off" />
+        </div>
+        <div style={inputStyle}>
+          <label className="form-label">Ваш id ВКонтакте (peer_id) — для оповещений</label>
           <input className="form-input" value={form.vk_peer_id} onChange={set("vk_peer_id")} placeholder="например, 123456789" autoComplete="off" />
         </div>
         {readyNote(vkReady, "Сообщество")}
