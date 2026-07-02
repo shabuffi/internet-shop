@@ -17,7 +17,7 @@ from app.core.config import settings
 from app.db.session import get_db
 from app.db.models.user import User
 from app.db.models.order import Order
-from app.schemas.auth import RegisterIn, LoginIn, UserOut
+from app.schemas.auth import RegisterIn, LoginIn, UserOut, ChangePasswordIn
 from app.schemas.order import OrderOut
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
@@ -145,6 +145,24 @@ def login(body: LoginIn, response: Response, db: Session = Depends(get_db)):
 
     _set_cookie(response, _create_token(user.id))
     return user
+
+
+@router.post("/change-password")
+def change_password(
+    body: ChangePasswordIn,
+    current: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Смена пароля покупателем: сверяем текущий, ставим новый (надёжность проверена схемой).
+
+    Raises:
+        HTTPException: 400, если текущий пароль неверный.
+    """
+    if not _verify_password(body.current_password, current.password_hash):
+        raise HTTPException(status_code=400, detail="Текущий пароль указан неверно")
+    current.password_hash = _hash_password(body.new_password)
+    db.commit()
+    return {"message": "Пароль изменён"}
 
 
 @router.post("/logout")

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { loginUser } from "@/lib/authApi";
+import PasswordField from "@/components/PasswordField";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -43,7 +44,7 @@ export default function LoginPage() {
         </div>
         <div className="field" style={{ marginBottom: "var(--s-5)" }}>
           <label>Пароль <span className="req">*</span></label>
-          <input className="input" type="password" required value={form.password} onChange={setField("password")} />
+          <PasswordField required value={form.password} onChange={setField("password")} autoComplete="current-password" />
         </div>
 
         {error && <p className="form-error" style={{ marginBottom: "var(--s-3)" }}>{error}</p>}

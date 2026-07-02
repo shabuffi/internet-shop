@@ -161,6 +161,28 @@ export function IconClock(p: SVGProps<SVGSVGElement>) {
   );
 }
 
+// Глаз — показать пароль.
+export function IconEye(p: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base} width="1em" height="1em" {...p}>
+      <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z" />
+      <circle cx="12" cy="12" r="3" />
+    </svg>
+  );
+}
+
+// Перечёркнутый глаз — скрыть пароль.
+export function IconEyeOff(p: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base} width="1em" height="1em" {...p}>
+      <path d="M9.9 5.1A9.5 9.5 0 0 1 12 5c6.5 0 10 7 10 7a17 17 0 0 1-3.1 3.8" />
+      <path d="M6.2 6.2A17 17 0 0 0 2 12s3.5 7 10 7a9.5 9.5 0 0 0 4-.85" />
+      <path d="M9.9 9.9a3 3 0 0 0 4.2 4.2" />
+      <line x1="3" y1="3" x2="21" y2="21" />
+    </svg>
+  );
+}
+
 // Восклицательный знак в кружке — пояснение/подсказка.
 export function IconInfo(p: SVGProps<SVGSVGElement>) {
   return (

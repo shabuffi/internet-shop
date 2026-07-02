@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { registerUser, type CustomerType } from "@/lib/authApi";
+import PasswordField from "@/components/PasswordField";
 
 const TYPES: { value: CustomerType; label: string }[] = [
   { value: "individual", label: "Физическое лицо" },
@@ -131,8 +132,8 @@ export default function RegisterPage() {
         )}
         <div className="field" style={{ marginBottom: "var(--s-4)" }}>
           <label>Пароль <span className="req">*</span></label>
-          <input className="input" type="password" required minLength={8} value={form.password} onChange={setField("password")}
-            placeholder="минимум 8 символов, буквы и цифры" />
+          <PasswordField required value={form.password} onChange={setField("password")}
+            autoComplete="new-password" placeholder="минимум 8 символов, буквы и цифры" />
           <p style={{ margin: "var(--s-1) 0 0", fontSize: "var(--t-xs)", color: form.password && passwordIssue(form.password) ? "var(--accent-2, #E02424)" : "var(--graphite)" }}>
             {form.password ? (passwordIssue(form.password) ?? "✓ Надёжный пароль") : "Не короче 8 символов, со строчной и заглавной буквой и цифрой"}
           </p>

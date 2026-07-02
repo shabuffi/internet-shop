@@ -114,6 +114,17 @@ class LoginIn(BaseModel):
         return v.strip().lower()
 
 
+class ChangePasswordIn(BaseModel):
+    """Смена пароля в личном кабинете: текущий (для проверки) + новый (с проверкой надёжности)."""
+    current_password: str
+    new_password: str
+
+    @field_validator("new_password")
+    @classmethod
+    def _new(cls, v: str) -> str:
+        return validate_password_strength(v)
+
+
 class UserOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

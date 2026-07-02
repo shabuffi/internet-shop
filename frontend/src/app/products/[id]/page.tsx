@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 import { getProduct, getStoreInfo } from "@/lib/api";
 import { formatPrice } from "@/lib/format";
 import AddToCartButton from "@/components/AddToCartButton";
+import BackButton from "@/components/BackButton";
 import ProductGallery from "@/components/ProductGallery";
 import ChestnyZnakBadge from "@/components/ChestnyZnakBadge";
 import { chatConfigFromStore, buildChatUrl, isChatReady } from "@/lib/chat";
@@ -71,6 +72,9 @@ export default async function ProductPage({ params }: Props) {
   return (
     <div className="page">
       <div className="container">
+        <div style={{ paddingTop: "var(--s-4)" }}>
+          <BackButton fallback="/catalog" label="Назад в каталог" />
+        </div>
         <div className="breadcrumb">
           <Link href="/catalog">Каталог</Link>
           {product.category && <><span>›</span><span>{product.category.name}</span></>}

@@ -4,10 +4,20 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
-  getMe, logoutUser, getMyOrders, CUSTOMER_TYPE_LABEL,
+  getMe, logoutUser, getMyOrders, changePassword, CUSTOMER_TYPE_LABEL,
   type UserProfile, type OrderHistory,
 } from "@/lib/authApi";
 import { formatPrice, formatMsk } from "@/lib/format";
+import PasswordField from "@/components/PasswordField";
+
+// Надёжность пароля — совпадает с бэкендом (validate_password_strength).
+function passwordIssue(p: string): string | null {
+  if (p.length < 8) return "Пароль не короче 8 символов";
+  if (!/[a-zа-яё]/.test(p)) return "Нужна строчная буква";
+  if (!/[A-ZА-ЯЁ]/.test(p)) return "Нужна заглавная буква";
+  if (!/\d/.test(p)) return "Нужна цифра";
+  return null;
+}
 
 // Статусы для покупателя. МойСклад не возвращает статусы исполнения обратно на сайт
 // (обмен заказами — односторонний, вверх), поэтому «new» показываем как «Принят»
@@ -93,6 +103,8 @@ export default function AccountPage() {
         </table>
       </div>
 
+      <ChangePasswordForm />
+
       <h2 style={{ fontFamily: "var(--font-display)", fontSize: "var(--t-h3)", margin: "var(--s-8) 0 var(--s-4)" }}>
         История заказов
       </h2>
@@ -109,6 +121,72 @@ export default function AccountPage() {
             <OrderCard key={o.id} order={o} />
           ))}
         </div>
+      )}
+    </div>
+  );
+}
+
+// Смена пароля в ЛК: сворачиваемая форма (текущий + новый, с глазиком и проверкой надёжности).
+function ChangePasswordForm() {
+  const [open, setOpen] = useState(false);
+  const [cur, setCur] = useState("");
+  const [nw, setNw] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+
+  const issue = nw ? passwordIssue(nw) : null;
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    setMsg(null);
+    const problem = passwordIssue(nw);
+    if (problem) { setMsg({ ok: false, text: problem }); return; }
+    setSaving(true);
+    try {
+      await changePassword({ current_password: cur, new_password: nw });
+      setMsg({ ok: true, text: "Пароль изменён" });
+      setCur(""); setNw("");
+    } catch (err) {
+      setMsg({ ok: false, text: err instanceof Error ? err.message : "Не удалось изменить пароль" });
+    } finally { setSaving(false); }
+  }
+
+  return (
+    <div style={{ marginTop: "var(--s-6)" }}>
+      <button type="button" onClick={() => setOpen((o) => !o)} className="link"
+        style={{ background: "none", border: "none", padding: 0, cursor: "pointer",
+          color: "var(--primary, #003399)", fontSize: "var(--t-sm)", fontWeight: 600 }}>
+        {open ? "Скрыть смену пароля" : "Сменить пароль"}
+      </button>
+
+      {open && (
+        <form onSubmit={submit}
+          style={{ marginTop: "var(--s-4)", background: "var(--paper)", border: "1px solid var(--hairline, #eee)",
+            borderRadius: "var(--r-xl)", padding: "var(--s-6)", boxShadow: "var(--shadow-1)", maxWidth: 420 }}>
+          <div className="field" style={{ marginBottom: "var(--s-3)" }}>
+            <label>Текущий пароль <span className="req">*</span></label>
+            <PasswordField required value={cur} onChange={(e) => setCur(e.target.value)} autoComplete="current-password" />
+          </div>
+          <div className="field" style={{ marginBottom: "var(--s-4)" }}>
+            <label>Новый пароль <span className="req">*</span></label>
+            <PasswordField required value={nw} onChange={(e) => setNw(e.target.value)} autoComplete="new-password" />
+            <p style={{ margin: "var(--s-1) 0 0", fontSize: "var(--t-xs)",
+              color: issue ? "var(--accent-2, #E02424)" : "var(--graphite)" }}>
+              {nw ? (issue ?? "✓ Надёжный пароль") : "Не короче 8 символов, со строчной и заглавной буквой и цифрой"}
+            </p>
+          </div>
+
+          {msg && (
+            <p style={{ marginBottom: "var(--s-3)", fontSize: "var(--t-sm)", fontWeight: 600,
+              color: msg.ok ? "var(--stock, #16794a)" : "var(--accent-2, #E02424)" }}>
+              {msg.ok ? "✓ " : ""}{msg.text}
+            </p>
+          )}
+
+          <button type="submit" className="btn btn--primary" disabled={saving || !cur || !nw}>
+            {saving ? "Сохраняем…" : "Изменить пароль"}
+          </button>
+        </form>
       )}
     </div>
   );

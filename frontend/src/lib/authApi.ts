@@ -63,6 +63,10 @@ export function loginUser(body: { email: string; password: string }): Promise<Us
   return postJson<UserProfile>("/login", body, "Неверный email или пароль");
 }
 
+export function changePassword(body: { current_password: string; new_password: string }): Promise<{ message: string }> {
+  return postJson<{ message: string }>("/change-password", body, "Не удалось изменить пароль");
+}
+
 export async function logoutUser(): Promise<void> {
   await fetch(`${API}/logout`, { method: "POST", credentials: "same-origin" }).catch(() => {});
 }
