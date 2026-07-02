@@ -51,6 +51,20 @@ function resolveCategoryLabel(categoryId: string | undefined, categories: Catego
   return null;
 }
 
+// Цепочка родителей выбранной категории (для хлебных крошек): [корень, …, текущая].
+// Только для одиночного category_id; для групп с главной цепочки нет.
+function resolveCategoryPath(categoryId: string | undefined, categories: Category[]): Category[] {
+  if (!categoryId || categoryId.includes(",")) return [];
+  const byId = new Map(categories.map((c) => [c.id, c]));
+  const path: Category[] = [];
+  let cur = byId.get(categoryId);
+  while (cur && path.length < 10) {   // ограничитель на случай цикла в данных
+    path.unshift(cur);
+    cur = cur.parent_id ? byId.get(cur.parent_id) : undefined;
+  }
+  return path;
+}
+
 // Окно из максимум 5 номеров страниц вокруг текущей.
 function pageNumbers(current: number, total: number): number[] {
   const span = 2;
@@ -80,6 +94,7 @@ export default async function CatalogPage({ searchParams }: Props) {
   ]);
 
   const categoryLabel = resolveCategoryLabel(categoryId, categories);
+  const categoryPath = resolveCategoryPath(categoryId, categories);
   // Слайдер баннеров — на общем каталоге (без выбранной категории/поиска), только если явно включён.
   const showBanners = !categoryId && !search && store?.banners_enabled === true;
   const banners = showBanners ? parseBanners(store?.home_banners) : [];
@@ -108,8 +123,24 @@ export default async function CatalogPage({ searchParams }: Props) {
         <div className="container catalog__hero">
           <h1>{categoryLabel ?? (search ? "Результаты поиска" : "Каталог товаров")}</h1>
           {categoryLabel ? (
-            <p>
-              Раздел каталога · <Link href="/catalog" style={{ color: "var(--accent)", textDecoration: "underline" }}>весь каталог</Link>
+            <p aria-label="Вы находитесь в разделе">
+              {/* Хлебные крошки: путь до текущей категории, родители кликабельны */}
+              <Link href="/catalog" style={{ color: "var(--accent)", textDecoration: "underline" }}>Каталог</Link>
+              {categoryPath.length > 0 ? (
+                categoryPath.map((c, i) => (
+                  <span key={c.id}>
+                    {" → "}
+                    {i < categoryPath.length - 1 ? (
+                      <Link href={buildHref({ category_id: c.id, view: listView ? "list" : undefined, sort, photo: withPhoto })}
+                        style={{ color: "var(--accent)", textDecoration: "underline" }}>{c.name}</Link>
+                    ) : (
+                      <b>{c.name}</b>
+                    )}
+                  </span>
+                ))
+              ) : (
+                <span>{" → "}<b>{categoryLabel}</b></span>
+              )}
             </p>
           ) : search ? (
             <p>По запросу «{search}» · <Link href="/catalog" style={{ color: "var(--accent)", textDecoration: "underline" }}>сбросить</Link></p>
