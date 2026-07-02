@@ -65,16 +65,19 @@ def build_orders_xml(orders, ms_id_by_product: dict[str, str], guest_ext_code: s
         # <Ид> контрагента → попадает во «Внешний код» в МойСклад (ключ сопоставления).
         # Приоритет: код пользователя (стабильный/привязка к существующему контрагенту);
         # иначе телефон (гость или аккаунт без кода) — прежнее поведение.
-        ext_code = None
         try:
-            if order.user is not None and order.user.moysklad_ext_code:
-                ext_code = order.user.moysklad_ext_code
+            has_user = order.user is not None
+            user_code = order.user.moysklad_ext_code if has_user else None
         except Exception:
-            ext_code = None
+            has_user, user_code = False, None
+        ext_code = user_code or None
         # Гостевой заказ (без пользователя): единый контрагент «Заказы с сайта», если задан,
         # чтобы не плодить нового контрагента на каждый заказ гостя.
         if not ext_code and guest_ext_code:
             ext_code = guest_ext_code
+        # Заказ гостя слит с общим контрагентом → под ним не видно, кто именно заказал.
+        # Ниже добавим «Гость: имя, телефон» в комментарий, чтобы заказ был опознаваем.
+        merged_guest = (not has_user) and bool(guest_ext_code)
         _sub(cp, "Ид", ext_code or order.customer_phone)
         _sub(cp, "Наименование", order.customer_name)
         _sub(cp, "ПолноеНаименование", order.customer_name)
@@ -113,9 +116,14 @@ def build_orders_xml(orders, ms_id_by_product: dict[str, str], guest_ext_code: s
             r = _sub(reqs, "ЗначениеРеквизита")
             _sub(r, "Наименование", "Адрес доставки")
             _sub(r, "Значение", order.delivery_address)
+        comment_parts = []
+        if merged_guest:
+            comment_parts.append(f"Гость: {order.customer_name}, {order.customer_phone}")
         if order.comment:
+            comment_parts.append(order.comment)
+        if comment_parts:
             r = _sub(reqs, "ЗначениеРеквизита")
             _sub(r, "Наименование", "Комментарий")
-            _sub(r, "Значение", order.comment)
+            _sub(r, "Значение", "\n".join(comment_parts))
 
     return etree.tostring(root, encoding="UTF-8", xml_declaration=True, pretty_print=True)

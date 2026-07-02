@@ -12,7 +12,14 @@ interface AdminUser {
   is_active: boolean; moysklad_ext_code: string | null;
 }
 
+interface UserOrder {
+  id: string; number: string; status: string; total_amount: string;
+  items_count: number; exported_at: string | null; created_at: string;
+}
+
 const TYPE_LABEL: Record<string, string> = { individual: "Физлицо", ip: "ИП", ooo: "ООО" };
+const ORDER_STATUS_LABEL: Record<string, string> = { new: "Новый", cancelled: "Отменён", confirmed: "Подтверждён", shipped: "Отправлен", delivered: "Доставлен" };
+const TABLE_COLS = 10;  // число колонок таблицы покупателей (для colSpan строки истории)
 
 const td: React.CSSProperties = { padding: "14px 16px", verticalAlign: "top" };
 const btnPrimary: React.CSSProperties = {
@@ -39,9 +46,23 @@ function UserRow({ u, busy, onPatch, onSaveDiscount, onDelete }: {
   const [activateExisting, setActivateExisting] = useState(false);
   const [editCode, setEditCode] = useState(false);
   const [codeInput, setCodeInput] = useState(u.moysklad_ext_code ?? "");
+  const [showOrders, setShowOrders] = useState(false);
+  const [orders, setOrders] = useState<UserOrder[] | null>(null);
+
+  async function toggleOrders() {
+    const next = !showOrders;
+    setShowOrders(next);
+    if (next && orders === null) {
+      try {
+        const d = await adminFetch<{ items: UserOrder[] }>(`/orders?user_id=${u.id}`);
+        setOrders(d.items);
+      } catch { setOrders([]); }
+    }
+  }
 
   return (
-    <tr style={{ borderBottom: "1px solid var(--hairline-soft)", background: u.is_active ? "transparent" : "var(--accent-2-soft, #fdeaea)" }}>
+    <>
+    <tr style={{ borderBottom: showOrders ? "none" : "1px solid var(--hairline-soft)", background: u.is_active ? "transparent" : "var(--accent-2-soft, #fdeaea)" }}>
       {/* Статус / активация */}
       <td style={{ ...td, whiteSpace: "nowrap", minWidth: 200 }}>
         {u.is_active ? (
@@ -121,15 +142,59 @@ function UserRow({ u, busy, onPatch, onSaveDiscount, onDelete }: {
       </td>
 
       <td style={{ ...td, color: "var(--ink-secondary)" }}>{formatMsk(u.created_at)}</td>
-      <td style={{ ...td, textAlign: "right" }}>
-        <button type="button" onClick={onDelete} disabled={busy} title="Удалить покупателя"
-          style={{ padding: "6px 12px", borderRadius: 8, cursor: busy ? "default" : "pointer",
-            border: "1px solid var(--danger, #c0392b)", background: "transparent",
-            color: "var(--danger, #c0392b)", fontSize: 13, fontWeight: 600, opacity: busy ? 0.5 : 1 }}>
-          Удалить
-        </button>
+      <td style={{ ...td, textAlign: "right", whiteSpace: "nowrap" }}>
+        <div style={{ display: "inline-flex", gap: 8 }}>
+          <button type="button" onClick={toggleOrders} title="История заказов покупателя"
+            style={{ padding: "6px 12px", borderRadius: 8, cursor: "pointer",
+              border: "1px solid var(--hairline-soft)", background: "var(--canvas)",
+              color: "var(--ink)", fontSize: 13, fontWeight: 600 }}>
+            {showOrders ? "Скрыть" : "Заказы"}
+          </button>
+          <button type="button" onClick={onDelete} disabled={busy} title="Удалить покупателя"
+            style={{ padding: "6px 12px", borderRadius: 8, cursor: busy ? "default" : "pointer",
+              border: "1px solid var(--danger, #c0392b)", background: "transparent",
+              color: "var(--danger, #c0392b)", fontSize: 13, fontWeight: 600, opacity: busy ? 0.5 : 1 }}>
+            Удалить
+          </button>
+        </div>
       </td>
     </tr>
+    {showOrders && (
+      <tr style={{ borderBottom: "1px solid var(--hairline-soft)", background: u.is_active ? "var(--surface, #fafafa)" : "var(--accent-2-soft, #fdeaea)" }}>
+        <td colSpan={TABLE_COLS} style={{ padding: "4px 16px 16px" }}>
+          {orders === null ? (
+            <span style={{ fontSize: 13, color: "var(--ink-secondary)" }}>Загрузка…</span>
+          ) : orders.length === 0 ? (
+            <span style={{ fontSize: 13, color: "var(--ink-secondary)" }}>Заказов пока нет</span>
+          ) : (
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+              <thead>
+                <tr style={{ color: "var(--ink-secondary)" }}>
+                  {["Номер", "Дата", "Позиций", "Сумма", "Статус", "Выгрузка"].map(h => (
+                    <th key={h} style={{ textAlign: "left", fontWeight: 600, padding: "6px 10px" }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {orders.map(o => (
+                  <tr key={o.id} style={{ borderTop: "1px solid var(--hairline-soft)" }}>
+                    <td style={{ padding: "6px 10px", fontWeight: 600 }}>{o.number}</td>
+                    <td style={{ padding: "6px 10px", color: "var(--ink-secondary)" }}>{formatMsk(o.created_at)}</td>
+                    <td style={{ padding: "6px 10px" }}>{o.items_count}</td>
+                    <td style={{ padding: "6px 10px", fontWeight: 600 }}>{Number(o.total_amount).toFixed(2)} ₽</td>
+                    <td style={{ padding: "6px 10px" }}>{ORDER_STATUS_LABEL[o.status] ?? o.status}</td>
+                    <td style={{ padding: "6px 10px", color: o.exported_at ? "var(--stock, #16794a)" : "var(--ink-tertiary)" }}>
+                      {o.exported_at ? "Выгружен" : "Ожидает"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </td>
+      </tr>
+    )}
+    </>
   );
 }
 

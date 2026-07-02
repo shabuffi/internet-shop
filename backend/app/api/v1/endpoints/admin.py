@@ -653,36 +653,52 @@ def dashboard(db: Session = Depends(get_db), _=Depends(_get_current_admin)):
 @router.get("/orders")
 def list_orders(
     page: int = 1,
+    user_id: str | None = None,
+    phone: str | None = None,
     db: Session = Depends(get_db),
     _=Depends(_get_current_admin),
 ):
-    """Список заказов для админки с пагинацией (по 20 на страницу).
+    """Список заказов для админки.
+
+    Без фильтров — постранично (по 20). С ``user_id`` (карточка зарегистрированного
+    клиента) или ``phone`` (история гостя по телефону) — все заказы этого покупателя,
+    без пагинации.
 
     Args:
-        page: Номер страницы (с 1).
-        db: Сессия БД.
+        page: Номер страницы (с 1); игнорируется при фильтре по клиенту.
+        user_id: Показать только заказы этого аккаунта.
+        phone: Показать только заказы с этим телефоном (в т.ч. гостевые).
 
     Returns:
-        Словарь с заказами текущей страницы (включая число позиций), общим числом и
+        Словарь с заказами (число позиций, признак гостя ``is_guest``), общим числом и
         номером страницы.
     """
+    from sqlalchemy import func
     from sqlalchemy.orm import joinedload
     PAGE = 20
+    filtered = bool(user_id or phone)
     # .unique() обязателен: joinedload коллекции (Order.items) даёт дублирующиеся строки,
     # и без unique() SQLAlchemy 2.0 кидает InvalidRequestError (иначе /orders падал 500,
     # а фронт молча показывал «0 всего»).
-    orders = db.scalars(
-        select(Order).options(joinedload(Order.items))
-        .order_by(Order.created_at.desc())
-        .offset((page - 1) * PAGE).limit(PAGE)
-    ).unique().all()
-    total = db.scalar(select(__import__("sqlalchemy", fromlist=["func"]).func.count()).select_from(Order))
+    q = select(Order).options(joinedload(Order.items)).order_by(Order.created_at.desc())
+    count_q = select(func.count()).select_from(Order)
+    if user_id:
+        q = q.where(Order.user_id == user_id)
+        count_q = count_q.where(Order.user_id == user_id)
+    if phone:
+        q = q.where(Order.customer_phone == phone)
+        count_q = count_q.where(Order.customer_phone == phone)
+    if not filtered:
+        q = q.offset((page - 1) * PAGE).limit(PAGE)
+    orders = db.scalars(q).unique().all()
+    total = db.scalar(count_q)
 
     return {
         "items": [
             {
                 "id": o.id, "number": o.number, "status": o.status,
                 "customer_name": o.customer_name, "customer_phone": o.customer_phone,
+                "user_id": o.user_id, "is_guest": o.user_id is None,
                 "total_amount": str(o.total_amount),
                 "exported_at": o.exported_at.isoformat() if o.exported_at else None,
                 "created_at": o.created_at.isoformat(),
