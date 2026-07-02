@@ -509,8 +509,6 @@ def get_settings(db: Session = Depends(get_db), _=Depends(_get_current_admin)):
         "exchange_password":  "***" if _get_setting(db, "exchange_password") else "",
         # «Внешний код» единого контрагента для гостевых заказов (без регистрации)
         "guest_moysklad_ext_code": _get_setting(db, "guest_moysklad_ext_code"),
-        # Ссылка на сообщество ВК (футер сайта)
-        "social_vk":          _get_setting(db, "social_vk"),
         # Владелец вводит свой id ВК и email; ключ сообщества/SMTP — на странице разработчика
         "vk_peer_id":         _get_setting(db, "vk_peer_id"),
         "notify_email":       _get_setting(db, "notify_email"),
@@ -544,8 +542,6 @@ def save_settings(body: dict, db: Session = Depends(get_db), _=Depends(_get_curr
         "vk_peer_id", "notify_email",
         # единый контрагент для гостевых заказов (внешний код из МойСклад)
         "guest_moysklad_ext_code",
-        # ссылка на сообщество ВК — показывается в футере сайта (соцссылки)
-        "social_vk",
     }
     # Настройки сайта (чат/соцсети/SEO/тема) перенесены на dev-страницу — см. save_dev_settings.
     for key, value in body.items():

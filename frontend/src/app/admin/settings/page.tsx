@@ -2,14 +2,14 @@
 
 import { useEffect, useState } from "react";
 import AdminShell from "@/components/AdminShell";
-import { adminFetch, adminUpload } from "@/lib/adminApi";
+import { adminFetch } from "@/lib/adminApi";
 
 interface OwnerSettings {
   shop_name: string; contact_phone: string; contact_email: string; contact_hours: string;
   company_legal_name: string; company_inn: string; company_ogrn: string; warehouse_address: string;
   delivery_info: string;
   exchange_login: string; exchange_password: string;
-  vk_peer_id: string; notify_email: string; social_vk: string;
+  vk_peer_id: string; notify_email: string;
   vk_ready?: boolean; email_ready?: boolean; has_logo?: boolean;
   exchange_last_seen?: string | null;
 }
@@ -18,9 +18,11 @@ const EMPTY: OwnerSettings = {
   shop_name: "", contact_phone: "", contact_email: "", contact_hours: "",
   company_legal_name: "", company_inn: "", company_ogrn: "", warehouse_address: "",
   delivery_info: "",
-  exchange_login: "", exchange_password: "", vk_peer_id: "", notify_email: "", social_vk: "",
+  exchange_login: "", exchange_password: "", vk_peer_id: "", notify_email: "",
 };
 const CH_LABEL: Record<string, string> = { vk: "ВКонтакте", email: "Email" };
+// Сообщество ВК магазина — фиксированная ссылка для инструкции (куда заходить отвечать клиентам).
+const VK_COMMUNITY_URL = "https://vk.com/club239539981";
 
 const cardStyle: React.CSSProperties = {
   background: "var(--canvas)", borderRadius: "var(--radius-lg)", border: "1px solid var(--hairline-soft)",
@@ -51,33 +53,12 @@ export default function SettingsPage() {
   const [pw, setPw] = useState({ current_password: "", new_password: "" });
   const [pwMsg, setPwMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [pwLoading, setPwLoading] = useState(false);
-  const [hasLogo, setHasLogo] = useState(false);
-  const [logoVer, setLogoVer] = useState(0);   // сброс кэша превью логотипа
-  const [logoBusy, setLogoBusy] = useState(false);
 
   useEffect(() => {
     adminFetch<OwnerSettings>("/settings")
-      .then(d => { setForm(d); setVkReady(!!d.vk_ready); setEmailReady(!!d.email_ready); setHasLogo(!!d.has_logo); })
+      .then(d => { setForm(d); setVkReady(!!d.vk_ready); setEmailReady(!!d.email_ready); })
       .catch(() => {});
   }, []);
-
-  async function handleLogoUpload(file: File | undefined) {
-    if (!file) return;
-    setLogoBusy(true);
-    try {
-      const fd = new FormData();
-      fd.append("file", file);
-      await adminUpload("/logo", fd);
-      setHasLogo(true); setLogoVer(v => v + 1);
-    } catch { /* ignore */ } finally { setLogoBusy(false); }
-  }
-  async function handleLogoRemove() {
-    setLogoBusy(true);
-    try {
-      await adminFetch("/logo", { method: "DELETE" });
-      setHasLogo(false); setLogoVer(v => v + 1);
-    } catch { /* ignore */ } finally { setLogoBusy(false); }
-  }
 
   // Сохраняет только поля одного блока
   async function saveSection(e: React.FormEvent, id: string, keys: (keyof OwnerSettings)[]) {
@@ -183,33 +164,6 @@ export default function SettingsPage() {
           <p style={{ fontSize: 12, color: "var(--ink-secondary)" }}>В футере и на вкладке браузера; в шапке — если не задан логотип</p>
         </div>
 
-        {/* Логотип (показывается в шапке вместо названия) */}
-        <div style={inputStyle}>
-          <label className="form-label">Логотип (в шапке сайта)</label>
-          <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
-            {hasLogo && (
-              <span style={{ display: "inline-flex", alignItems: "center", height: 44, padding: "0 12px",
-                background: "var(--cloud)", border: "1px solid var(--hairline-soft)", borderRadius: 8 }}>
-                <img src={`/api/v1/admin/logo?v=${logoVer}`} alt="логотип" style={{ height: 28, width: "auto", display: "block" }} />
-              </span>
-            )}
-            <label style={{ padding: "0 16px", height: 38, display: "inline-flex", alignItems: "center", borderRadius: "var(--radius-md)",
-              border: "1px solid var(--graphite)", color: "var(--ink)", fontWeight: 600, fontSize: 14,
-              cursor: logoBusy ? "wait" : "pointer", opacity: logoBusy ? 0.5 : 1 }}>
-              {hasLogo ? "Заменить" : "Загрузить логотип"}
-              <input type="file" accept="image/*" hidden
-                onChange={e => { handleLogoUpload(e.target.files?.[0]); e.target.value = ""; }} />
-            </label>
-            {hasLogo && (
-              <button type="button" onClick={handleLogoRemove} disabled={logoBusy}
-                style={{ padding: "0 14px", height: 38, borderRadius: "var(--radius-md)", border: "1px solid var(--hairline-soft)",
-                  background: "transparent", color: "var(--ink-secondary)", fontWeight: 600, fontSize: 14, cursor: "pointer" }}>
-                Убрать
-              </button>
-            )}
-          </div>
-          <p style={{ fontSize: 12, color: "var(--ink-secondary)" }}>PNG/JPG/SVG. Если загружен — показывается в шапке вместо названия.</p>
-        </div>
         <div style={inputStyle}>
           <label className="form-label">Телефон (футер сайта)</label>
           <input className="form-input" value={form.contact_phone} onChange={set("contact_phone")} placeholder="+7 999 123-45-67" />
@@ -277,18 +231,13 @@ export default function SettingsPage() {
       </form>
 
       {/* ВКонтакте */}
-      <form style={cardStyle} onSubmit={e => saveSection(e, "vk", ["vk_peer_id", "social_vk"])}>
+      <form style={cardStyle} onSubmit={e => saveSection(e, "vk", ["vk_peer_id"])}>
         <p style={{ fontWeight: 600, fontSize: 16, marginBottom: 6 }}>ВКонтакте</p>
         <p style={{ fontSize: 13, color: "var(--ink-secondary)", marginBottom: 12 }}>
-          Ссылка на сообщество (показывается покупателям в футере сайта) и куда вам
-          приходят оповещения о новых заказах.
+          Куда вам приходят оповещения о новых заказах в ВК.
         </p>
         <div style={inputStyle}>
-          <label className="form-label">Ссылка на сообщество ВК</label>
-          <input className="form-input" value={form.social_vk} onChange={set("social_vk")} placeholder="https://vk.com/club239539981" autoComplete="off" />
-        </div>
-        <div style={inputStyle}>
-          <label className="form-label">Ваш id ВКонтакте (peer_id) — для оповещений</label>
+          <label className="form-label">Ваш id ВКонтакте (peer_id)</label>
           <input className="form-input" value={form.vk_peer_id} onChange={set("vk_peer_id")} placeholder="например, 123456789" autoComplete="off" />
         </div>
         {readyNote(vkReady, "Сообщество")}
@@ -306,7 +255,11 @@ export default function SettingsPage() {
             </ol>
             <p style={{ fontWeight: 600, color: "var(--ink)", margin: "6px 0 4px" }}>2. Чтобы сообщения доходили (обязательно один раз)</p>
             <ol style={{ margin: 0, paddingLeft: 18 }}>
-              <li>Откройте сообщество магазина в ВК и <b>напишите ему любое сообщение</b> от своего личного аккаунта (например, «привет»).</li>
+              <li>
+                Откройте <a href={VK_COMMUNITY_URL} target="_blank" rel="noopener noreferrer"
+                  style={{ color: "var(--accent, #2563eb)", fontWeight: 600 }}>сообщество магазина в ВК</a>{" "}
+                и <b>напишите ему любое сообщение</b> от своего личного аккаунта (например, «привет»).
+              </li>
               <li>Это нужно, потому что ВК запрещает сообществу писать вам первым. После вашего сообщения — бот сможет вам отвечать.</li>
               <li>Теперь нажмите <b>«Отправить тест»</b> ниже — должно прийти сообщение в личку ВК.</li>
             </ol>
