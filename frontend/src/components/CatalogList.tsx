@@ -31,15 +31,11 @@ function ProductThumb({ product }: { product: Product }) {
         ? <img src={`/api/v1/products/${product.id}/image`} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
         : <span style={{ display: "flex", width: "100%", height: "100%", alignItems: "center", justifyContent: "center", color: "var(--graphite)", opacity: .5 }}><IconImage width="1.2em" height="1.2em" /></span>}
       {box && (
+        // Всплывашка ровно по размеру картинки: без подложки и полей — только само фото.
         <span style={{ position: "fixed", left: box.left, top: box.top, zIndex: 60, pointerEvents: "none",
-          width: SIZE, height: SIZE, borderRadius: 12, overflow: "hidden",
-          boxShadow: "0 12px 44px rgba(0,0,0,.22)" }}>
-          {/* Размытая подложка из того же фото — заполняет края, чтобы не было белых полос («контура») */}
-          <img src={`/api/v1/products/${product.id}/image`} alt="" aria-hidden="true"
-            style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover",
-              filter: "blur(18px)", transform: "scale(1.2)", opacity: 0.5 }} />
+          borderRadius: 12, overflow: "hidden", boxShadow: "0 12px 44px rgba(0,0,0,.22)", display: "block" }}>
           <img src={`/api/v1/products/${product.id}/image`} alt={product.name}
-            style={{ position: "relative", width: "100%", height: "100%", objectFit: "contain", display: "block" }} />
+            style={{ display: "block", maxWidth: SIZE, maxHeight: SIZE, width: "auto", height: "auto" }} />
         </span>
       )}
     </Link>
