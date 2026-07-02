@@ -104,12 +104,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                   <SearchIcon />
                   <input name="search" placeholder="Поиск товаров" aria-label="Поиск товаров" />
                 </form>
-                {telHref && (
-                  <a href={telHref} className="header__phone hide-mobile">{phone}</a>
-                )}
                 <AccountNav />
                 <CartIcon />
-                <MobileMenu phone={phone} />
+                <MobileMenu />
               </div>
             </div>
           </header>

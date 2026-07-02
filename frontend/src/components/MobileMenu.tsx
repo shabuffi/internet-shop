@@ -13,11 +13,10 @@ const LINKS = [
 ];
 
 // Бургер-меню для телефона: кнопка в шапке + выезжающая панель с навигацией.
-export default function MobileMenu({ phone }: { phone?: string }) {
+export default function MobileMenu() {
   const [open, setOpen] = useState(false);
   const [authed, setAuthed] = useState<boolean | null>(null);
   const path = usePathname() || "/";
-  const tel = phone ? `tel:${phone.replace(/[^+\d]/g, "")}` : "";
 
   // Узнаём статус входа при первом открытии меню (на мобильной шапке ссылки «Войти» нет).
   useEffect(() => {
@@ -55,7 +54,6 @@ export default function MobileMenu({ phone }: { phone?: string }) {
             >
               {authed ? "Личный кабинет" : "Войти / Регистрация"}
             </Link>
-            {tel && <a href={tel} className="mmenu__phone">{phone}</a>}
           </nav>
         </div>
       )}
