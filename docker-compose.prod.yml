@@ -100,8 +100,11 @@ services:
     mem_limit: 96m
     ports:
       - "80:80"
+      - "443:443"
     volumes:
       - ./nginx/nginx.prod.conf:/etc/nginx/conf.d/default.conf:ro
+      - /etc/letsencrypt:/etc/letsencrypt:ro          # сертификаты Let's Encrypt
+      - /var/www/certbot:/var/www/certbot:ro          # webroot для ACME-челленджа
     depends_on:
       backend:
         condition: service_healthy
