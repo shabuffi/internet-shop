@@ -46,3 +46,5 @@ local_backup_*.sql
 
 import.xml
 ИНЖЕНЕР/
+design-ref/
+test-results/

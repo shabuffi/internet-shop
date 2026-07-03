@@ -6,12 +6,62 @@
 
 Формат коротко: **Готово** — вмёржено/задеплоено; **В работе** — текущее; **Отложено** — backlog.
 
-> **⚠️ БОЕВОЙ СЕРВЕР СМЕНИЛСЯ (2026-07-03):** теперь `31.129.110.22`, домен **https://td-engineer.ru**
+> **⚠️ БОЕВОЙ СЕРВЕР (с 2026-07-03):** `31.129.110.22`, домен **https://td-engineer.ru**
 > (Let's Encrypt, автопродление webroot). Каталог `/opt/internet-shop`, деплой `git pull && ./deploy.sh`.
-> В `.env.prod`: `COOKIE_SECURE=true`, `ALLOWED_ORIGINS`/`SITE_URL` = домен. Старый сервер
-> `139.100.226.168` — переносной снимок от ~09:16, гасится после переключения МойСклад.
-> **ОСТАЛОСЬ:** в МойСклад сменить «Адрес магазина» на `https://td-engineer.ru/api/v1/1c/exchange`
-> (креды обмена те же). До этого обмен всё ещё идёт со старым сервером.
+> В `.env.prod`: `COOKIE_SECURE=true`, `ALLOWED_ORIGINS`/`SITE_URL` = домен.
+> МойСклад переключён на `https://td-engineer.ru/api/v1/1c/exchange` — **обмен идёт с новым
+> сервером** (склад и сайт синхронизированы). Старый сервер `139.100.226.168` остановлен
+> (`docker compose down`), код сохранён на случай отката.
+
+---
+
+## Спринт 11 — Переезд на td-engineer.ru, статусы заказов из МойСклад, cookie, тех-долг · 2026-07-04
+
+**Переезд на свой домен + HTTPS (ЗАДЕПЛОЕНО):**
+- Прод переехал `139.100.226.168` → `31.129.110.22`, домен **https://td-engineer.ru**
+  (Let's Encrypt; первый серт standalone, продление webroot + deploy-hook `reload-nginx.sh`).
+- `nginx/nginx.prod.conf` + `docker-compose.prod.yml`: 80→443, редирект, certbot-тома.
+- `.env.prod`: `COOKIE_SECURE=true`, `ALLOWED_ORIGINS`/`SITE_URL`=домен.
+- Данные перенесены (pg_dump + том `media_data` + `.env.prod`). Старый сервер остановлен
+  (`docker compose down`), код на нём сохранён, временные файлы `/root/migration` вычищены (оба).
+- Яндекс: подтверждение прав DNS TXT (`yandex-verification` через Beget), sitemap подан.
+
+**Статусы заказов из МойСклад (получение orders.xml) (ЗАДЕПЛОЕНО):**
+- Модель `Order`: `moysklad_status` (String 100), `moysklad_number` (String 50);
+  миграция `c1d2e3f4a5b6` (down_revision `9f3e7a1c2b48`), применена локально и на проде.
+- `integrations/moysklad/commerceml_order_status.py` — `parse_order_statuses(xml)`; читает
+  **document-level** `ЗначенияРеквизитов` («Статус заказа», «Номер по 1С», «ПометкаУдаления»),
+  умеет с/без namespace. Матч по `number` (ORD-XXXX). Тесты `tests/test_order_status.py`.
+- `exchange.py`: принимает `POST type=sale&mode=file` (orders.xml) → сырьё в Redis →
+  `_apply_order_statuses` обновляет `moysklad_status/number` (+ПометкаУдаления→cancelled).
+  Добавлен мониторинг `_touch_exchange_seen` (last-seen в Redis).
+- Схема `OrderOut.moysklad_status`; фронт `/admin/orders` и `/account` показывают
+  `moysklad_status || внутренний`. `notify.check_exchange_health` (beat): алерт если обмена >24ч.
+
+**Статус read-only (этот заход):**
+- Удалён мёртвый `PATCH /admin/orders/{id}/status` (+ класс `OrderStatusUpdate`, импорт
+  `Literal`) в `admin.py`; вычищены его тесты в `tests/test_admin_orders.py`. Статус ведётся
+  только в МойСклад. Тесты зелёные (13 passed).
+
+**Cookie-согласие (этот заход, НЕ задеплоено):**
+- `components/CookieConsent.tsx` — плашка снизу, `localStorage cookie_consent_v1`, ссылка на
+  `/offer`; смонтирована в `layout.tsx` рядом с чат-виджетом. Typecheck чист.
+
+**Админка/UX/адаптив (ЗАДЕПЛОЕНО ранее в спринте):**
+- `/admin/orders`: статус read-only (пилюля `statusView`), мобильные карточки (`useIsMobile`).
+- `/admin/users`: поиск+сортировка, история заказов бордер-листом, действия иконками
+  (`IconOrders`/`IconTrash`), мобильные карточки.
+- `AdminShell`: иконки единого размера 19px, авто-сворот меню на мобиле (matchMedia).
+- `components/icons.tsx`: +IconTrash/IconEye/IconEyeOff/IconInfo/IconCheckCircle/IconClock/IconPencil.
+- `PasswordField` с «глазиком» (login/register/account/admin), смена пароля в ЛК, ИП→ФИО.
+- Уникальность телефона (регистрация) и внешнего кода (админка). Ссылка на ВК в инструкции уведомлений.
+
+**Документация (этот заход):**
+- `ИЗМЕНЕНИЯ.md` — новый блок «Свежие доработки (июль 2026)» + обновлён раздел планов.
+- `ПЛАН-МОДЕРНИЗАЦИИ.md` — новый §7 «Тех-долг и планы» (почта, next/image, Sentry, Метрика — с объяснениями).
+
+**Осталось:** задеплоить cookie-баннер + удаление PATCH-эндпоинта (по подтверждению).
+Планы: корп. почта (email-флоу), next/image, Sentry (DSN), Яндекс.Метрика.
 
 ---
 
@@ -371,8 +421,9 @@ Ubuntu-сервер `139.100.226.168`, `/opt/internet-shop`, деплой чер
 ---
 
 ## Инфра-памятка (чтобы не искать каждый раз)
-- **Прод:** `ssh root@139.100.226.168`, каталог `/opt/internet-shop`, деплой `git pull && ./deploy.sh`,
-  прод-compose `docker-compose.prod.yml` (env в `.env.prod`).
+- **Прод:** `ssh root@31.129.110.22` (домен https://td-engineer.ru), каталог `/opt/internet-shop`,
+  деплой `git pull && ./deploy.sh`, прод-compose `docker-compose.prod.yml` (env в `.env.prod`).
+  Старый сервер `139.100.226.168` остановлен (код сохранён, для отката).
 - **Локально:** `make up` / `make down`; БД `shop_user`/`shop_db`; локально только тестовые данные.
 - **Гит:** ветка `main`, репозиторий github.com/shabuffi/internet-shop.
 - **Интеграция:** только CommerceML (`/api/v1/1c/exchange`), пароль МойСклад не используется.

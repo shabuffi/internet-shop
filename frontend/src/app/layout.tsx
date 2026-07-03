@@ -8,6 +8,7 @@ import MainNav from "@/components/MainNav";
 import MobileMenu from "@/components/MobileMenu";
 import ChatWidget from "@/components/ChatWidget";
 import VkChatWidget from "@/components/VkChatWidget";
+import CookieConsent from "@/components/CookieConsent";
 import { SITE_URL, SITE_NAME, SITE_DESCRIPTION } from "@/lib/site";
 import { getStoreInfo } from "@/lib/api";
 import { chatConfigFromStore } from "@/lib/chat";
@@ -172,6 +173,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             : chatMode === "button"
             ? <ChatWidget config={chat} />
             : null}
+
+          <CookieConsent />
         </CartProvider>
       </body>
     </html>

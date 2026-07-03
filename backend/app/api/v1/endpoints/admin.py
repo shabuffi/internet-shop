@@ -5,7 +5,6 @@ import hmac
 import jwt
 import os
 from datetime import datetime, timedelta, timezone
-from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, UploadFile, File, Query
 from pydantic import BaseModel
@@ -726,43 +725,8 @@ def list_orders(
     }
 
 
-# Допустимые статусы заказа: new → confirmed → shipped → delivered / cancelled
-class OrderStatusUpdate(BaseModel):
-    # Заказы ведутся в МойСклад; на сайте оставляем только «Новый» и «Отменён»
-    # («Отменён» возвращает остаток на сайт). Промежуточные статусы убраны.
-    status: Literal["new", "cancelled"]
-
-
-@router.patch("/orders/{order_id}/status")
-def update_order_status(
-    order_id: str,
-    body: OrderStatusUpdate,
-    db: Session = Depends(get_db),
-    _=Depends(_get_current_admin),
-):
-    """Меняет статус заказа (``new`` / ``cancelled``).
-
-    Допустимые статусы валидирует Pydantic (``OrderStatusUpdate``). Остаток не трогаем —
-    количество товаров на сайте не зависит от заказов.
-
-    Args:
-        order_id: ID заказа.
-        body: Новый статус.
-        db: Сессия БД.
-
-    Returns:
-        Словарь с ID заказа и новым статусом.
-
-    Raises:
-        HTTPException: 404, если заказ не найден.
-    """
-    order = db.get(Order, order_id)
-    if not order:
-        raise HTTPException(status_code=404, detail="Заказ не найден")
-
-    order.status = body.status
-    db.commit()
-    return {"id": order.id, "status": order.status}
+# Статус заказа ведётся в МойСклад (приходит обратно в orders.xml, см. exchange.py) —
+# на сайте его НЕ меняем. Прежний ручной PATCH /orders/{id}/status удалён.
 
 
 @router.get("/products")
