@@ -14,7 +14,7 @@ interface AdminUser {
 }
 
 interface UserOrder {
-  id: string; number: string; status: string; total_amount: string;
+  id: string; number: string; status: string; moysklad_status?: string | null; total_amount: string;
   items_count: number; exported_at: string | null; created_at: string;
 }
 
@@ -104,13 +104,24 @@ function UserRow({ u, busy, isMobile, onPatch, onSaveDiscount, onDelete }: {
     : (
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         {orders.map(o => (
-          <div key={o.id} style={{ display: "flex", flexWrap: "wrap", gap: "2px 12px", fontSize: 13 }}>
-            <b>{o.number}</b>
-            <span style={{ color: "var(--ink-secondary)" }}>{formatMsk(o.created_at)}</span>
-            <span>{o.items_count} поз.</span>
-            <b>{Number(o.total_amount).toFixed(2)} ₽</b>
-            <span>{ORDER_STATUS_LABEL[o.status] ?? o.status}</span>
-            <span style={{ color: o.exported_at ? "var(--stock, #16794a)" : "var(--ink-tertiary)" }}>{o.exported_at ? "Выгружен" : "Ожидает"}</span>
+          <div key={o.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12,
+            flexWrap: "wrap", padding: "9px 12px", background: "var(--surface, #f7f8fa)", borderRadius: 10 }}>
+            <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap", minWidth: 0 }}>
+              <b style={{ fontSize: 13 }}>{o.number}</b>
+              <span style={{ fontSize: 12, color: "var(--ink-secondary)" }}>{formatMsk(o.created_at)}</span>
+              <span style={{ fontSize: 12, color: "var(--ink-tertiary)" }}>· {o.items_count} поз.</span>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <span style={{ fontSize: 11, fontWeight: 600, padding: "2px 9px", borderRadius: 999,
+                background: "var(--accent-soft, #e7edff)", color: "var(--accent, #003399)", whiteSpace: "nowrap" }}>
+                {o.moysklad_status || ORDER_STATUS_LABEL[o.status] || o.status}
+              </span>
+              <b style={{ fontSize: 13, whiteSpace: "nowrap" }}>{Number(o.total_amount).toFixed(2)} ₽</b>
+              <span title={o.exported_at ? "Выгружен в МойСклад" : "Ожидает выгрузки"}
+                style={{ fontSize: 13, color: o.exported_at ? "var(--stock, #16794a)" : "var(--ink-tertiary)" }}>
+                {o.exported_at ? "✓" : "…"}
+              </span>
+            </div>
           </div>
         ))}
       </div>
