@@ -8,11 +8,9 @@ import { useIsMobile } from "@/lib/useIsMobile";
 
 interface AdminOrder { id: string; number: string; status: string; moysklad_status: string | null; customer_name: string; customer_phone: string; user_id: string | null; is_guest: boolean; total_amount: string; exported_at: string | null; created_at: string; items_count: number; }
 
-// Заказы ведутся в МойСклад; на сайте оставляем только «Новый» и «Отменён».
-// (остальные метки — для отображения возможных старых значений)
+// Статус заказа ведётся в МойСклад — на сайте только показываем (не меняем).
+// Внутренние коды (если статус МС ещё не пришёл) переводим в подписи.
 const STATUS_LABEL: Record<string, string> = { new: "Новый", cancelled: "Отменён", confirmed: "Подтверждён", shipped: "Отправлен", delivered: "Доставлен" };
-const STATUS_ORDER = ["new", "cancelled"];
-const STATUS_COLOR: Record<string, string> = { new: "var(--primary)", cancelled: "var(--critical)", confirmed: "var(--ink)", shipped: "var(--ink)", delivered: "var(--success)" };
 
 const pill = (color: string, bg: string): React.CSSProperties => ({
   display: "inline-block", fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 999,
@@ -22,7 +20,6 @@ const pill = (color: string, bg: string): React.CSSProperties => ({
 export default function AdminOrdersPage() {
   const [orders, setOrders] = useState<AdminOrder[]>([]);
   const [total, setTotal] = useState(0);
-  const [savingId, setSavingId] = useState<string | null>(null);
   const [error, setError] = useState("");
   // Фильтр «история одного покупателя»: гость — по телефону. null → обычный постраничный список.
   const [phoneFilter, setPhoneFilter] = useState<string | null>(null);
@@ -35,33 +32,20 @@ export default function AdminOrdersPage() {
   }
   useEffect(() => { load(); }, [phoneFilter]);  // eslint-disable-line react-hooks/exhaustive-deps
 
-  async function handleStatusChange(orderId: string, status: string) {
-    setError("");
-    setSavingId(orderId);
-    // оптимистично обновляем UI; при ошибке перечитываем с сервера (источник правды)
-    setOrders(os => os.map(o => o.id === orderId ? { ...o, status } : o));
-    try {
-      await adminFetch(`/orders/${orderId}/status`, { method: "PATCH", body: JSON.stringify({ status }) });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Не удалось сменить статус");
-      load();
-    } finally {
-      setSavingId(null);
-    }
-  }
-
-  // Общие элементы (переиспользуются в таблице и в мобильных карточках)
-  const statusSelect = (o: AdminOrder) => (
-    <select value={o.status} aria-label={`Статус заказа ${o.number}`} disabled={savingId === o.id}
-      onChange={e => handleStatusChange(o.id, e.target.value)}
-      style={{ fontSize: 13, fontWeight: 600, padding: "6px 10px", borderRadius: 8,
-        border: "1px solid var(--hairline-soft)", background: "var(--canvas)",
-        color: STATUS_COLOR[o.status] ?? "var(--ink)", cursor: "pointer", opacity: savingId === o.id ? 0.5 : 1 }}>
-      {(STATUS_ORDER.includes(o.status) ? STATUS_ORDER : [o.status, ...STATUS_ORDER]).map(s => (
-        <option key={s} value={s}>{STATUS_LABEL[s] ?? s}</option>
-      ))}
-    </select>
-  );
+  // Общие элементы (переиспользуются в таблице и в мобильных карточках).
+  // Статус — ТОЛЬКО показ (на сайте не меняется): приоритет статусу из МойСклад,
+  // иначе внутренний. Отменённый — красным.
+  const statusView = (o: AdminOrder) => {
+    const label = o.moysklad_status || STATUS_LABEL[o.status] || o.status;
+    const cancelled = o.status === "cancelled";
+    return (
+      <span title={o.moysklad_status ? "Статус из МойСклад" : "Статус заказа"}
+        style={pill(cancelled ? "var(--critical, #c0392b)" : "var(--accent, #003399)",
+          cancelled ? "var(--accent-2-soft, #fbeaeb)" : "var(--accent-soft, #e7edff)")}>
+        {label}
+      </span>
+    );
+  };
   const phoneBtn = (o: AdminOrder) => (
     <button type="button" onClick={() => setPhoneFilter(o.customer_phone)} title="Показать все заказы этого телефона"
       style={{ padding: 0, border: "none", background: "none", cursor: "pointer",
@@ -75,9 +59,6 @@ export default function AdminOrdersPage() {
   const exportBadge = (o: AdminOrder) => (o.exported_at
     ? <span style={{ color: "var(--success)", fontSize: 12 }} title="Выгружен в МойСклад">✓ Выгружен</span>
     : <span style={{ color: "var(--ink-tertiary)", fontSize: 12 }} title="МойСклад заберёт заказ при следующем обмене">Ожидает</span>);
-  const msBadge = (o: AdminOrder) => (o.moysklad_status
-    ? <span title="Статус в МойСклад" style={{ fontSize: 11, fontWeight: 600, color: "var(--accent, #003399)", whiteSpace: "nowrap" }}>МС: {o.moysklad_status}</span>
-    : null);
 
   return (
     <AdminShell>
@@ -126,8 +107,8 @@ export default function AdminOrdersPage() {
                 {exportBadge(o)}
               </div>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, borderTop: "1px solid var(--hairline-soft)", paddingTop: 10, flexWrap: "wrap" }}>
-                <span style={{ fontSize: 12, color: "var(--ink-tertiary)" }}>Статус {msBadge(o)}</span>
-                {statusSelect(o)}
+                <span style={{ fontSize: 12, color: "var(--ink-tertiary)" }}>Статус</span>
+                {statusView(o)}
               </div>
             </div>
           ))}
@@ -154,12 +135,7 @@ export default function AdminOrdersPage() {
                   <td style={{ padding: "14px 16px" }}>{phoneBtn(o)}</td>
                   <td style={{ padding: "14px 16px" }}>{o.items_count}</td>
                   <td style={{ padding: "14px 16px", fontWeight: 600, whiteSpace: "nowrap" }}>{Number(o.total_amount).toFixed(2)} ₽</td>
-                  <td style={{ padding: "14px 16px" }}>
-                    <div style={{ display: "flex", flexDirection: "column", gap: 4, alignItems: "flex-start" }}>
-                      {statusSelect(o)}
-                      {msBadge(o)}
-                    </div>
-                  </td>
+                  <td style={{ padding: "14px 16px" }}>{statusView(o)}</td>
                   <td style={{ padding: "14px 16px", fontSize: 12 }}>{exportBadge(o)}</td>
                   <td style={{ padding: "14px 16px", color: "var(--ink-secondary)", whiteSpace: "nowrap" }}>{formatMsk(o.created_at)}</td>
                 </tr>

@@ -5,7 +5,7 @@ import AdminShell from "@/components/AdminShell";
 import { adminFetch } from "@/lib/adminApi";
 import { formatMsk } from "@/lib/format";
 import { useIsMobile } from "@/lib/useIsMobile";
-import { IconCheckCircle, IconClock, IconPencil, IconInfo } from "@/components/icons";
+import { IconCheckCircle, IconClock, IconPencil, IconInfo, IconOrders, IconTrash } from "@/components/icons";
 
 interface AdminUser {
   id: string; email: string; phone: string; customer_type: string;
@@ -102,18 +102,19 @@ function UserRow({ u, busy, isMobile, onPatch, onSaveDiscount, onDelete }: {
     : orders.length === 0
     ? <span style={{ fontSize: 13, color: "var(--ink-secondary)" }}>Заказов пока нет</span>
     : (
-      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-        {orders.map(o => (
+      <div style={{ border: "1px solid var(--hairline-soft)", borderRadius: 12, overflow: "hidden", background: "var(--canvas)" }}>
+        {orders.map((o, i) => (
           <div key={o.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12,
-            flexWrap: "wrap", padding: "9px 12px", background: "var(--surface, #f7f8fa)", borderRadius: 10 }}>
+            flexWrap: "wrap", padding: "11px 14px", borderTop: i ? "1px solid var(--hairline-soft)" : "none" }}>
             <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap", minWidth: 0 }}>
               <b style={{ fontSize: 13 }}>{o.number}</b>
               <span style={{ fontSize: 12, color: "var(--ink-secondary)" }}>{formatMsk(o.created_at)}</span>
               <span style={{ fontSize: 12, color: "var(--ink-tertiary)" }}>· {o.items_count} поз.</span>
             </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <span style={{ fontSize: 11, fontWeight: 600, padding: "2px 9px", borderRadius: 999,
-                background: "var(--accent-soft, #e7edff)", color: "var(--accent, #003399)", whiteSpace: "nowrap" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11.5, fontWeight: 600,
+                padding: "3px 10px", borderRadius: 999, background: "var(--accent-soft, #e7edff)", color: "var(--accent, #003399)", whiteSpace: "nowrap" }}>
+                <span style={{ width: 6, height: 6, borderRadius: 999, background: "currentColor" }} />
                 {o.moysklad_status || ORDER_STATUS_LABEL[o.status] || o.status}
               </span>
               <b style={{ fontSize: 13, whiteSpace: "nowrap" }}>{Number(o.total_amount).toFixed(2)} ₽</b>
@@ -294,18 +295,20 @@ function UserRow({ u, busy, isMobile, onPatch, onSaveDiscount, onDelete }: {
 
       <td style={{ ...td, color: "var(--ink-secondary)" }}>{formatMsk(u.created_at)}</td>
       <td style={{ ...td, textAlign: "right", whiteSpace: "nowrap" }}>
-        <div style={{ display: "inline-flex", gap: 8 }}>
-          <button type="button" onClick={toggleOrders} title="История заказов покупателя"
-            style={{ padding: "6px 12px", borderRadius: 8, cursor: "pointer",
-              border: "1px solid var(--hairline-soft)", background: "var(--canvas)",
-              color: "var(--ink)", fontSize: 13, fontWeight: 600 }}>
-            {showOrders ? "Скрыть" : "Заказы"}
+        <div style={{ display: "inline-flex", gap: 6 }}>
+          <button type="button" onClick={toggleOrders} title={showOrders ? "Скрыть заказы" : "История заказов покупателя"}
+            aria-label="История заказов"
+            style={{ display: "inline-flex", padding: 7, borderRadius: 8, cursor: "pointer",
+              border: "1px solid " + (showOrders ? "var(--accent, #003399)" : "var(--hairline-soft)"),
+              background: showOrders ? "var(--accent-soft, #e7edff)" : "var(--canvas)",
+              color: showOrders ? "var(--accent, #003399)" : "var(--ink-secondary)" }}>
+            <IconOrders style={{ width: 16, height: 16 }} />
           </button>
-          <button type="button" onClick={onDelete} disabled={busy} title="Удалить покупателя"
-            style={{ padding: "6px 12px", borderRadius: 8, cursor: busy ? "default" : "pointer",
+          <button type="button" onClick={onDelete} disabled={busy} title="Удалить покупателя" aria-label="Удалить"
+            style={{ display: "inline-flex", padding: 7, borderRadius: 8, cursor: busy ? "default" : "pointer",
               border: "1px solid var(--danger, #c0392b)", background: "transparent",
-              color: "var(--danger, #c0392b)", fontSize: 13, fontWeight: 600, opacity: busy ? 0.5 : 1 }}>
-            Удалить
+              color: "var(--danger, #c0392b)", opacity: busy ? 0.5 : 1 }}>
+            <IconTrash style={{ width: 16, height: 16 }} />
           </button>
         </div>
       </td>
