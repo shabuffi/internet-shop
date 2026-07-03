@@ -171,13 +171,14 @@ export default function AdminProductsPage() {
                   </td>
                   <td style={{ padding: "14px 16px", fontWeight: 500 }}>{p.name}</td>
                   <td style={{ padding: "14px 16px", color: "var(--ink-secondary)" }}>{p.article ?? "—"}</td>
-                  <td style={{ padding: "14px 16px", fontWeight: 600 }}>{Number(p.price).toFixed(2)} ₽</td>
+                  <td style={{ padding: "14px 16px", fontWeight: 600, whiteSpace: "nowrap" }}>{Number(p.price).toFixed(2)} ₽</td>
                   <td style={{ padding: "14px 16px" }}>
                     <button
                       onClick={() => toggleAvailability(p.id, !p.available)}
                       title="Нажмите, чтобы переключить наличие"
                       style={{
                         fontSize: 12, fontWeight: 600, padding: "5px 12px", borderRadius: 999, cursor: "pointer",
+                        whiteSpace: "nowrap",
                         border: "1px solid " + (p.available ? "var(--stock)" : "var(--hairline-soft)"),
                         background: p.available ? "var(--stock-soft)" : "var(--cloud)",
                         color: p.available ? "var(--stock)" : "var(--ink-tertiary)",
