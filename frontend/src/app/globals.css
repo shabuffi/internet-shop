@@ -802,7 +802,7 @@ textarea.form-input { height: auto; min-height: 90px; padding: var(--s-3) var(--
   .brand { font-size: 21px; }
   .catalog__hero h1 { font-size: 30px; }
   .catalog__hero p { font-size: var(--t-body); }
-  .hero__grid { padding-top: var(--s-10); padding-bottom: var(--s-10); }
+  .hero__grid { padding-top: var(--s-12); padding-bottom: var(--s-16); }
   .hero h1 { font-size: 34px; }
   .hero__lead { font-size: var(--t-body); }
   .hero__actions .btn { width: 100%; }
