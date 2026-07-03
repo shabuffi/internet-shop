@@ -75,7 +75,7 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
                 background: active ? "var(--surface)" : "transparent",
                 marginBottom: 2, transition: "background .15s, color .15s",
               }}>
-                <item.Icon style={{ flexShrink: 0, opacity: active ? 1 : 0.7 }} /> {!c && item.label}
+                <item.Icon width={19} height={19} style={{ width: 19, height: 19, flexShrink: 0, opacity: active ? 1 : 0.7 }} /> {!c && item.label}
               </Link>
             );
           })}
