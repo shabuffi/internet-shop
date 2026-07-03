@@ -93,6 +93,19 @@ def test_patch_user_requires_auth_401(client, db_session):
     assert r.status_code == 401
 
 
+def test_set_duplicate_ext_code_409(client, token, db_session):
+    _make_user(db_session, email="a@ya.ru", phone="+79001110000", moysklad_ext_code="SAME")
+    u2 = _make_user(db_session, email="b@ya.ru", phone="+79002220000", moysklad_ext_code="OTHER")
+    # попытка поставить второму тот же код, что у первого → 409
+    r = client.patch(f"/api/v1/admin/users/{u2.id}",
+                     json={"moysklad_ext_code": "SAME"}, headers=_auth(token))
+    assert r.status_code == 409
+    # свой же код у себя менять можно (не считаем дублем)
+    ok = client.patch(f"/api/v1/admin/users/{u2.id}",
+                      json={"moysklad_ext_code": "OTHER"}, headers=_auth(token))
+    assert ok.status_code == 200
+
+
 # ─── история заказов по клиенту (фильтры user_id / phone + is_guest) ─────────
 
 def test_orders_filter_by_user_id(client, token, db_session):

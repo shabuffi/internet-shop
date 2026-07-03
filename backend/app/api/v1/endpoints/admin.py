@@ -1170,6 +1170,15 @@ def update_user(
 
     if "moysklad_ext_code" in body:
         code = (str(body["moysklad_ext_code"]) or "").strip()
+        if code:
+            # Один «Внешний код» = один контрагент = один покупатель. Не даём привязать
+            # тот же код к другому клиенту (иначе их заказы уйдут на одного контрагента).
+            dup = db.scalar(select(Customer).where(
+                Customer.moysklad_ext_code == code, Customer.id != user_id))
+            if dup:
+                raise HTTPException(
+                    status_code=409,
+                    detail=f"Этот «Внешний код» уже стоит у покупателя «{dup.customer_name}»")
         user.moysklad_ext_code = code or None
 
     db.commit()

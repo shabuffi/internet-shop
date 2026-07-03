@@ -105,6 +105,9 @@ def register(body: RegisterIn, request: Request, response: Response, db: Session
     rate_limit(f"rl:register:{client_ip(request)}", limit=5, window_sec=3600)
     if db.scalar(select(User).where(User.email == body.email)):
         raise HTTPException(status_code=409, detail="Пользователь с таким email уже зарегистрирован")
+    # Телефон нормализован схемой к +7XXXXXXXXXX — проверяем уникальность (один номер = один аккаунт)
+    if db.scalar(select(User).where(User.phone == body.phone)):
+        raise HTTPException(status_code=409, detail="Пользователь с таким телефоном уже зарегистрирован")
 
     user = User(
         email=body.email,

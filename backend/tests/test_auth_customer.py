@@ -66,6 +66,13 @@ def test_register_duplicate_email_409(client, db_session):
     assert r.status_code == 409
 
 
+def test_register_duplicate_phone_409(client, db_session):
+    client.post("/api/v1/auth/register", json=VALID)
+    # другой email, тот же телефон → отклоняем
+    r = client.post("/api/v1/auth/register", json={**VALID, "email": "other@yandex.ru"})
+    assert r.status_code == 409
+
+
 # ─── вход (существующие клиенты не должны потерять доступ) ────────────────────
 
 def test_login_existing_weak_password_works(client, db_session):
