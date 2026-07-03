@@ -370,6 +370,13 @@ async def exchange_post(
             saved = save_image(filename, body)
             logger.info("Received image: %s → %s (%d bytes)", filename, saved, len(body))
             return "success"
+        # Изменения по заказам от МойСклад (опция «Выгружать изменения по заказам»):
+        # МойСклад загружает нам orders.xml с текущим состоянием заказов. Сохраняем сырьё
+        # (для разбора статусов) и подтверждаем — иначе МойСклад шлёт его каждый цикл.
+        if filename == "orders.xml":
+            redis_client.set("exchange:incoming:orders.xml", body, ex=7 * 86400)
+            logger.info("Received orders.xml от МойСклад (%d bytes) — сохранено для разбора", len(body))
+            return "success"
         logger.warning("Отклонён файл обмена с именем %s", filename)
         return "failure\nНедопустимое имя файла"
 
