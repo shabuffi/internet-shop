@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import AdminShell from "@/components/AdminShell";
 import { adminFetch, adminUpload } from "@/lib/adminApi";
 import { formatMsk } from "@/lib/format";
+import { useIsMobile } from "@/lib/useIsMobile";
 
 interface AdminProduct { id: string; name: string; article: string | null; price: string; stock: number; available: boolean; images: string[]; images_manual: boolean; is_active: boolean; synced_at: string | null; }
 
@@ -17,6 +18,7 @@ export default function AdminProductsPage() {
   const [filters, setFilters] = useState({ photo: "", desc: "", avail: "" }); // фильтры каталога
   const [ver, setVer] = useState(0);                       // для сброса кэша миниатюр
   const [busyId, setBusyId] = useState<string | null>(null);
+  const isMobile = useIsMobile();
 
   const pages = Math.max(1, Math.ceil(total / pageSize));
 
@@ -82,6 +84,37 @@ export default function AdminProductsPage() {
     } catch { /* ignore */ } finally { setBusyId(null); }
   }
 
+  // Общие элементы (таблица + мобильные карточки)
+  const photoStrip = (p: AdminProduct) => (
+    <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+      {p.images.map((img, i) => (
+        <span key={img} style={{ position: "relative", lineHeight: 0 }}>
+          <img src={`/api/v1/products/${p.id}/image?n=${i}&v=${ver}`} alt="" width={40} height={40}
+            style={{ objectFit: "cover", borderRadius: 6, border: "1px solid var(--hairline-soft)" }} />
+          <button onClick={() => deleteImage(p.id, img)} title="Удалить фото"
+            style={{ position: "absolute", top: -7, right: -7, width: 18, height: 18, borderRadius: 999,
+              border: "none", background: "var(--ink)", color: "#fff", fontSize: 12, lineHeight: "16px", cursor: "pointer", padding: 0 }}>×</button>
+        </span>
+      ))}
+      <label title="Загрузить фото"
+        style={{ width: 40, height: 40, borderRadius: 6, border: "1px dashed var(--graphite)",
+          display: "flex", alignItems: "center", justifyContent: "center", cursor: busyId === p.id ? "wait" : "pointer",
+          color: "var(--graphite)", fontSize: 20, opacity: busyId === p.id ? 0.5 : 1 }}>
+        ＋
+        <input type="file" accept="image/*" hidden onChange={e => { uploadImage(p.id, e.target.files?.[0]); e.target.value = ""; }} />
+      </label>
+    </div>
+  );
+  const availBtn = (p: AdminProduct) => (
+    <button onClick={() => toggleAvailability(p.id, !p.available)} title="Нажмите, чтобы переключить наличие"
+      style={{ fontSize: 12, fontWeight: 600, padding: "5px 12px", borderRadius: 999, cursor: "pointer", whiteSpace: "nowrap",
+        border: "1px solid " + (p.available ? "var(--stock)" : "var(--hairline-soft)"),
+        background: p.available ? "var(--stock-soft)" : "var(--cloud)",
+        color: p.available ? "var(--stock)" : "var(--ink-tertiary)" }}>
+      {p.available ? "В наличии" : "Нет"}
+    </button>
+  );
+
   return (
     <AdminShell>
       <div style={{ display: "flex", alignItems: "baseline", gap: 12, marginBottom: 20, flexWrap: "wrap" }}>
@@ -129,12 +162,33 @@ export default function AdminProductsPage() {
         )}
       </div>
 
-      <div style={{ background: "var(--canvas)", borderRadius: "var(--radius-lg)", border: "1px solid var(--hairline-soft)", overflow: "hidden" }}>
-        {products.length === 0 ? (
+      {products.length === 0 ? (
+        <div style={{ background: "var(--canvas)", borderRadius: "var(--radius-lg)", border: "1px solid var(--hairline-soft)" }}>
           <p style={{ padding: 32, color: "var(--ink-secondary)", textAlign: "center" }}>
             {query ? `По запросу «${query}» ничего не найдено` : "Товаров нет — запустите синхронизацию"}
           </p>
-        ) : (
+        </div>
+      ) : isMobile ? (
+        /* Мобильный вид — карточки вместо таблицы */
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          {products.map(p => (
+            <div key={p.id} style={{ background: "var(--canvas)", border: "1px solid var(--hairline-soft)", borderRadius: 12, padding: 14 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "flex-start", marginBottom: 12 }}>
+                <div style={{ fontWeight: 600, minWidth: 0, lineHeight: 1.35 }}>{p.name}</div>
+                <div style={{ fontWeight: 700, whiteSpace: "nowrap" }}>{Number(p.price).toFixed(2)} ₽</div>
+              </div>
+              <div style={{ marginBottom: 12 }}>{photoStrip(p)}</div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: "8px 16px", alignItems: "center", fontSize: 13, color: "var(--ink-secondary)" }}>
+                {availBtn(p)}
+                <span style={{ fontWeight: 600, color: p.is_active ? "var(--success)" : "var(--ink-tertiary)" }}>{p.is_active ? "Активен" : "Скрыт"}</span>
+                {p.article && <span>Арт. {p.article}</span>}
+                <span>{formatMsk(p.synced_at)}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div style={{ background: "var(--canvas)", borderRadius: "var(--radius-lg)", border: "1px solid var(--hairline-soft)", overflow: "hidden" }}>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
             <thead>
               <tr style={{ borderBottom: "1px solid var(--hairline-soft)" }}>
@@ -146,61 +200,23 @@ export default function AdminProductsPage() {
             <tbody>
               {products.map(p => (
                 <tr key={p.id} style={{ borderBottom: "1px solid var(--hairline-soft)" }}>
-                  <td style={{ padding: "12px 16px" }}>
-                    <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
-                      {p.images.map((img, i) => (
-                        <span key={img} style={{ position: "relative", lineHeight: 0 }}>
-                          <img src={`/api/v1/products/${p.id}/image?n=${i}&v=${ver}`} alt=""
-                            width={40} height={40}
-                            style={{ objectFit: "cover", borderRadius: 6, border: "1px solid var(--hairline-soft)" }} />
-                          <button onClick={() => deleteImage(p.id, img)} title="Удалить фото"
-                            style={{ position: "absolute", top: -7, right: -7, width: 18, height: 18, borderRadius: 999,
-                              border: "none", background: "var(--ink)", color: "#fff", fontSize: 12, lineHeight: "16px",
-                              cursor: "pointer", padding: 0 }}>×</button>
-                        </span>
-                      ))}
-                      <label title="Загрузить фото"
-                        style={{ width: 40, height: 40, borderRadius: 6, border: "1px dashed var(--graphite)",
-                          display: "flex", alignItems: "center", justifyContent: "center", cursor: busyId === p.id ? "wait" : "pointer",
-                          color: "var(--graphite)", fontSize: 20, opacity: busyId === p.id ? 0.5 : 1 }}>
-                        ＋
-                        <input type="file" accept="image/*" hidden
-                          onChange={e => { uploadImage(p.id, e.target.files?.[0]); e.target.value = ""; }} />
-                      </label>
-                    </div>
-                  </td>
+                  <td style={{ padding: "12px 16px" }}>{photoStrip(p)}</td>
                   <td style={{ padding: "14px 16px", fontWeight: 500 }}>{p.name}</td>
                   <td style={{ padding: "14px 16px", color: "var(--ink-secondary)" }}>{p.article ?? "—"}</td>
                   <td style={{ padding: "14px 16px", fontWeight: 600, whiteSpace: "nowrap" }}>{Number(p.price).toFixed(2)} ₽</td>
-                  <td style={{ padding: "14px 16px" }}>
-                    <button
-                      onClick={() => toggleAvailability(p.id, !p.available)}
-                      title="Нажмите, чтобы переключить наличие"
-                      style={{
-                        fontSize: 12, fontWeight: 600, padding: "5px 12px", borderRadius: 999, cursor: "pointer",
-                        whiteSpace: "nowrap",
-                        border: "1px solid " + (p.available ? "var(--stock)" : "var(--hairline-soft)"),
-                        background: p.available ? "var(--stock-soft)" : "var(--cloud)",
-                        color: p.available ? "var(--stock)" : "var(--ink-tertiary)",
-                      }}
-                    >
-                      {p.available ? "В наличии" : "Нет"}
-                    </button>
-                  </td>
+                  <td style={{ padding: "14px 16px" }}>{availBtn(p)}</td>
                   <td style={{ padding: "14px 16px" }}>
                     <span style={{ fontSize: 12, fontWeight: 600, color: p.is_active ? "var(--success)" : "var(--ink-tertiary)" }}>
                       {p.is_active ? "Активен" : "Скрыт"}
                     </span>
                   </td>
-                  <td style={{ padding: "14px 16px", fontSize: 12, color: "var(--ink-secondary)" }}>
-                    {formatMsk(p.synced_at)}
-                  </td>
+                  <td style={{ padding: "14px 16px", fontSize: 12, color: "var(--ink-secondary)" }}>{formatMsk(p.synced_at)}</td>
                 </tr>
               ))}
             </tbody>
           </table>
-        )}
-      </div>
+        </div>
+      )}
 
       {pages > 1 && (
         <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 12, marginTop: 24 }}>
