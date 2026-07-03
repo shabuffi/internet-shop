@@ -131,6 +131,38 @@ def _mark_orders_exported(db: Session) -> None:
     logger.info("EXCHANGE success: помечено выгруженными %d", marked)
 
 
+def _apply_order_statuses(db: Session, body: bytes) -> int:
+    """Применяет статусы из orders.xml к нашим заказам (сопоставление по номеру).
+
+    МойСклад присылает по каждому заказу «Статус заказа» (свободный текст) и «Номер по 1С».
+    Обновляем ``moysklad_status`` / ``moysklad_number``; ПометкаУдаления=true → отменяем заказ
+    на сайте (остаток не трогаем — им управляет МойСклад).
+
+    Returns:
+        Число заказов, у которых что-то изменилось.
+    """
+    from app.integrations.moysklad.commerceml_order_status import parse_order_statuses
+    n = 0
+    for r in parse_order_statuses(body):
+        order = db.scalar(select(Order).where(Order.number == r["number"]))
+        if not order:
+            continue
+        changed = False
+        if r["status"] and order.moysklad_status != r["status"]:
+            order.moysklad_status = r["status"]
+            changed = True
+        if r["ms_number"] and order.moysklad_number != r["ms_number"]:
+            order.moysklad_number = r["ms_number"]
+            changed = True
+        if r["deleted"] and order.status != "cancelled":
+            order.status = "cancelled"
+            changed = True
+        if changed:
+            n += 1
+    db.commit()
+    return n
+
+
 # ── Аутентификация обмена ─────────────────────────────────────────────────────
 # МойСклад присылает логин/пароль (Basic Auth) на checkauth и cookie на
 # последующих запросах. Сверяем их с парой, сохранённой в админке.
@@ -371,11 +403,15 @@ async def exchange_post(
             logger.info("Received image: %s → %s (%d bytes)", filename, saved, len(body))
             return "success"
         # Изменения по заказам от МойСклад (опция «Выгружать изменения по заказам»):
-        # МойСклад загружает нам orders.xml с текущим состоянием заказов. Сохраняем сырьё
-        # (для разбора статусов) и подтверждаем — иначе МойСклад шлёт его каждый цикл.
+        # МойСклад загружает orders.xml с текущим состоянием заказов. Разбираем статус
+        # («Статус заказа») и обновляем свои заказы по номеру. Сырьё храним для диагностики.
         if filename == "orders.xml":
             redis_client.set("exchange:incoming:orders.xml", body, ex=7 * 86400)
-            logger.info("Received orders.xml от МойСклад (%d bytes) — сохранено для разбора", len(body))
+            try:
+                updated = _apply_order_statuses(db, body)
+                logger.info("orders.xml от МойСклад (%d bytes): обновлено заказов %d", len(body), updated)
+            except Exception as exc:
+                logger.error("orders.xml разбор/применение — ошибка: %s", exc)
             return "success"
         logger.warning("Отклонён файл обмена с именем %s", filename)
         return "failure\nНедопустимое имя файла"

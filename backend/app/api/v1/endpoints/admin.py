@@ -711,6 +711,7 @@ def list_orders(
         "items": [
             {
                 "id": o.id, "number": o.number, "status": o.status,
+                "moysklad_status": o.moysklad_status,
                 "customer_name": o.customer_name, "customer_phone": o.customer_phone,
                 "user_id": o.user_id, "is_guest": o.user_id is None,
                 "total_amount": str(o.total_amount),

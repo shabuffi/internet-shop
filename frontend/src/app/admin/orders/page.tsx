@@ -6,7 +6,7 @@ import { adminFetch } from "@/lib/adminApi";
 import { formatMsk } from "@/lib/format";
 import { useIsMobile } from "@/lib/useIsMobile";
 
-interface AdminOrder { id: string; number: string; status: string; customer_name: string; customer_phone: string; user_id: string | null; is_guest: boolean; total_amount: string; exported_at: string | null; created_at: string; items_count: number; }
+interface AdminOrder { id: string; number: string; status: string; moysklad_status: string | null; customer_name: string; customer_phone: string; user_id: string | null; is_guest: boolean; total_amount: string; exported_at: string | null; created_at: string; items_count: number; }
 
 // Заказы ведутся в МойСклад; на сайте оставляем только «Новый» и «Отменён».
 // (остальные метки — для отображения возможных старых значений)
@@ -75,6 +75,9 @@ export default function AdminOrdersPage() {
   const exportBadge = (o: AdminOrder) => (o.exported_at
     ? <span style={{ color: "var(--success)", fontSize: 12 }} title="Выгружен в МойСклад">✓ Выгружен</span>
     : <span style={{ color: "var(--ink-tertiary)", fontSize: 12 }} title="МойСклад заберёт заказ при следующем обмене">Ожидает</span>);
+  const msBadge = (o: AdminOrder) => (o.moysklad_status
+    ? <span title="Статус в МойСклад" style={{ fontSize: 11, fontWeight: 600, color: "var(--accent, #003399)", whiteSpace: "nowrap" }}>МС: {o.moysklad_status}</span>
+    : null);
 
   return (
     <AdminShell>
@@ -122,8 +125,8 @@ export default function AdminOrdersPage() {
                 <span>{formatMsk(o.created_at)}</span>
                 {exportBadge(o)}
               </div>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, borderTop: "1px solid var(--hairline-soft)", paddingTop: 10 }}>
-                <span style={{ fontSize: 12, color: "var(--ink-tertiary)" }}>Статус</span>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, borderTop: "1px solid var(--hairline-soft)", paddingTop: 10, flexWrap: "wrap" }}>
+                <span style={{ fontSize: 12, color: "var(--ink-tertiary)" }}>Статус {msBadge(o)}</span>
                 {statusSelect(o)}
               </div>
             </div>
@@ -151,7 +154,12 @@ export default function AdminOrdersPage() {
                   <td style={{ padding: "14px 16px" }}>{phoneBtn(o)}</td>
                   <td style={{ padding: "14px 16px" }}>{o.items_count}</td>
                   <td style={{ padding: "14px 16px", fontWeight: 600, whiteSpace: "nowrap" }}>{Number(o.total_amount).toFixed(2)} ₽</td>
-                  <td style={{ padding: "14px 16px" }}>{statusSelect(o)}</td>
+                  <td style={{ padding: "14px 16px" }}>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 4, alignItems: "flex-start" }}>
+                      {statusSelect(o)}
+                      {msBadge(o)}
+                    </div>
+                  </td>
                   <td style={{ padding: "14px 16px", fontSize: 12 }}>{exportBadge(o)}</td>
                   <td style={{ padding: "14px 16px", color: "var(--ink-secondary)", whiteSpace: "nowrap" }}>{formatMsk(o.created_at)}</td>
                 </tr>

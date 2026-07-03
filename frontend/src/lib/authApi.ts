@@ -92,6 +92,7 @@ export interface OrderHistory {
   id: string;
   number: string;
   status: string;
+  moysklad_status?: string | null;
   total_amount: string;
   items: OrderHistoryItem[];
   created_at: string;

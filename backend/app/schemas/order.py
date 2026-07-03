@@ -52,6 +52,8 @@ class OrderOut(BaseModel):
     id: str
     number: str
     status: str
+    # Статус из МойСклад (фактический статус исполнения), если пришёл обратно в обмене
+    moysklad_status: str | None = None
     total_amount: Decimal
     items: list[OrderItemOut]
     created_at: datetime

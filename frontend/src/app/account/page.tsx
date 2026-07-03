@@ -228,7 +228,10 @@ function OrderCard({ order }: { order: OrderHistory }) {
         <span style={{ fontSize: "var(--t-sm)", color: "var(--charcoal)" }}>{formatMsk(order.created_at)}</span>
       </div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: "var(--s-3)", marginBottom: "var(--s-3)" }}>
-        <span style={{ fontSize: "var(--t-sm)", fontWeight: 600, color: order.status === "cancelled" ? "var(--charcoal)" : "var(--primary, #003399)", background: "var(--surface, #f5f6f8)", padding: "2px 10px", borderRadius: 999 }}>{BUYER_ORDER_STATUS[order.status] ?? order.status}</span>
+        <span style={{ fontSize: "var(--t-sm)", fontWeight: 600, color: order.status === "cancelled" ? "var(--charcoal)" : "var(--primary, #003399)", background: "var(--surface, #f5f6f8)", padding: "2px 10px", borderRadius: 999 }}>
+          {/* Статус из МойСклад (фактический) приоритетнее нашего внутреннего */}
+          {order.moysklad_status || BUYER_ORDER_STATUS[order.status] || order.status}
+        </span>
         <span style={{ fontWeight: 700 }}>{formatPrice(order.total_amount)}</span>
       </div>
       <ul style={{ listStyle: "none", margin: 0, padding: 0, fontSize: "var(--t-sm)", color: "var(--ink)" }}>

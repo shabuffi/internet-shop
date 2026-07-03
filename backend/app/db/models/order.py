@@ -38,6 +38,13 @@ class Order(Base):
     # ID заказа в МойСклад (заполняется после синхронизации)
     moysklad_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
 
+    # Статус заказа из МойСклад (приходит обратно в orders.xml, реквизит «Статус заказа»):
+    # свободный текст МойСклад — «Новый», «Подтверждён», «Собран», «Отгружен» и т.п.
+    # Показываем клиенту/владельцу как фактический статус исполнения.
+    moysklad_status: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    # Внутренний номер заказа в МойСклад («Номер по 1С», напр. 00005)
+    moysklad_number: Mapped[str | None] = mapped_column(String(50), nullable=True)
+
     # Когда заказ выгружен в МойСклад через обмен CommerceML (МойСклад сам забирает
     # заказы). NULL — ещё не выгружен; ставится при подтверждении выгрузки (mode=success).
     exported_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
