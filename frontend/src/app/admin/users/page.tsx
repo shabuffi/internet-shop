@@ -21,7 +21,7 @@ const TYPE_LABEL: Record<string, string> = { individual: "Физлицо", ip: "
 const ORDER_STATUS_LABEL: Record<string, string> = { new: "Новый", cancelled: "Отменён", confirmed: "Подтверждён", shipped: "Отправлен", delivered: "Доставлен" };
 const TABLE_COLS = 10;  // число колонок таблицы покупателей (для colSpan строки истории)
 
-const td: React.CSSProperties = { padding: "14px 16px", verticalAlign: "top" };
+const td: React.CSSProperties = { padding: "11px 12px", verticalAlign: "top" };
 const btnPrimary: React.CSSProperties = {
   padding: "6px 14px", borderRadius: 8, cursor: "pointer", border: "none",
   background: "var(--accent-2, #E02424)", color: "#fff", fontSize: 13, fontWeight: 700,
@@ -82,8 +82,8 @@ function UserRow({ u, busy, onPatch, onSaveDiscount, onDelete }: {
   return (
     <>
     <tr style={{ borderBottom: showOrders ? "none" : "1px solid var(--hairline-soft)", background: u.is_active ? "transparent" : "var(--accent-2-soft, #fdeaea)" }}>
-      {/* Статус / активация */}
-      <td style={{ ...td, whiteSpace: "nowrap", minWidth: 200 }}>
+      {/* Статус / активация (ширину не форсируем — «Активен» узкий; кнопки активации переносятся) */}
+      <td style={{ ...td, whiteSpace: "nowrap" }}>
         {u.is_active ? (
           <span style={{ display: "inline-flex", alignItems: "center", gap: 7, fontSize: 13, fontWeight: 600, color: "var(--stock, #16794a)" }}>
             <IconCheckCircle style={{ width: 16, height: 16 }} /> Активен
@@ -320,7 +320,7 @@ export default function AdminUsersPage() {
             <thead>
               <tr style={{ borderBottom: "1px solid var(--hairline-soft)" }}>
                 {["Статус", "Наименование", "Тип", "ИНН", "Email", "Телефон", "Скидка %", "Внешний код МС", "Регистрация", ""].map((h, i) => (
-                  <th key={h || i} style={{ padding: "12px 16px", textAlign: "left", fontWeight: 600, color: "var(--ink-secondary)", fontSize: 12, whiteSpace: "nowrap" }}>{h}</th>
+                  <th key={h || i} style={{ padding: "10px 12px", textAlign: "left", fontWeight: 600, color: "var(--ink-secondary)", fontSize: 12, whiteSpace: "nowrap" }}>{h}</th>
                 ))}
               </tr>
             </thead>
