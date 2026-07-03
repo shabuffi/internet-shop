@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import AdminShell from "@/components/AdminShell";
 import { adminFetch } from "@/lib/adminApi";
 import { formatMsk } from "@/lib/format";
@@ -20,6 +20,21 @@ interface UserOrder {
 const TYPE_LABEL: Record<string, string> = { individual: "Физлицо", ip: "ИП", ooo: "ООО" };
 const ORDER_STATUS_LABEL: Record<string, string> = { new: "Новый", cancelled: "Отменён", confirmed: "Подтверждён", shipped: "Отправлен", delivered: "Доставлен" };
 const TABLE_COLS = 10;  // число колонок таблицы покупателей (для colSpan строки истории)
+
+type SortKey = "is_active" | "customer_name" | "customer_type" | "inn" | "email" | "phone" | "discount_percent" | "moysklad_ext_code" | "created_at";
+// Колонки таблицы: label + ключ сортировки (null — колонка не сортируется).
+const COLS: { label: string; key: SortKey | null }[] = [
+  { label: "Статус", key: "is_active" },
+  { label: "Наименование", key: "customer_name" },
+  { label: "Тип", key: "customer_type" },
+  { label: "ИНН", key: "inn" },
+  { label: "Email", key: "email" },
+  { label: "Телефон", key: "phone" },
+  { label: "Скидка %", key: "discount_percent" },
+  { label: "Внешний код МС", key: "moysklad_ext_code" },
+  { label: "Регистрация", key: "created_at" },
+  { label: "", key: null },
+];
 
 const td: React.CSSProperties = { padding: "11px 12px", verticalAlign: "top" };
 const btnPrimary: React.CSSProperties = {
@@ -225,6 +240,33 @@ export default function AdminUsersPage() {
   const [guestCode, setGuestCode] = useState("");
   const [guestSaving, setGuestSaving] = useState(false);
   const [guestSaved, setGuestSaved] = useState(false);
+  // Поиск и сортировка (клиентские — покупателей немного)
+  const [query, setQuery] = useState("");
+  const [sort, setSort] = useState<{ key: SortKey; dir: "asc" | "desc" }>({ key: "created_at", dir: "desc" });
+
+  function toggleSort(key: SortKey) {
+    setSort((s) => (s.key === key ? { key, dir: s.dir === "asc" ? "desc" : "asc" } : { key, dir: "asc" }));
+  }
+
+  const visible = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    const list = q
+      ? users.filter((u) =>
+          [u.customer_name, u.email, u.phone, u.inn ?? "", u.moysklad_ext_code ?? ""]
+            .some((v) => v.toLowerCase().includes(q)))
+      : users;
+    const dir = sort.dir === "asc" ? 1 : -1;
+    const val = (u: AdminUser): string | number => {
+      if (sort.key === "is_active") return u.is_active ? 1 : 0;
+      if (sort.key === "discount_percent") return Number(u.discount_percent);
+      if (sort.key === "created_at") return u.created_at;   // ISO — сортируется хронологически
+      return (u[sort.key] ?? "").toString().toLowerCase();
+    };
+    return [...list].sort((a, b) => {
+      const av = val(a), bv = val(b);
+      return av < bv ? -dir : av > bv ? dir : 0;
+    });
+  }, [users, query, sort]);
 
   function load() {
     adminFetch<AdminUser[]>("/users").then(setUsers).catch(() => {});
@@ -279,7 +321,9 @@ export default function AdminUsersPage() {
     <AdminShell>
       <div style={{ display: "flex", alignItems: "baseline", gap: 12, marginBottom: 16 }}>
         <h1 style={{ fontSize: 24, fontWeight: 700, letterSpacing: -0.3 }}>Покупатели</h1>
-        <span style={{ fontSize: 14, color: "var(--ink-secondary)" }}>{users.length} всего</span>
+        <span style={{ fontSize: 14, color: "var(--ink-secondary)" }}>
+          {query ? `${visible.length} из ${users.length}` : `${users.length} всего`}
+        </span>
         {pending > 0 && <span style={{ fontSize: 13, fontWeight: 600, color: "var(--accent-2, #E02424)" }}>{pending} ждут активации</span>}
         {error && <span style={{ fontSize: 13, color: "var(--critical, #c0392b)" }}>{error}</span>}
       </div>
@@ -312,20 +356,39 @@ export default function AdminUsersPage() {
         {guestSaved && <span style={{ fontSize: 13, color: "var(--stock, #16794a)", fontWeight: 600 }}>✓ Сохранено</span>}
       </div>
 
+      {/* Поиск по покупателям */}
+      <div style={{ marginBottom: 12, maxWidth: 360 }}>
+        <input value={query} onChange={(e) => setQuery(e.target.value)}
+          placeholder="Поиск: имя, email, телефон, ИНН, код…"
+          style={{ width: "100%", fontSize: 14, padding: "8px 12px", borderRadius: 8,
+            border: "1px solid var(--hairline-soft)", background: "var(--canvas)", color: "var(--ink)" }} />
+      </div>
+
       <div style={{ background: "var(--canvas)", borderRadius: "var(--radius-lg)", border: "1px solid var(--hairline-soft)", overflowX: "auto" }}>
         {users.length === 0 ? (
           <p style={{ padding: 32, color: "var(--ink-secondary)", textAlign: "center" }}>Зарегистрированных покупателей пока нет</p>
+        ) : visible.length === 0 ? (
+          <p style={{ padding: 32, color: "var(--ink-secondary)", textAlign: "center" }}>Ничего не найдено по «{query}»</p>
         ) : (
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
             <thead>
               <tr style={{ borderBottom: "1px solid var(--hairline-soft)" }}>
-                {["Статус", "Наименование", "Тип", "ИНН", "Email", "Телефон", "Скидка %", "Внешний код МС", "Регистрация", ""].map((h, i) => (
-                  <th key={h || i} style={{ padding: "10px 12px", textAlign: "left", fontWeight: 600, color: "var(--ink-secondary)", fontSize: 12, whiteSpace: "nowrap" }}>{h}</th>
-                ))}
+                {COLS.map((col, i) => {
+                  const activeSort = col.key && sort.key === col.key;
+                  return (
+                    <th key={col.label || i}
+                      onClick={col.key ? () => toggleSort(col.key!) : undefined}
+                      style={{ padding: "10px 12px", textAlign: "left", fontWeight: 600,
+                        color: activeSort ? "var(--ink)" : "var(--ink-secondary)", fontSize: 12, whiteSpace: "nowrap",
+                        cursor: col.key ? "pointer" : "default", userSelect: "none" }}>
+                      {col.label}{activeSort ? (sort.dir === "asc" ? " ↑" : " ↓") : ""}
+                    </th>
+                  );
+                })}
               </tr>
             </thead>
             <tbody>
-              {users.map((u) => (
+              {visible.map((u) => (
                 <UserRow key={u.id} u={u} busy={busyId === u.id}
                   onPatch={(patch) => patchUser(u.id, patch)}
                   onSaveDiscount={(raw) => saveDiscount(u.id, raw)}
