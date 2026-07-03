@@ -41,6 +41,12 @@ export async function generateMetadata(): Promise<Metadata> {
       description: store?.seo_og_description || description,
     },
     robots: { index: true, follow: true },
+    // Подтверждение прав в Яндекс.Вебмастере / Google Search Console (мета-теги в <head>).
+    // Коды вставляются в админке (раздел «Разработчик» → SEO); пусто → тег не выводится.
+    verification: {
+      yandex: store?.seo_yandex_verification || undefined,
+      google: store?.seo_google_verification || undefined,
+    },
   };
 }
 

@@ -101,6 +101,7 @@ export interface StoreInfo {
   // SEO
   seo_title?: string; seo_description?: string; seo_og_title?: string; seo_og_description?: string;
   seo_robots_index?: boolean;
+  seo_yandex_verification?: string; seo_google_verification?: string;
   // Тема
   theme_primary?: string;
   // Баннеры слайдера (в каталоге) — редактируется в dev-настройках

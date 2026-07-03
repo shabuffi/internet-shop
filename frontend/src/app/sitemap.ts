@@ -2,6 +2,9 @@ import type { MetadataRoute } from "next";
 import { getProducts } from "@/lib/api";
 import { SITE_URL } from "@/lib/site";
 
+// Рендер на запрос: свежий список товаров + корректный SITE_URL (домен из рантайма).
+export const dynamic = "force-dynamic";
+
 // Карта сайта для поисковиков: главная + все карточки товаров.
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const products: { id: string; updated_at?: string }[] = [];

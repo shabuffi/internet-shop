@@ -286,6 +286,9 @@ def get_dev_settings(db: Session = Depends(get_db), _=Depends(_get_current_dev))
         "seo_og_title":       _get_setting(db, "seo_og_title"),
         "seo_og_description": _get_setting(db, "seo_og_description"),
         "seo_robots_index":   _get_setting(db, "seo_robots_index", "1") != "0",
+        # Коды подтверждения прав в Яндекс.Вебмастере / Google Search Console (мета-теги)
+        "seo_yandex_verification": _get_setting(db, "seo_yandex_verification"),
+        "seo_google_verification": _get_setting(db, "seo_google_verification"),
         "theme_primary":      _get_setting(db, "theme_primary"),
     }
 
@@ -418,6 +421,7 @@ def save_dev_settings(body: dict, db: Session = Depends(get_db), _=Depends(_get_
         "chat_vk_api_id", "chat_vk_group_id",
         "social_vk", "social_telegram", "social_whatsapp", "social_instagram",
         "seo_title", "seo_description", "seo_og_title", "seo_og_description", "seo_robots_index",
+        "seo_yandex_verification", "seo_google_verification",
         "theme_primary",
     }
     bool_keys = {"chat_enabled", "seo_robots_index"}
@@ -983,6 +987,9 @@ def store_info_public(db: Session = Depends(get_db)):
         "seo_og_description": _get_setting(db, "seo_og_description"),
         # Индексация по умолчанию включена; "0" — выключить
         "seo_robots_index":   _get_setting(db, "seo_robots_index", "1") != "0",
+        # Коды подтверждения прав (мета-теги в <head>)
+        "seo_yandex_verification": _get_setting(db, "seo_yandex_verification"),
+        "seo_google_verification": _get_setting(db, "seo_google_verification"),
         # Тема
         "theme_primary":      _get_setting(db, "theme_primary"),
         # Баннеры слайдера (в каталоге): включён ли показ + JSON-массив (по умолчанию выкл.)

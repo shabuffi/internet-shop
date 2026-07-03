@@ -1,6 +1,10 @@
 import type { MetadataRoute } from "next";
 import { SITE_URL } from "@/lib/site";
 
+// Рендерим на каждый запрос (не кешируем на сборке) — иначе Sitemap-URL берёт SITE_URL
+// времени билда (был http://localhost), а не рантайма (домен из .env.prod).
+export const dynamic = "force-dynamic";
+
 // robots.txt: по умолчанию пускаем поисковики в каталог, закрываем админку и API.
 // Индексацию можно выключить в админке (раздел «Сайт» → SEO) — тогда закрываем весь сайт.
 export default async function robots(): Promise<MetadataRoute.Robots> {

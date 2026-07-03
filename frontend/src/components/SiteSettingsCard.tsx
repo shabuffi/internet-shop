@@ -27,6 +27,8 @@ interface SiteSettings {
   seo_og_title: string;
   seo_og_description: string;
   seo_robots_index: boolean;
+  seo_yandex_verification: string;
+  seo_google_verification: string;
   theme_primary: string;
 }
 
@@ -36,7 +38,8 @@ const EMPTY: SiteSettings = {
   chat_vk_api_id: "", chat_vk_group_id: "",
   social_vk: "", social_telegram: "", social_whatsapp: "", social_instagram: "",
   seo_title: "", seo_description: "", seo_og_title: "", seo_og_description: "",
-  seo_robots_index: true, theme_primary: "",
+  seo_robots_index: true, seo_yandex_verification: "", seo_google_verification: "",
+  theme_primary: "",
 };
 
 const KEYS = Object.keys(EMPTY) as (keyof SiteSettings)[];
@@ -191,6 +194,16 @@ export default function SiteSettingsCard() {
       <div style={{ ...field, flexDirection: "row", alignItems: "center", gap: 10 }}>
         <input type="checkbox" checked={form.seo_robots_index} onChange={(e) => set("seo_robots_index", e.target.checked)} />
         <span className="form-label" style={{ margin: 0 }}>Разрешить индексацию поисковиками (robots.txt)</span>
+      </div>
+      <div style={field}>
+        <label className="form-label">Код подтверждения Яндекс.Вебмастер</label>
+        <input className="form-input" value={form.seo_yandex_verification} onChange={(e) => set("seo_yandex_verification", e.target.value)}
+          placeholder="только значение content из мета-тега yandex-verification" autoComplete="off" />
+      </div>
+      <div style={field}>
+        <label className="form-label">Код подтверждения Google Search Console</label>
+        <input className="form-input" value={form.seo_google_verification} onChange={(e) => set("seo_google_verification", e.target.value)}
+          placeholder="только значение content из мета-тега google-site-verification" autoComplete="off" />
       </div>
 
       <div style={hr} />
