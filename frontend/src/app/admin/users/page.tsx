@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import AdminShell from "@/components/AdminShell";
 import { adminFetch } from "@/lib/adminApi";
 import { formatMsk } from "@/lib/format";
+import { useIsMobile } from "@/lib/useIsMobile";
 import { IconCheckCircle, IconClock, IconPencil, IconInfo } from "@/components/icons";
 
 interface AdminUser {
@@ -70,9 +71,10 @@ function InfoTooltip({ text }: { text: string }) {
 }
 
 // Одна строка покупателя: активация (как новый / как существующий) + редактирование кода (через карандаш).
-function UserRow({ u, busy, onPatch, onSaveDiscount, onDelete }: {
+function UserRow({ u, busy, isMobile, onPatch, onSaveDiscount, onDelete }: {
   u: AdminUser;
   busy: boolean;
+  isMobile: boolean;
   onPatch: (patch: Record<string, unknown>) => void;
   onSaveDiscount: (raw: string) => void;
   onDelete: () => void;
@@ -92,6 +94,110 @@ function UserRow({ u, busy, onPatch, onSaveDiscount, onDelete }: {
         setOrders(d.items);
       } catch { setOrders([]); }
     }
+  }
+
+  // История заказов — компактный список (общий для мобилы и десктопа)
+  const ordersHistory = orders === null
+    ? <span style={{ fontSize: 13, color: "var(--ink-secondary)" }}>Загрузка…</span>
+    : orders.length === 0
+    ? <span style={{ fontSize: 13, color: "var(--ink-secondary)" }}>Заказов пока нет</span>
+    : (
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        {orders.map(o => (
+          <div key={o.id} style={{ display: "flex", flexWrap: "wrap", gap: "2px 12px", fontSize: 13 }}>
+            <b>{o.number}</b>
+            <span style={{ color: "var(--ink-secondary)" }}>{formatMsk(o.created_at)}</span>
+            <span>{o.items_count} поз.</span>
+            <b>{Number(o.total_amount).toFixed(2)} ₽</b>
+            <span>{ORDER_STATUS_LABEL[o.status] ?? o.status}</span>
+            <span style={{ color: o.exported_at ? "var(--stock, #16794a)" : "var(--ink-tertiary)" }}>{o.exported_at ? "Выгружен" : "Ожидает"}</span>
+          </div>
+        ))}
+      </div>
+    );
+
+  // ─── Мобильная карточка ───
+  if (isMobile) {
+    return (
+      <div style={{ background: u.is_active ? "var(--canvas)" : "var(--accent-2-soft, #fdeaea)", border: "1px solid var(--hairline-soft)", borderRadius: 12, padding: 14 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "flex-start", marginBottom: 10 }}>
+          <div style={{ fontWeight: 600, minWidth: 0 }}>{u.customer_name}</div>
+          {u.is_active
+            ? <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 600, color: "var(--stock, #16794a)", whiteSpace: "nowrap" }}><IconCheckCircle style={{ width: 15, height: 15 }} /> Активен</span>
+            : <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 700, color: "var(--accent-2, #E02424)", whiteSpace: "nowrap" }}><IconClock style={{ width: 14, height: 14 }} /> Новый</span>}
+        </div>
+
+        {!u.is_active && (
+          <div style={{ marginBottom: 12 }}>
+            {!activateExisting ? (
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                <button type="button" style={btnPrimary} disabled={busy} onClick={() => onPatch({ is_active: true })}>Активировать как нового</button>
+                <button type="button" style={btnOutline} disabled={busy} onClick={() => { setCodeInput(u.moysklad_ext_code ?? ""); setActivateExisting(true); }}>Как существующего</button>
+              </div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                <span style={{ fontSize: 12, color: "var(--ink-secondary)" }}>«Внешний код» контрагента из МойСклад:</span>
+                <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+                  <input value={codeInput} onChange={(e) => setCodeInput(e.target.value)} placeholder="Внешний код МойСклад" style={codeInputStyle} />
+                  <button type="button" style={btnPrimary} disabled={busy || !codeInput.trim()} onClick={() => { onPatch({ is_active: true, moysklad_ext_code: codeInput.trim() }); setActivateExisting(false); }}>Активировать</button>
+                  <button type="button" style={btnOutline} disabled={busy} onClick={() => setActivateExisting(false)}>Отмена</button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "8px 16px", fontSize: 13, marginBottom: 12 }}>
+          <span style={{ color: "var(--ink-secondary)" }}>{TYPE_LABEL[u.customer_type] ?? u.customer_type}</span>
+          {u.inn && <span style={{ color: "var(--ink-secondary)" }}>ИНН {u.inn}</span>}
+          <span>{u.email}</span>
+          <span style={{ color: "var(--ink-secondary)" }}>{u.phone}</span>
+          <span style={{ color: "var(--ink-tertiary)" }}>{formatMsk(u.created_at)}</span>
+        </div>
+
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "10px 18px", alignItems: "center", marginBottom: 12 }}>
+          <label style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: 13, color: "var(--ink-secondary)" }}>
+            Скидка %
+            <input type="number" min={-30} max={9} step={1} defaultValue={Number(u.discount_percent)} aria-label={`Скидка ${u.customer_name}`} disabled={busy}
+              onBlur={(e) => { if (Number(e.target.value) !== Number(u.discount_percent)) onSaveDiscount(e.target.value); }}
+              style={{ width: 72, fontSize: 14, fontWeight: 600, padding: "6px 10px", borderRadius: 8, border: "1px solid var(--hairline-soft)", background: "var(--canvas)", color: "var(--ink)", opacity: busy ? 0.5 : 1 }} />
+          </label>
+          <div style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: 13, color: "var(--ink-secondary)", flexWrap: "wrap" }}>
+            Код МС:
+            {editCode ? (
+              <span style={{ display: "inline-flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+                <input value={codeInput} onChange={(e) => setCodeInput(e.target.value)} placeholder="Внешний код" style={codeInputStyle} autoFocus />
+                <button type="button" style={btnPrimary} disabled={busy} onClick={() => { onPatch({ moysklad_ext_code: codeInput.trim() }); setEditCode(false); }}>Сохранить</button>
+                <button type="button" style={btnOutline} disabled={busy} onClick={() => { setCodeInput(u.moysklad_ext_code ?? ""); setEditCode(false); }}>Отмена</button>
+              </span>
+            ) : (
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+                <span style={{ fontFamily: "ui-monospace, monospace", color: u.moysklad_ext_code ? "var(--ink)" : "var(--ink-tertiary)" }}>{u.moysklad_ext_code || "— не задан"}</span>
+                <button type="button" onClick={() => { setCodeInput(u.moysklad_ext_code ?? ""); setEditCode(true); }} title="Изменить внешний код" disabled={busy}
+                  style={{ display: "inline-flex", padding: 6, borderRadius: 8, cursor: "pointer", border: "1px solid var(--hairline-soft)", background: "var(--canvas)", color: "var(--ink-secondary)" }}>
+                  <IconPencil style={{ width: 15, height: 15 }} />
+                </button>
+              </span>
+            )}
+          </div>
+        </div>
+
+        <div style={{ display: "flex", gap: 8, borderTop: "1px solid var(--hairline-soft)", paddingTop: 12 }}>
+          <button type="button" onClick={toggleOrders}
+            style={{ padding: "6px 12px", borderRadius: 8, cursor: "pointer", border: "1px solid var(--hairline-soft)", background: "var(--canvas)", color: "var(--ink)", fontSize: 13, fontWeight: 600 }}>
+            {showOrders ? "Скрыть заказы" : "Заказы"}
+          </button>
+          <button type="button" onClick={onDelete} disabled={busy}
+            style={{ marginLeft: "auto", padding: "6px 12px", borderRadius: 8, cursor: busy ? "default" : "pointer", border: "1px solid var(--danger, #c0392b)", background: "transparent", color: "var(--danger, #c0392b)", fontSize: 13, fontWeight: 600, opacity: busy ? 0.5 : 1 }}>
+            Удалить
+          </button>
+        </div>
+
+        {showOrders && (
+          <div style={{ marginTop: 12, borderTop: "1px solid var(--hairline-soft)", paddingTop: 10 }}>{ordersHistory}</div>
+        )}
+      </div>
+    );
   }
 
   return (
@@ -195,37 +301,7 @@ function UserRow({ u, busy, onPatch, onSaveDiscount, onDelete }: {
     </tr>
     {showOrders && (
       <tr style={{ borderBottom: "1px solid var(--hairline-soft)", background: u.is_active ? "var(--surface, #fafafa)" : "var(--accent-2-soft, #fdeaea)" }}>
-        <td colSpan={TABLE_COLS} style={{ padding: "4px 16px 16px" }}>
-          {orders === null ? (
-            <span style={{ fontSize: 13, color: "var(--ink-secondary)" }}>Загрузка…</span>
-          ) : orders.length === 0 ? (
-            <span style={{ fontSize: 13, color: "var(--ink-secondary)" }}>Заказов пока нет</span>
-          ) : (
-            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
-              <thead>
-                <tr style={{ color: "var(--ink-secondary)" }}>
-                  {["Номер", "Дата", "Позиций", "Сумма", "Статус", "Выгрузка"].map(h => (
-                    <th key={h} style={{ textAlign: "left", fontWeight: 600, padding: "6px 10px" }}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {orders.map(o => (
-                  <tr key={o.id} style={{ borderTop: "1px solid var(--hairline-soft)" }}>
-                    <td style={{ padding: "6px 10px", fontWeight: 600 }}>{o.number}</td>
-                    <td style={{ padding: "6px 10px", color: "var(--ink-secondary)" }}>{formatMsk(o.created_at)}</td>
-                    <td style={{ padding: "6px 10px" }}>{o.items_count}</td>
-                    <td style={{ padding: "6px 10px", fontWeight: 600 }}>{Number(o.total_amount).toFixed(2)} ₽</td>
-                    <td style={{ padding: "6px 10px" }}>{ORDER_STATUS_LABEL[o.status] ?? o.status}</td>
-                    <td style={{ padding: "6px 10px", color: o.exported_at ? "var(--stock, #16794a)" : "var(--ink-tertiary)" }}>
-                      {o.exported_at ? "Выгружен" : "Ожидает"}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </td>
+        <td colSpan={TABLE_COLS} style={{ padding: "4px 16px 16px" }}>{ordersHistory}</td>
       </tr>
     )}
     </>
@@ -243,6 +319,7 @@ export default function AdminUsersPage() {
   // Поиск и сортировка (клиентские — покупателей немного)
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<{ key: SortKey; dir: "asc" | "desc" }>({ key: "created_at", dir: "desc" });
+  const isMobile = useIsMobile();
 
   function toggleSort(key: SortKey) {
     setSort((s) => (s.key === key ? { key, dir: s.dir === "asc" ? "desc" : "asc" } : { key, dir: "asc" }));
@@ -364,12 +441,41 @@ export default function AdminUsersPage() {
             border: "1px solid var(--hairline-soft)", background: "var(--canvas)", color: "var(--ink)" }} />
       </div>
 
-      <div style={{ background: "var(--canvas)", borderRadius: "var(--radius-lg)", border: "1px solid var(--hairline-soft)", overflowX: "auto" }}>
-        {users.length === 0 ? (
+      {/* Сортировка на мобиле (на десктопе — клик по заголовку колонки) */}
+      {isMobile && users.length > 0 && (
+        <div style={{ marginBottom: 12, display: "flex", alignItems: "center", gap: 8 }}>
+          <span style={{ fontSize: 13, color: "var(--ink-secondary)" }}>Сортировка:</span>
+          <select value={`${sort.key}:${sort.dir}`}
+            onChange={(e) => { const [k, d] = e.target.value.split(":"); setSort({ key: k as SortKey, dir: d as "asc" | "desc" }); }}
+            style={{ fontSize: 13, padding: "6px 10px", borderRadius: 8, border: "1px solid var(--hairline-soft)", background: "var(--canvas)", color: "var(--ink)" }}>
+            <option value="created_at:desc">Сначала новые</option>
+            <option value="created_at:asc">Сначала старые</option>
+            <option value="customer_name:asc">Имя А–Я</option>
+            <option value="is_active:asc">Сначала «Новые»</option>
+            <option value="discount_percent:asc">Скидка ↑</option>
+          </select>
+        </div>
+      )}
+
+      {users.length === 0 ? (
+        <div style={{ background: "var(--canvas)", borderRadius: "var(--radius-lg)", border: "1px solid var(--hairline-soft)" }}>
           <p style={{ padding: 32, color: "var(--ink-secondary)", textAlign: "center" }}>Зарегистрированных покупателей пока нет</p>
-        ) : visible.length === 0 ? (
+        </div>
+      ) : visible.length === 0 ? (
+        <div style={{ background: "var(--canvas)", borderRadius: "var(--radius-lg)", border: "1px solid var(--hairline-soft)" }}>
           <p style={{ padding: 32, color: "var(--ink-secondary)", textAlign: "center" }}>Ничего не найдено по «{query}»</p>
-        ) : (
+        </div>
+      ) : isMobile ? (
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          {visible.map((u) => (
+            <UserRow key={u.id} u={u} isMobile busy={busyId === u.id}
+              onPatch={(patch) => patchUser(u.id, patch)}
+              onSaveDiscount={(raw) => saveDiscount(u.id, raw)}
+              onDelete={() => deleteUser(u.id, u.customer_name)} />
+          ))}
+        </div>
+      ) : (
+        <div style={{ background: "var(--canvas)", borderRadius: "var(--radius-lg)", border: "1px solid var(--hairline-soft)", overflowX: "auto" }}>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
             <thead>
               <tr style={{ borderBottom: "1px solid var(--hairline-soft)" }}>
@@ -389,15 +495,15 @@ export default function AdminUsersPage() {
             </thead>
             <tbody>
               {visible.map((u) => (
-                <UserRow key={u.id} u={u} busy={busyId === u.id}
+                <UserRow key={u.id} u={u} isMobile={false} busy={busyId === u.id}
                   onPatch={(patch) => patchUser(u.id, patch)}
                   onSaveDiscount={(raw) => saveDiscount(u.id, raw)}
                   onDelete={() => deleteUser(u.id, u.customer_name)} />
               ))}
             </tbody>
           </table>
-        )}
-      </div>
+        </div>
+      )}
     </AdminShell>
   );
 }
