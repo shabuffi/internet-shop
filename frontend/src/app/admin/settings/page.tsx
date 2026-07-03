@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import AdminShell from "@/components/AdminShell";
 import { adminFetch } from "@/lib/adminApi";
+import PasswordField from "@/components/PasswordField";
 
 interface OwnerSettings {
   shop_name: string; contact_phone: string; contact_email: string; contact_hours: string;
@@ -225,7 +226,7 @@ export default function SettingsPage() {
         </div>
         <div style={inputStyle}>
           <label className="form-label">Пароль обмена</label>
-          <input className="form-input" type="password" value={form.exchange_password} onChange={set("exchange_password")} placeholder="новый пароль или оставьте ***" autoComplete="off" />
+          <PasswordField className="form-input" value={form.exchange_password} onChange={set("exchange_password")} placeholder="новый пароль или оставьте ***" autoComplete="off" />
         </div>
         {saveRow("exchange")}
       </form>
@@ -293,12 +294,12 @@ export default function SettingsPage() {
         <p style={{ fontWeight: 600, fontSize: 16, marginBottom: 20 }}>Смена пароля админа</p>
         <div style={inputStyle}>
           <label className="form-label">Текущий пароль</label>
-          <input className="form-input" type="password" value={pw.current_password}
+          <PasswordField className="form-input" value={pw.current_password}
             onChange={e => setPw(p => ({ ...p, current_password: e.target.value }))} autoComplete="current-password" required />
         </div>
         <div style={inputStyle}>
           <label className="form-label">Новый пароль</label>
-          <input className="form-input" type="password" value={pw.new_password}
+          <PasswordField className="form-input" value={pw.new_password}
             onChange={e => setPw(p => ({ ...p, new_password: e.target.value }))} autoComplete="new-password" required minLength={8} />
           <p style={{ fontSize: 12, color: "var(--ink-secondary)" }}>Минимум 8 символов</p>
         </div>

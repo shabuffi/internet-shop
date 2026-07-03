@@ -837,6 +837,12 @@ textarea.form-input { height: auto; min-height: 90px; padding: var(--s-3) var(--
   .result-count { display: none; }
   .catalog-grid { grid-template-columns: 1fr 1fr; gap: var(--s-3); }
   .pcard__name { font-size: var(--t-sm); }
+  /* Регионы-бегущая строка: на узком экране шире затухание по краям, чтобы плитки
+     не выглядели резко обрубленными */
+  .marquee { padding: var(--s-4) 0;
+    -webkit-mask-image: linear-gradient(90deg, transparent, #000 16%, #000 84%, transparent);
+            mask-image: linear-gradient(90deg, transparent, #000 16%, #000 84%, transparent); }
+  .marquee__track { gap: var(--s-2); }
   .pdp { grid-template-columns: 1fr; gap: var(--s-6); }
   .pdp__media { position: static; }
   .pdp__title { font-size: 26px; }
@@ -880,8 +886,8 @@ textarea.form-input { height: auto; min-height: 90px; padding: var(--s-3) var(--
 .marquee { position: relative; overflow: hidden; padding: var(--s-5) 0;
   border-top: 1px solid var(--hairline); border-bottom: 1px solid var(--hairline);
   background: var(--paper);
-  -webkit-mask-image: linear-gradient(90deg, transparent, #000 7%, #000 93%, transparent);
-          mask-image: linear-gradient(90deg, transparent, #000 7%, #000 93%, transparent); }
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 10%, #000 90%, transparent);
+          mask-image: linear-gradient(90deg, transparent, #000 10%, #000 90%, transparent); }
 .marquee__track { display: flex; gap: var(--s-3); width: max-content;
   animation: marquee-scroll 30s linear infinite; }
 .marquee:hover .marquee__track { animation-play-state: paused; }

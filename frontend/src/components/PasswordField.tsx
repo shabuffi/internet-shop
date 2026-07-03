@@ -3,9 +3,10 @@
 import { useState } from "react";
 import { IconEye, IconEyeOff } from "@/components/icons";
 
-/** Поле ввода пароля с переключателем видимости (глазик). Использует класс `.input`. */
+/** Поле ввода пароля с переключателем видимости (глазик). По умолчанию класс `.input`
+ *  (витрина); в админке передаётся `className="form-input"`. */
 export default function PasswordField({
-  value, onChange, placeholder, required, autoFocus, autoComplete, id, name,
+  value, onChange, placeholder, required, autoFocus, autoComplete, id, name, className = "input", minLength,
 }: {
   value: string;
   onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
@@ -15,12 +16,15 @@ export default function PasswordField({
   autoComplete?: string;
   id?: string;
   name?: string;
+  className?: string;
+  minLength?: number;
 }) {
   const [show, setShow] = useState(false);
   return (
     <div style={{ position: "relative" }}>
       <input
-        className="input"
+        className={className}
+        minLength={minLength}
         type={show ? "text" : "password"}
         value={value}
         onChange={onChange}
