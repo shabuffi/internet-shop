@@ -49,7 +49,8 @@ export default function RegisterPage() {
       setForm((p) => ({ ...p, [k]: e.target.value }));
 
   const needInn = form.customer_type !== "individual";
-  const nameLabel = form.customer_type === "individual" ? "ФИО" : "Наименование организации";
+  // ИП — это человек (ИП + ФИО), а не организация → ФИО. «Наименование организации» только у ООО.
+  const nameLabel = form.customer_type === "ooo" ? "Наименование организации" : "ФИО";
   const innLen = form.customer_type === "ip" ? 12 : 10;
 
   async function submit(e: React.FormEvent) {
@@ -121,7 +122,7 @@ export default function RegisterPage() {
         <div className="field" style={{ marginBottom: "var(--s-3)" }}>
           <label>{nameLabel} <span className="req">*</span></label>
           <input className="input" required value={form.customer_name} onChange={setField("customer_name")}
-            placeholder={form.customer_type === "individual" ? "Иванов Иван Иванович" : "ООО «Ромашка»"} />
+            placeholder={form.customer_type === "ooo" ? "ООО «Ромашка»" : "Иванов Иван Иванович"} />
         </div>
         {needInn && (
           <div className="field" style={{ marginBottom: "var(--s-3)" }}>

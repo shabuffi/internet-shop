@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import AdminShell from "@/components/AdminShell";
 import { adminFetch } from "@/lib/adminApi";
 import { formatMsk } from "@/lib/format";
+import { useIsMobile } from "@/lib/useIsMobile";
 
 interface AdminOrder { id: string; number: string; status: string; customer_name: string; customer_phone: string; user_id: string | null; is_guest: boolean; total_amount: string; exported_at: string | null; created_at: string; items_count: number; }
 
@@ -25,6 +26,7 @@ export default function AdminOrdersPage() {
   const [error, setError] = useState("");
   // Фильтр «история одного покупателя»: гость — по телефону. null → обычный постраничный список.
   const [phoneFilter, setPhoneFilter] = useState<string | null>(null);
+  const isMobile = useIsMobile();
 
   function load() {
     const qs = phoneFilter ? `?phone=${encodeURIComponent(phoneFilter)}` : "";
@@ -48,6 +50,32 @@ export default function AdminOrdersPage() {
     }
   }
 
+  // Общие элементы (переиспользуются в таблице и в мобильных карточках)
+  const statusSelect = (o: AdminOrder) => (
+    <select value={o.status} aria-label={`Статус заказа ${o.number}`} disabled={savingId === o.id}
+      onChange={e => handleStatusChange(o.id, e.target.value)}
+      style={{ fontSize: 13, fontWeight: 600, padding: "6px 10px", borderRadius: 8,
+        border: "1px solid var(--hairline-soft)", background: "var(--canvas)",
+        color: STATUS_COLOR[o.status] ?? "var(--ink)", cursor: "pointer", opacity: savingId === o.id ? 0.5 : 1 }}>
+      {(STATUS_ORDER.includes(o.status) ? STATUS_ORDER : [o.status, ...STATUS_ORDER]).map(s => (
+        <option key={s} value={s}>{STATUS_LABEL[s] ?? s}</option>
+      ))}
+    </select>
+  );
+  const phoneBtn = (o: AdminOrder) => (
+    <button type="button" onClick={() => setPhoneFilter(o.customer_phone)} title="Показать все заказы этого телефона"
+      style={{ padding: 0, border: "none", background: "none", cursor: "pointer",
+        color: "var(--accent, #003399)", fontSize: 14, textDecoration: "underline", textUnderlineOffset: 2 }}>
+      {o.customer_phone}
+    </button>
+  );
+  const guestPill = (o: AdminOrder) => (o.is_guest
+    ? <span style={pill("var(--ink-secondary)", "var(--surface, #f0f1f3)")} title="Заказ без регистрации">Гость</span>
+    : <span style={pill("var(--accent, #003399)", "var(--accent-soft, #e7edff)")} title="Заказ зарегистрированного покупателя">Клиент</span>);
+  const exportBadge = (o: AdminOrder) => (o.exported_at
+    ? <span style={{ color: "var(--success)", fontSize: 12 }} title="Выгружен в МойСклад">✓ Выгружен</span>
+    : <span style={{ color: "var(--ink-tertiary)", fontSize: 12 }} title="МойСклад заберёт заказ при следующем обмене">Ожидает</span>);
+
   return (
     <AdminShell>
       <div style={{ display: "flex", alignItems: "baseline", gap: 12, marginBottom: 16, flexWrap: "wrap" }}>
@@ -70,10 +98,39 @@ export default function AdminOrdersPage() {
         </div>
       )}
 
-      <div style={{ background: "var(--canvas)", borderRadius: "var(--radius-lg)", border: "1px solid var(--hairline-soft)", overflowX: "auto" }}>
-        {orders.length === 0 ? (
+      {orders.length === 0 ? (
+        <div style={{ background: "var(--canvas)", borderRadius: "var(--radius-lg)", border: "1px solid var(--hairline-soft)" }}>
           <p style={{ padding: 32, color: "var(--ink-secondary)", textAlign: "center" }}>Заказов пока нет</p>
-        ) : (
+        </div>
+      ) : isMobile ? (
+        /* Мобильный вид — карточки вместо горизонтального скролла таблицы */
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          {orders.map(o => (
+            <div key={o.id} style={{ background: "var(--canvas)", border: "1px solid var(--hairline-soft)", borderRadius: 12, padding: 14 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "flex-start", marginBottom: 10 }}>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontWeight: 700 }}>{o.number}</div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 4, flexWrap: "wrap" }}>
+                    <span>{o.customer_name}</span>{guestPill(o)}
+                  </div>
+                </div>
+                <div style={{ fontWeight: 700, whiteSpace: "nowrap" }}>{Number(o.total_amount).toFixed(2)} ₽</div>
+              </div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: "6px 16px", fontSize: 13, color: "var(--ink-secondary)", marginBottom: 12 }}>
+                {phoneBtn(o)}
+                <span>Позиций: {o.items_count}</span>
+                <span>{formatMsk(o.created_at)}</span>
+                {exportBadge(o)}
+              </div>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, borderTop: "1px solid var(--hairline-soft)", paddingTop: 10 }}>
+                <span style={{ fontSize: 12, color: "var(--ink-tertiary)" }}>Статус</span>
+                {statusSelect(o)}
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div style={{ background: "var(--canvas)", borderRadius: "var(--radius-lg)", border: "1px solid var(--hairline-soft)", overflowX: "auto" }}>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
             <thead>
               <tr style={{ borderBottom: "1px solid var(--hairline-soft)" }}>
@@ -88,56 +145,21 @@ export default function AdminOrdersPage() {
                   <td style={{ padding: "14px 16px", fontWeight: 600, whiteSpace: "nowrap" }}>{o.number}</td>
                   <td style={{ padding: "14px 16px" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                      <span>{o.customer_name}</span>
-                      {o.is_guest
-                        ? <span style={pill("var(--ink-secondary)", "var(--surface, #f0f1f3)")} title="Заказ без регистрации">Гость</span>
-                        : <span style={pill("var(--accent, #003399)", "var(--accent-soft, #e7edff)")} title="Заказ зарегистрированного покупателя">Клиент</span>}
+                      <span>{o.customer_name}</span>{guestPill(o)}
                     </div>
                   </td>
-                  <td style={{ padding: "14px 16px" }}>
-                    <button type="button" onClick={() => setPhoneFilter(o.customer_phone)}
-                      title="Показать все заказы этого телефона"
-                      style={{ padding: 0, border: "none", background: "none", cursor: "pointer",
-                        color: "var(--accent, #003399)", fontSize: 14, textDecoration: "underline", textUnderlineOffset: 2 }}>
-                      {o.customer_phone}
-                    </button>
-                  </td>
+                  <td style={{ padding: "14px 16px" }}>{phoneBtn(o)}</td>
                   <td style={{ padding: "14px 16px" }}>{o.items_count}</td>
                   <td style={{ padding: "14px 16px", fontWeight: 600, whiteSpace: "nowrap" }}>{Number(o.total_amount).toFixed(2)} ₽</td>
-                  <td style={{ padding: "14px 16px" }}>
-                    <select
-                      value={o.status}
-                      aria-label={`Статус заказа ${o.number}`}
-                      disabled={savingId === o.id}
-                      onChange={e => handleStatusChange(o.id, e.target.value)}
-                      style={{
-                        fontSize: 13, fontWeight: 600, padding: "6px 10px", borderRadius: 8,
-                        border: "1px solid var(--hairline-soft)", background: "var(--canvas)",
-                        color: STATUS_COLOR[o.status] ?? "var(--ink)", cursor: "pointer",
-                        opacity: savingId === o.id ? 0.5 : 1,
-                      }}
-                    >
-                      {(STATUS_ORDER.includes(o.status) ? STATUS_ORDER : [o.status, ...STATUS_ORDER]).map(s => (
-                        <option key={s} value={s}>{STATUS_LABEL[s] ?? s}</option>
-                      ))}
-                    </select>
-                  </td>
-                  <td style={{ padding: "14px 16px", fontSize: 12 }}>
-                    {o.exported_at ? (
-                      <span style={{ color: "var(--success)" }} title="Выгружен в МойСклад">✓ Выгружен</span>
-                    ) : (
-                      <span style={{ color: "var(--ink-tertiary)" }} title="МойСклад заберёт заказ при следующем обмене">Ожидает</span>
-                    )}
-                  </td>
-                  <td style={{ padding: "14px 16px", color: "var(--ink-secondary)", whiteSpace: "nowrap" }}>
-                    {formatMsk(o.created_at)}
-                  </td>
+                  <td style={{ padding: "14px 16px" }}>{statusSelect(o)}</td>
+                  <td style={{ padding: "14px 16px", fontSize: 12 }}>{exportBadge(o)}</td>
+                  <td style={{ padding: "14px 16px", color: "var(--ink-secondary)", whiteSpace: "nowrap" }}>{formatMsk(o.created_at)}</td>
                 </tr>
               ))}
             </tbody>
           </table>
-        )}
-      </div>
+        </div>
+      )}
     </AdminShell>
   );
 }
