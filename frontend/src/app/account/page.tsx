@@ -75,8 +75,8 @@ export default function AccountPage() {
     );
   }
 
-  // Персональная скидка показывается, только если это реально скидка (discount_percent < 0).
-  const discount = Math.max(0, -Number(user.discount_percent || 0));
+  // Персональную скидку/наценку не показываем: клиент просто видит свои цены в каталоге
+  // (процент не совпадает с бытовым понятием «скидка», поэтому не выводим цифру вовсе).
   // Контакты (без наименования — оно в шапке; без типа — он чипом).
   const infoItems: [string, string][] = [
     ["Email", user.email],
@@ -105,7 +105,6 @@ export default function AccountPage() {
           </h1>
           <div style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap" }}>
             <span style={chip()}>{CUSTOMER_TYPE_LABEL[user.customer_type] ?? user.customer_type}</span>
-            {discount > 0 && <span style={chip(true)}>Персональная скидка {discount}%</span>}
           </div>
         </div>
         <button type="button" className="btn btn--ghost" onClick={handleLogout} style={{ flexShrink: 0 }}>Выйти</button>
