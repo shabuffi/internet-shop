@@ -157,7 +157,7 @@ export default async function HomePage() {
       </div>
 
       {/* Категории */}
-      <div className="container section">
+      <div className="container section section--cats">
         <div className="section-head">
           <div>
             <h2 className="section-title section-title--caps">Популярные разделы</h2>

@@ -264,9 +264,14 @@ button, input, textarea, select { font-family: inherit; }
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: var(--s-5);
 }
+/* Плитка обёрнута в .reveal (grid-ячейка). Ячейка растягивается по высоте ряда —
+   заставляем и обёртку, и плитку заполнять её, чтобы карточки были одной высоты
+   при разной длине названия. */
+.cat-grid > .reveal { height: 100%; }
 .cat-tile {
   display: flex;
   flex-direction: column;
+  height: 100%;
   min-height: 238px;
   background: var(--paper);
   border: 1px solid var(--hairline);
@@ -810,6 +815,10 @@ textarea.form-input { height: auto; min-height: 90px; padding: var(--s-3) var(--
   .trust { grid-template-columns: 1fr; gap: var(--s-3); }
   .trust-item { min-height: 0; }
   .cat-grid { grid-template-columns: 1fr 1fr; gap: var(--s-3); }
+  /* Секция «Популярные разделы» на мобильном: меньше пустоты сверху (иначе двойной
+     отступ с предыдущей секцией) и больше воздуха снизу — чтобы нижний ряд карточек
+     не примыкал к синему футеру. */
+  .section--cats { padding-top: var(--s-6); padding-bottom: var(--s-16); }
   .cat-tile { min-height: 0; }
   .cat-tile__media { height: 124px; padding: var(--s-4); }
   .cat-tile__media img { max-height: 86px; max-width: 132px; }
