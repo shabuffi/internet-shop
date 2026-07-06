@@ -15,6 +15,7 @@ import base64
 import logging
 import secrets
 from datetime import datetime, timezone
+from decimal import Decimal, InvalidOperation
 
 import bcrypt
 from fastapi import APIRouter, Request, Depends, Query
@@ -25,7 +26,7 @@ from sqlalchemy.orm import Session
 from app.core.redis_client import redis_client
 from app.db.session import get_db
 from app.db.models.admin import ShopSettings
-from app.db.models.order import Order
+from app.db.models.order import Order, OrderItem
 from app.db.models.product import Product
 from app.integrations.moysklad.commerceml_parser import parse_import_xml, parse_offers_xml
 from app.integrations.moysklad.commerceml_orders import build_orders_xml
@@ -131,12 +132,66 @@ def _mark_orders_exported(db: Session) -> None:
     logger.info("EXCHANGE success: помечено выгруженными %d", marked)
 
 
-def _apply_order_statuses(db: Session, body: bytes) -> int:
-    """Применяет статусы из orders.xml к нашим заказам (сопоставление по номеру).
+_CENTS = Decimal("0.01")
 
-    МойСклад присылает по каждому заказу «Статус заказа» (свободный текст) и «Номер по 1С».
-    Обновляем ``moysklad_status`` / ``moysklad_number``; ПометкаУдаления=true → отменяем заказ
-    на сайте (остаток не трогаем — им управляет МойСклад).
+
+def _to_decimal(s) -> Decimal | None:
+    """Строка МойСклад → Decimal с округлением до копеек (или None при мусоре)."""
+    if s is None:
+        return None
+    try:
+        return Decimal(str(s)).quantize(_CENTS)
+    except (InvalidOperation, ValueError, TypeError):
+        return None
+
+
+def _to_qty(s) -> int | None:
+    """Количество из МойСклад («5.0») → целое (магазин штучный)."""
+    try:
+        return max(0, int(round(float(s))))
+    except (TypeError, ValueError):
+        return None
+
+
+def _desired_items(rows: list[dict]) -> list[dict]:
+    """Позиции из парсера → нормализованные ``{ms_id, article, name, price, quantity}``.
+
+    Отбрасываем позиции без имени/цены/количества (кол-во 0 тоже отбрасываем).
+    """
+    out: list[dict] = []
+    for it in rows:
+        price = _to_decimal(it.get("price"))
+        qty = _to_qty(it.get("quantity"))
+        name = (it.get("name") or "").strip()
+        if not name or price is None or not qty:
+            continue
+        out.append({
+            "ms_id": (it.get("ms_id") or "").strip(),
+            "article": (it.get("article") or "").strip() or None,
+            "name": name,
+            "price": price,
+            "quantity": qty,
+        })
+    return out
+
+
+def _sig(pairs) -> list:
+    """Сигнатура состава (имя, цена, кол-во) без учёта порядка — для сравнения."""
+    return sorted((p["name"], str(p["price"]), p["quantity"]) for p in pairs)
+
+
+def _apply_order_statuses(db: Session, body: bytes) -> int:
+    """Применяет данные из orders.xml к нашим заказам (сопоставление по номеру).
+
+    МойСклад присылает по каждому заказу статус, номер по 1С, состав (Товары) и итог (Сумма).
+    Обновляем:
+      • ``moysklad_status`` / ``moysklad_number`` — статус и внутренний номер;
+      • ``ПометкаУдаления=true`` → отменяем заказ на сайте (остаток не трогаем — им управляет МойСклад);
+      • **состав** (позиции) и **сумму** — если в МойСклад заказ отредактировали.
+
+    Состав перезаписываем снимком из МойСклад: ``product_id`` ищем по ``moysklad_id`` товара
+    (если товара уже нет в каталоге — ссылка пустая, имя/цена сохраняются). Остаток товаров
+    на сайте НЕ трогаем.
 
     Returns:
         Число заказов, у которых что-то изменилось.
@@ -157,6 +212,36 @@ def _apply_order_statuses(db: Session, body: bytes) -> int:
         if r["deleted"] and order.status != "cancelled":
             order.status = "cancelled"
             changed = True
+
+        # Состав заказа: пришёл (есть секция Товары) и отличается от текущего — перезаписываем.
+        raw_items = r.get("items")
+        desired = _desired_items(raw_items) if raw_items else []
+        if desired and _sig(desired) != _sig(
+            [{"name": i.product_name, "price": i.price, "quantity": i.quantity} for i in order.items]
+        ):
+            order.items.clear()
+            for d in desired:
+                pid = (
+                    db.scalar(select(Product.id).where(Product.moysklad_id == d["ms_id"]))
+                    if d["ms_id"] else None
+                )
+                order.items.append(OrderItem(
+                    product_id=pid,
+                    product_name=d["name"],
+                    product_article=d["article"],
+                    price=d["price"],
+                    quantity=d["quantity"],
+                ))
+            changed = True
+
+        # Сумма заказа: итог документа; если его нет — считаем по позициям.
+        total = _to_decimal(r.get("total"))
+        if total is None and desired:
+            total = sum((d["price"] * d["quantity"] for d in desired), Decimal("0")).quantize(_CENTS)
+        if total is not None and order.total_amount != total:
+            order.total_amount = total
+            changed = True
+
         if changed:
             n += 1
     db.commit()

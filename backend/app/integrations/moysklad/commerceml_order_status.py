@@ -41,8 +41,44 @@ def _doc_requisites(doc) -> dict:
     return out
 
 
+def _text(el) -> str:
+    """Текст элемента (или пусто), обрезанный."""
+    return (el.text or "").strip() if el is not None and el.text is not None else ""
+
+
+def _parse_items(doc) -> list[dict] | None:
+    """Позиции заказа из ``<Товары><Товар>…``.
+
+    Возвращает список ``{ms_id, article, name, price, quantity}`` (строки — приведёт
+    вызывающий) или ``None``, если секции ``<Товары>`` нет (тогда состав не трогаем).
+    """
+    tovary = _child(doc, "Товары")
+    if tovary is None:
+        return None
+    items: list[dict] = []
+    for tov in tovary:
+        if _local(tov.tag) != "Товар":
+            continue
+        name = _text(_child(tov, "Наименование"))
+        if not name:
+            continue
+        items.append({
+            "ms_id": _text(_child(tov, "Ид")),
+            "article": _text(_child(tov, "Артикул")),
+            "name": name,
+            "price": _text(_child(tov, "ЦенаЗаЕдиницу")),
+            "quantity": _text(_child(tov, "Количество")),
+        })
+    return items
+
+
 def parse_order_statuses(xml: bytes) -> list[dict]:
-    """Разбирает orders.xml → список ``{number, status, ms_number, deleted}`` по документам."""
+    """Разбирает orders.xml → список словарей по документам.
+
+    Каждый: ``{number, status, ms_number, deleted, total, items}``. ``total`` — итоговая
+    сумма документа (``<Сумма>`` — прямой ребёнок ``<Документ>``, не внутри Товара/Скидки);
+    ``items`` — позиции (см. ``_parse_items``) или ``None``, если товаров в документе нет.
+    """
     try:
         root = etree.fromstring(xml)
     except Exception:
@@ -61,5 +97,9 @@ def parse_order_statuses(xml: bytes) -> list[dict]:
             "status": reqs.get("Статус заказа") or None,
             "ms_number": reqs.get("Номер по 1С") or None,
             "deleted": reqs.get("ПометкаУдаления", "").lower() == "true",
+            # _child(doc, "Сумма") — первый прямой ребёнок Документа (общий итог); суммы
+            # внутри Товар/Скидки вложены глубже и сюда не попадают.
+            "total": _text(_child(doc, "Сумма")) or None,
+            "items": _parse_items(doc),
         })
     return result
