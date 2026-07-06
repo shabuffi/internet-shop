@@ -720,6 +720,16 @@ def list_orders(
                 "exported_at": o.exported_at.isoformat() if o.exported_at else None,
                 "created_at": o.created_at.isoformat(),
                 "items_count": len(o.items),
+                # Состав заказа — чтобы в админке было видно, что именно заказывали
+                "items": [
+                    {
+                        "product_name": it.product_name,
+                        "product_article": it.product_article,
+                        "price": str(it.price),
+                        "quantity": it.quantity,
+                    }
+                    for it in o.items
+                ],
             }
             for o in orders
         ],

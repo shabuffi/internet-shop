@@ -164,3 +164,6 @@ def test_list_orders_returns_orders_with_items(client, token, db_session):
     assert data["total"] == 1
     assert data["items"][0]["number"] == "ORD-LIST"
     assert data["items"][0]["items_count"] == 1   # одна позиция (количество=2 внутри неё)
+    # состав заказа виден в админке (что именно заказывали)
+    line = data["items"][0]["items"][0]
+    assert line["product_name"] == "Т" and line["quantity"] == 2

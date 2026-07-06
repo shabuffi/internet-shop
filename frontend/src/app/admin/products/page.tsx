@@ -105,15 +105,26 @@ export default function AdminProductsPage() {
       </label>
     </div>
   );
-  const availBtn = (p: AdminProduct) => (
-    <button onClick={() => toggleAvailability(p.id, !p.available)} title="Нажмите, чтобы переключить наличие"
-      style={{ fontSize: 12, fontWeight: 600, padding: "5px 12px", borderRadius: 999, cursor: "pointer", whiteSpace: "nowrap",
-        border: "1px solid " + (p.available ? "var(--stock)" : "var(--hairline-soft)"),
-        background: p.available ? "var(--stock-soft)" : "var(--cloud)",
-        color: p.available ? "var(--stock)" : "var(--ink-tertiary)" }}>
-      {p.available ? "В наличии" : "Нет"}
-    </button>
-  );
+  const availBtn = (p: AdminProduct) => {
+    // «В наличии» (с числом остатка) — только если товар реально на складе (stock > 0).
+    // available — ручной флаг видимости на сайте: если выключен, товар «Скрыт».
+    const inStock = p.available && p.stock > 0;
+    const label = !p.available ? "Скрыт" : p.stock > 0 ? `${p.stock} шт.` : "Нет";
+    const title = inStock
+      ? `На складе: ${p.stock} шт. Нажмите, чтобы скрыть с сайта`
+      : p.available
+      ? "Нет на складе. Нажмите, чтобы скрыть с сайта"
+      : "Скрыт с сайта. Нажмите, чтобы показать";
+    return (
+      <button onClick={() => toggleAvailability(p.id, !p.available)} title={title}
+        style={{ fontSize: 12, fontWeight: 600, padding: "5px 12px", borderRadius: 999, cursor: "pointer", whiteSpace: "nowrap",
+          border: "1px solid " + (inStock ? "var(--stock)" : "var(--hairline-soft)"),
+          background: inStock ? "var(--stock-soft)" : "var(--cloud)",
+          color: inStock ? "var(--stock)" : "var(--ink-tertiary)" }}>
+        {label}
+      </button>
+    );
+  };
 
   return (
     <AdminShell>
