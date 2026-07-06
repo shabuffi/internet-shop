@@ -43,12 +43,22 @@ _TTL = 3600                                  # 1 час — сессия обм�
 
 # Метка последнего контакта МойСклад — для мониторинга простоя обмена (без TTL, переживает паузы)
 _LAST_SEEN_KEY = "exchange:last_seen"
+# Метка последней успешной синхронизации ЗАКАЗОВ (приём orders.xml) — показываем в админке
+_LAST_ORDERS_SYNC_KEY = "exchange:last_orders_sync"
 
 
 def _touch_exchange_seen() -> None:
     """Отмечает момент последнего обращения МойСклад к обмену (для алерта о простое)."""
     try:
         redis_client.set(_LAST_SEEN_KEY, datetime.now(timezone.utc).isoformat())
+    except Exception:
+        pass
+
+
+def _touch_orders_sync() -> None:
+    """Отмечает момент последней синхронизации заказов (получили orders.xml от МойСклад)."""
+    try:
+        redis_client.set(_LAST_ORDERS_SYNC_KEY, datetime.now(timezone.utc).isoformat())
     except Exception:
         pass
 
@@ -494,6 +504,7 @@ async def exchange_post(
             redis_client.set("exchange:incoming:orders.xml", body, ex=7 * 86400)
             try:
                 updated = _apply_order_statuses(db, body)
+                _touch_orders_sync()   # отметка «заказы синхронизированы» — для админки
                 logger.info("orders.xml от МойСклад (%d bytes): обновлено заказов %d", len(body), updated)
             except Exception as exc:
                 logger.error("orders.xml разбор/применение — ошибка: %s", exc)

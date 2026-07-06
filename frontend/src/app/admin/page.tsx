@@ -11,6 +11,8 @@ interface DashboardData {
   product_count: number;
   order_count: number;
   last_sync: { status: string; products_created: number; products_updated: number; finished_at: string } | null;
+  last_exchange_seen: string | null;
+  last_orders_sync: string | null;
 }
 
 function StatCard({ Icon, label, value }: { Icon: ComponentType<SVGProps<SVGSVGElement>>; label: string; value: string | number }) {
@@ -40,21 +42,27 @@ export default function AdminDashboard() {
         <StatCard Icon={IconSync} label="Последняя синхр." value={data?.last_sync?.status ?? "—"} />
       </div>
 
-      {data?.last_sync && (
-        <div style={{ background: "var(--canvas)", borderRadius: "var(--radius-lg)", border: "1px solid var(--hairline-soft)", padding: "20px 24px" }}>
-          <p style={{ fontWeight: 600, marginBottom: 12 }}>Последняя синхронизация</p>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16, fontSize: 14 }}>
-            <div><p style={{ color: "var(--ink-secondary)" }}>Статус</p><p style={{ fontWeight: 600 }}>{data.last_sync.status}</p></div>
-            <div><p style={{ color: "var(--ink-secondary)" }}>Создано</p><p style={{ fontWeight: 600 }}>{data.last_sync.products_created}</p></div>
-            <div><p style={{ color: "var(--ink-secondary)" }}>Обновлено</p><p style={{ fontWeight: 600 }}>{data.last_sync.products_updated}</p></div>
+      {/* Когда что последний раз синхронизировалось с МойСклад */}
+      <div style={{ background: "var(--canvas)", borderRadius: "var(--radius-lg)", border: "1px solid var(--hairline-soft)", padding: "20px 24px", marginBottom: 24 }}>
+        <p style={{ fontWeight: 600, marginBottom: 16 }}>Синхронизация с МойСклад</p>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 16, fontSize: 14 }}>
+          <div>
+            <p style={{ color: "var(--ink-secondary)", marginBottom: 4 }}>Каталог (товары и остатки)</p>
+            <p style={{ fontWeight: 600 }}>{data?.last_sync?.finished_at ? formatMsk(data.last_sync.finished_at) : "—"}</p>
+            {data?.last_sync && <p style={{ fontSize: 12, color: "var(--ink-tertiary)", marginTop: 2 }}>создано {data.last_sync.products_created} · обновлено {data.last_sync.products_updated} · {data.last_sync.status}</p>}
           </div>
-          {data.last_sync.finished_at && (
-            <p style={{ fontSize: 12, color: "var(--ink-tertiary)", marginTop: 12 }}>
-              {formatMsk(data.last_sync.finished_at)}
-            </p>
-          )}
+          <div>
+            <p style={{ color: "var(--ink-secondary)", marginBottom: 4 }}>Заказы</p>
+            <p style={{ fontWeight: 600 }}>{data?.last_orders_sync ? formatMsk(data.last_orders_sync) : "—"}</p>
+            <p style={{ fontSize: 12, color: "var(--ink-tertiary)", marginTop: 2 }}>статусы и состав заказов из МойСклад</p>
+          </div>
+          <div>
+            <p style={{ color: "var(--ink-secondary)", marginBottom: 4 }}>Последний контакт МойСклад</p>
+            <p style={{ fontWeight: 600 }}>{data?.last_exchange_seen ? formatMsk(data.last_exchange_seen) : "—"}</p>
+            <p style={{ fontSize: 12, color: "var(--ink-tertiary)", marginTop: 2 }}>любой обмен (проверка связи)</p>
+          </div>
         </div>
-      )}
+      </div>
     </AdminShell>
   );
 }

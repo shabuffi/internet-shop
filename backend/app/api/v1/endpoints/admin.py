@@ -654,6 +654,15 @@ def dashboard(db: Session = Depends(get_db), _=Depends(_get_current_admin)):
         select(SyncLog).order_by(SyncLog.id.desc())
     )
 
+    # Метки обмена из Redis: последний контакт МойСклад и последняя синхронизация заказов.
+    from app.core.redis_client import redis_client
+    def _redis_str(key):
+        try:
+            v = redis_client.get(key)
+            return v.decode() if isinstance(v, bytes) else v
+        except Exception:
+            return None
+
     return {
         "product_count": product_count,
         "order_count":   order_count,
@@ -663,6 +672,9 @@ def dashboard(db: Session = Depends(get_db), _=Depends(_get_current_admin)):
             "products_updated":  last_sync.products_updated if last_sync else 0,
             "finished_at":       last_sync.finished_at.isoformat() if last_sync and last_sync.finished_at else None,
         } if last_sync else None,
+        # Последний контакт МойСклад (любой обмен) и последняя синхронизация заказов (orders.xml)
+        "last_exchange_seen":  _redis_str("exchange:last_seen"),
+        "last_orders_sync":    _redis_str("exchange:last_orders_sync"),
     }
 
 
