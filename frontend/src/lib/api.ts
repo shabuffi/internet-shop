@@ -90,6 +90,7 @@ export async function getCategories(): Promise<Category[]> {
 export interface StoreInfo {
   shop_name: string; contact_phone: string; contact_email: string; contact_hours: string;
   company_legal_name: string; company_inn: string; company_ogrn: string; warehouse_address: string;
+  warehouse_coords?: string;
   delivery_info: string;
   has_logo?: boolean;
   // Чат с менеджером

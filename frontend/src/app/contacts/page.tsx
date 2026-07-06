@@ -21,6 +21,13 @@ export default async function ContactsPage() {
   const email = store?.contact_email || "";
   const address = store?.warehouse_address || "";
   const hours = store?.contact_hours || "";
+
+  // Карта: если заданы координаты «широта, долгота» — ставим аккуратную метку по ним
+  // (без поиска и кнопок «Организации в доме»). Иначе — поиск по адресу (как раньше).
+  const coordsMatch = (store?.warehouse_coords || "").match(/(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)/);
+  const mapSrc = coordsMatch
+    ? `https://yandex.ru/map-widget/v1/?ll=${coordsMatch[2]},${coordsMatch[1]}&z=16&pt=${coordsMatch[2]},${coordsMatch[1]},pm2rdm`
+    : `https://yandex.ru/map-widget/v1/?text=${encodeURIComponent(address)}&z=15`;
   const telHref = phone ? `tel:${phone.replace(/[^+\d]/g, "")}` : "";
 
   const cards: { label: string; value: string; href?: string }[] = [
@@ -68,7 +75,7 @@ export default async function ContactsPage() {
           <div style={{ marginTop: "var(--s-8)", borderRadius: "var(--r-lg)", overflow: "hidden", border: "1px solid var(--hairline)" }}>
             <iframe
               title="Карта склада"
-              src={`https://yandex.ru/map-widget/v1/?text=${encodeURIComponent(address)}&z=15`}
+              src={mapSrc}
               width="100%" height="420" frameBorder="0" style={{ display: "block", border: 0 }}
               loading="lazy"
             />

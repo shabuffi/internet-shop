@@ -8,6 +8,7 @@ import PasswordField from "@/components/PasswordField";
 interface OwnerSettings {
   shop_name: string; contact_phone: string; contact_email: string; contact_hours: string;
   company_legal_name: string; company_inn: string; company_ogrn: string; warehouse_address: string;
+  warehouse_coords: string;
   delivery_info: string;
   exchange_login: string; exchange_password: string;
   vk_peer_id: string; notify_email: string;
@@ -18,6 +19,7 @@ interface OwnerSettings {
 const EMPTY: OwnerSettings = {
   shop_name: "", contact_phone: "", contact_email: "", contact_hours: "",
   company_legal_name: "", company_inn: "", company_ogrn: "", warehouse_address: "",
+  warehouse_coords: "",
   delivery_info: "",
   exchange_login: "", exchange_password: "", vk_peer_id: "", notify_email: "",
 };
@@ -157,7 +159,7 @@ export default function SettingsPage() {
       {error && <p className="form-error" style={{ maxWidth: 520, marginBottom: 16 }}>{error}</p>}
 
       {/* Магазин */}
-      <form style={cardStyle} onSubmit={e => saveSection(e, "shop", ["shop_name", "contact_phone", "contact_email", "contact_hours", "company_legal_name", "company_inn", "company_ogrn", "warehouse_address", "delivery_info"])}>
+      <form style={cardStyle} onSubmit={e => saveSection(e, "shop", ["shop_name", "contact_phone", "contact_email", "contact_hours", "company_legal_name", "company_inn", "company_ogrn", "warehouse_address", "warehouse_coords", "delivery_info"])}>
         <p style={{ fontWeight: 600, fontSize: 16, marginBottom: 16 }}>Магазин</p>
         <div style={inputStyle}>
           <label className="form-label">Название магазина</label>
@@ -195,6 +197,16 @@ export default function SettingsPage() {
           <label className="form-label">Адрес склада</label>
           <input className="form-input" value={form.warehouse_address} onChange={set("warehouse_address")} placeholder="г. Тверь, ул. …, д. …" />
           <p style={{ fontSize: 12, color: "var(--ink-secondary)" }}>Покажется на «Контактах» с картой.</p>
+        </div>
+
+        <div style={inputStyle}>
+          <label className="form-label">Координаты для метки на карте</label>
+          <input className="form-input" value={form.warehouse_coords} onChange={set("warehouse_coords")} placeholder="например: 56.859611, 35.911896" />
+          <p style={{ fontSize: 12, color: "var(--ink-secondary)" }}>
+            Необязательно. Откройте <a href="https://yandex.ru/maps" target="_blank" rel="noopener noreferrer" style={{ color: "var(--accent)" }}>Яндекс.Карты</a>,
+            правый клик по нужной точке → «Что здесь?» → скопируйте координаты (широта, долгота).
+            С координатами карта покажет аккуратную метку без кнопок поиска. Пусто — карта ищет по адресу.
+          </p>
         </div>
 
         <div style={inputStyle}>

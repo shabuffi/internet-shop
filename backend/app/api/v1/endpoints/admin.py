@@ -503,6 +503,8 @@ def get_settings(db: Session = Depends(get_db), _=Depends(_get_current_admin)):
         "company_inn":        _get_setting(db, "company_inn"),
         "company_ogrn":       _get_setting(db, "company_ogrn"),
         "warehouse_address":  _get_setting(db, "warehouse_address"),
+        # Координаты склада «широта, долгота» — для чистой метки на карте (без поиска)
+        "warehouse_coords":   _get_setting(db, "warehouse_coords"),
         # Условия доставки — единый текст для всех товаров (показывается на карточке товара)
         "delivery_info":      _get_setting(db, "delivery_info"),
         # Логотип в шапке (загружается отдельной кнопкой)
@@ -539,6 +541,7 @@ def save_settings(body: dict, db: Session = Depends(get_db), _=Depends(_get_curr
         "shop_name",
         "contact_phone", "contact_email", "contact_hours",
         "company_legal_name", "company_inn", "company_ogrn", "warehouse_address",
+        "warehouse_coords",
         "delivery_info",
         # обмен с МойСклад + личные идентификаторы получателя (id ВК, email)
         "exchange_login", "exchange_password",
@@ -930,6 +933,7 @@ def store_info_public(db: Session = Depends(get_db)):
         "company_inn":        _get_setting(db, "company_inn"),
         "company_ogrn":       _get_setting(db, "company_ogrn"),
         "warehouse_address":  _get_setting(db, "warehouse_address"),
+        "warehouse_coords":   _get_setting(db, "warehouse_coords"),
         "delivery_info":      _get_setting(db, "delivery_info"),
         "has_logo":           bool(_get_setting(db, "logo_file")),
         # Чат с менеджером

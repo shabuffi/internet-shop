@@ -30,8 +30,6 @@ const BUYER_ORDER_STATUS: Record<string, string> = {
   cancelled: "Отменён",
 };
 
-// Сколько позиций заказа показывать до нажатия «Показать полностью».
-const ORDER_ITEMS_PREVIEW = 3;
 
 export default function AccountPage() {
   const router = useRouter();
@@ -216,9 +214,10 @@ function ChangePasswordForm() {
 
 // Карточка заказа с компактной историей: длинный список позиций сворачивается.
 function OrderCard({ order }: { order: OrderHistory }) {
-  const [expanded, setExpanded] = useState(false);
-  const hiddenCount = order.items.length - ORDER_ITEMS_PREVIEW;
-  const shown = expanded ? order.items : order.items.slice(0, ORDER_ITEMS_PREVIEW);
+  // Список товаров скрыт по умолчанию — карточка компактная (номер/дата/статус/сумма),
+  // позиции раскрываются по клику.
+  const [open, setOpen] = useState(false);
+  const count = order.items.length;
 
   return (
     <div style={{ background: "var(--paper)", border: "1px solid var(--hairline, #eee)", borderRadius: "var(--r-xl)", padding: "var(--s-5)", boxShadow: "var(--shadow-1)" }}>
@@ -226,27 +225,34 @@ function OrderCard({ order }: { order: OrderHistory }) {
         <span style={{ fontWeight: 700 }}>{order.number}</span>
         <span style={{ fontSize: "var(--t-sm)", color: "var(--charcoal)" }}>{formatMsk(order.created_at)}</span>
       </div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: "var(--s-3)", marginBottom: "var(--s-3)" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: "var(--s-3)" }}>
         <span style={{ fontSize: "var(--t-sm)", fontWeight: 600, color: order.status === "cancelled" ? "var(--charcoal)" : "var(--primary, #003399)", background: "var(--surface, #f5f6f8)", padding: "2px 10px", borderRadius: 999 }}>
           {/* Статус из МойСклад (фактический) приоритетнее нашего внутреннего */}
           {order.moysklad_status || BUYER_ORDER_STATUS[order.status] || order.status}
         </span>
         <span style={{ fontWeight: 700 }}>{formatPrice(order.total_amount)}</span>
       </div>
-      <ul style={{ listStyle: "none", margin: 0, padding: 0, fontSize: "var(--t-sm)", color: "var(--ink)" }}>
-        {shown.map((it, i) => (
-          <li key={i} style={{ display: "flex", justifyContent: "space-between", gap: "var(--s-3)", padding: "var(--s-1) 0", borderTop: i ? "1px solid var(--hairline, #f0f0f0)" : "none" }}>
-            <span>{it.product_name} <span style={{ color: "var(--charcoal)" }}>× {it.quantity}</span></span>
-            <span style={{ whiteSpace: "nowrap" }}>{formatPrice(it.price)}</span>
-          </li>
-        ))}
-      </ul>
-      {hiddenCount > 0 && (
-        <button type="button" onClick={() => setExpanded((e) => !e)} className="link"
-          style={{ marginTop: "var(--s-3)", background: "none", border: "none", padding: 0, cursor: "pointer",
-            color: "var(--primary, #003399)", fontSize: "var(--t-sm)", fontWeight: 600 }}>
-          {expanded ? "Свернуть" : `Показать полностью (ещё ${hiddenCount})`}
-        </button>
+
+      {/* Раскрывашка списка товаров */}
+      <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open}
+        style={{ marginTop: "var(--s-3)", width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between",
+          gap: "var(--s-3)", background: "none", border: "none", borderTop: "1px solid var(--hairline, #f0f0f0)",
+          padding: "var(--s-3) 0 0", cursor: "pointer", color: "var(--primary, #003399)", fontSize: "var(--t-sm)", fontWeight: 600 }}>
+        <span>{open ? "Скрыть товары" : `Показать товары (${count})`}</span>
+        <span style={{ display: "inline-flex", transform: open ? "rotate(180deg)" : "none", transition: "transform .2s" }}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9" /></svg>
+        </span>
+      </button>
+
+      {open && (
+        <ul style={{ listStyle: "none", margin: "var(--s-3) 0 0", padding: 0, fontSize: "var(--t-sm)", color: "var(--ink)" }}>
+          {order.items.map((it, i) => (
+            <li key={i} style={{ display: "flex", justifyContent: "space-between", gap: "var(--s-3)", padding: "var(--s-1) 0", borderTop: i ? "1px solid var(--hairline, #f0f0f0)" : "none" }}>
+              <span>{it.product_name} <span style={{ color: "var(--charcoal)" }}>× {it.quantity}</span></span>
+              <span style={{ whiteSpace: "nowrap" }}>{formatPrice(it.price)}</span>
+            </li>
+          ))}
+        </ul>
       )}
     </div>
   );
