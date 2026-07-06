@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 import { getProduct, getStoreInfo } from "@/lib/api";
 import { formatPrice, minOrderQtyText, MIN_ORDER_QTY_LABEL } from "@/lib/format";
 import AddToCartButton from "@/components/AddToCartButton";
+import CartBar from "@/components/CartBar";
 import BackButton from "@/components/BackButton";
 import ProductGallery from "@/components/ProductGallery";
 import ChestnyZnakBadge from "@/components/ChestnyZnakBadge";
@@ -144,6 +145,9 @@ export default async function ProductPage({ params }: Props) {
           </div>
         </div>
       </div>
+
+      {/* Липкая панель корзины снизу — чтобы после «В корзину» сразу было видно корзину */}
+      <CartBar />
     </div>
   );
 }

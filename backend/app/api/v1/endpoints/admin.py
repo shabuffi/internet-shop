@@ -799,10 +799,12 @@ def list_products_admin(
     elif desc == "without":
         stmt = stmt.where(~_has_desc)
 
+    # «В наличии» = показан на сайте (available) И есть реальный остаток (stock > 0) —
+    # так же, как теперь считается наличие в таблице/на витрине.
     if avail == "yes":
-        stmt = stmt.where(Product.available == True)
+        stmt = stmt.where(Product.available == True, Product.stock > 0)
     elif avail == "no":
-        stmt = stmt.where(Product.available == False)
+        stmt = stmt.where(or_(Product.available == False, Product.stock <= 0))
 
     products = db.scalars(
         stmt.order_by(Product.name).offset((page - 1) * PAGE).limit(PAGE)

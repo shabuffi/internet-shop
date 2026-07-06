@@ -5,7 +5,7 @@ import { getProducts, getCategories, getStoreInfo } from "@/lib/api";
 import { CATEGORY_GROUPS, normCatName } from "@/lib/categoryGroups";
 import { parseBanners } from "@/lib/banners";
 import type { Category } from "@/types/product";
-import { formatPrice, minOrderQty, minOrderQtyText } from "@/lib/format";
+import { formatPrice } from "@/lib/format";
 import Slider from "@/components/Slider";
 import AddToCartCard from "@/components/AddToCartCard";
 import ChestnyZnakBadge from "@/components/ChestnyZnakBadge";
@@ -225,10 +225,6 @@ export default async function CatalogPage({ searchParams }: Props) {
                         <Link href={`/products/${p.id}`} className="pcard__name">{p.name}</Link>
                       </div>
                       <div className="pcard__sku">{p.article ? `Арт. ${p.article}` : " "}</div>
-                      <div style={{ fontSize: 12, fontWeight: 600, marginTop: 2,
-                        color: minOrderQty(p.attributes) ? "var(--accent)" : "var(--ink-tertiary)" }}>
-                        Мин. кол-во: {minOrderQtyText(p.attributes)}
-                      </div>
                       <div className="pcard__foot">
                         <span className="price">{Number(p.price) > 0 ? formatPrice(p.price) : "—"}</span>
                         <AddToCartCard product={p} />
