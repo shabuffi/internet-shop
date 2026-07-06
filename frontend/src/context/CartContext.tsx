@@ -27,6 +27,9 @@ const CartContext = createContext<CartContextValue | null>(null);
 
 export function CartProvider({ children }: { children: React.ReactNode }) {
   const [items, setItems] = useState<CartItem[]>([]);
+  // Пока корзина не загружена из localStorage — НЕ сохраняем (иначе пустое
+  // начальное состояние затрёт уже сохранённую корзину).
+  const [loaded, setLoaded] = useState(false);
 
   // При первом рендере — читаем корзину из localStorage
   useEffect(() => {
@@ -34,12 +37,14 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       const saved = localStorage.getItem("cart");
       if (saved) setItems(JSON.parse(saved));
     } catch {}
+    setLoaded(true);
   }, []);
 
-  // При каждом изменении — сохраняем в localStorage
+  // При каждом изменении — сохраняем в localStorage (только после первичной загрузки)
   useEffect(() => {
+    if (!loaded) return;
     localStorage.setItem("cart", JSON.stringify(items));
-  }, [items]);
+  }, [items, loaded]);
 
   const addItem = useCallback((item: Omit<CartItem, "quantity">) => {
     setItems((prev) => {
