@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useCart } from "@/context/CartContext";
-import { formatPrice } from "@/lib/format";
+import { formatPrice, minOrderUnit } from "@/lib/format";
 import { IconImage } from "@/components/icons";
 import ChestnyZnakBadge from "@/components/ChestnyZnakBadge";
 import type { Product } from "@/types/product";
@@ -109,6 +109,7 @@ export default function CatalogList({ products }: { products: Product[] }) {
                     <Link href={`/products/${p.id}`} style={{ fontWeight: 600, color: "var(--ink)", textDecoration: "none" }}>{p.name}</Link>
                   </span>
                   {p.category?.name && <div style={{ fontSize: 12, color: "var(--ink-tertiary)" }}>{p.category.name}</div>}
+                  {minOrderUnit(p.attributes) && <div style={{ fontSize: 12, fontWeight: 600, color: "var(--accent)" }}>Мин. партия: {minOrderUnit(p.attributes)} шт.</div>}
                 </td>
                 <td style={{ ...td, color: "var(--ink-secondary)", fontVariantNumeric: "tabular-nums" }}>{p.article || "—"}</td>
                 <td style={td}>
@@ -144,6 +145,7 @@ export default function CatalogList({ products }: { products: Product[] }) {
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
               <div style={{ fontSize: 12, color: "var(--ink-tertiary)", display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap", minWidth: 0 }}>
                 {p.article && <span style={{ fontVariantNumeric: "tabular-nums" }}>Арт. {p.article}</span>}
+                {minOrderUnit(p.attributes) && <span style={{ fontWeight: 600, color: "var(--accent)" }}>Мин. партия: {minOrderUnit(p.attributes)} шт.</span>}
                 <span style={{ display: "inline-flex", alignItems: "center", gap: 5, whiteSpace: "nowrap", color: p.available ? "var(--stock)" : "var(--ink-tertiary)" }}>
                   <span style={{ width: 6, height: 6, borderRadius: 999, background: "currentColor" }} />
                   {p.available && p.stock > 0 ? `${p.stock} шт.` : "Нет"}

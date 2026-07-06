@@ -3,7 +3,7 @@ export const dynamic = 'force-dynamic';
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getProduct, getStoreInfo } from "@/lib/api";
-import { formatPrice } from "@/lib/format";
+import { formatPrice, minOrderUnit } from "@/lib/format";
 import AddToCartButton from "@/components/AddToCartButton";
 import BackButton from "@/components/BackButton";
 import ProductGallery from "@/components/ProductGallery";
@@ -104,6 +104,14 @@ export default async function ProductPage({ params }: Props) {
             </div>
 
             <div className="pdp__price">{formatPrice(product.price)}</div>
+
+            {minOrderUnit(product.attributes) && (
+              <div style={{ display: "inline-flex", alignItems: "center", gap: 6, marginBottom: "var(--s-3)",
+                padding: "4px 12px", borderRadius: 999, background: "var(--accent-soft, #e7edff)",
+                color: "var(--accent)", fontWeight: 600, fontSize: "var(--t-sm)" }}>
+                Минимальная партия: {minOrderUnit(product.attributes)} шт.
+              </div>
+            )}
 
             <AddToCartButton product={product} />
 

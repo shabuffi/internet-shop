@@ -39,3 +39,13 @@ export function formatMsk(iso: string | null | undefined): string {
   if (Number.isNaN(d.getTime())) return "—";
   return d.toLocaleString("ru-RU", { timeZone: "Europe/Moscow" });
 }
+
+/** Значение поля «Минимальная единица отгрузки» (доп. поле МойСклад) из характеристик
+ *  товара. Возвращает число (партию) только если оно осмысленно (> 1), иначе null. */
+export function minOrderUnit(attributes?: { name: string; value: string }[] | null): number | null {
+  if (!attributes) return null;
+  const a = attributes.find((x) => /минимальн.*единиц.*отгрузк/iu.test(x.name || ""));
+  if (!a) return null;
+  const n = parseInt(String(a.value).replace(/[^\d]/g, ""), 10);
+  return Number.isFinite(n) && n > 1 ? n : null;
+}
