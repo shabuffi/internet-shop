@@ -3,7 +3,7 @@
 import { Fragment, useEffect, useState } from "react";
 import AdminShell from "@/components/AdminShell";
 import { adminFetch } from "@/lib/adminApi";
-import { formatMsk } from "@/lib/format";
+import { formatMsk, formatPrice, cleanProductName } from "@/lib/format";
 import { useIsMobile } from "@/lib/useIsMobile";
 
 interface AdminOrderItem { product_name: string; product_article: string | null; price: string; quantity: number; }
@@ -75,18 +75,20 @@ export default function AdminOrdersPage() {
       </span>
     </button>
   );
-  // Список позиций заказа
+  // Список позиций заказа: чистое имя (без служебных префиксов) + «кол-во × цена = сумма»
   const itemsBlock = (o: AdminOrder) => (
     <ul style={{ listStyle: "none", margin: 0, padding: 0, fontSize: 13 }}>
       {o.items.map((it, i) => (
         <li key={i} style={{ display: "flex", justifyContent: "space-between", gap: 12, padding: "6px 0",
           borderTop: i ? "1px solid var(--hairline-soft)" : "none" }}>
           <span style={{ minWidth: 0 }}>
-            {it.product_name}
+            {cleanProductName(it.product_name)}
             {it.product_article && <span style={{ color: "var(--ink-tertiary)" }}> · арт. {it.product_article}</span>}
-            <span style={{ color: "var(--ink-secondary)" }}> × {it.quantity}</span>
           </span>
-          <span style={{ whiteSpace: "nowrap", color: "var(--ink-secondary)" }}>{Number(it.price).toFixed(2)} ₽</span>
+          <span style={{ whiteSpace: "nowrap", color: "var(--ink-secondary)" }}>
+            {it.quantity} × {formatPrice(it.price)} =
+            <b style={{ color: "var(--ink)", marginLeft: 4 }}>{formatPrice(Number(it.price) * it.quantity)}</b>
+          </span>
         </li>
       ))}
     </ul>

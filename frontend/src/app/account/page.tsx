@@ -7,7 +7,7 @@ import {
   getMe, logoutUser, getMyOrders, changePassword, CUSTOMER_TYPE_LABEL,
   type UserProfile, type OrderHistory,
 } from "@/lib/authApi";
-import { formatPrice, formatMsk } from "@/lib/format";
+import { formatPrice, formatMsk, cleanProductName } from "@/lib/format";
 import PasswordField from "@/components/PasswordField";
 
 // Надёжность пароля — совпадает с бэкендом (validate_password_strength).
@@ -248,8 +248,11 @@ function OrderCard({ order }: { order: OrderHistory }) {
         <ul style={{ listStyle: "none", margin: "var(--s-3) 0 0", padding: 0, fontSize: "var(--t-sm)", color: "var(--ink)" }}>
           {order.items.map((it, i) => (
             <li key={i} style={{ display: "flex", justifyContent: "space-between", gap: "var(--s-3)", padding: "var(--s-1) 0", borderTop: i ? "1px solid var(--hairline, #f0f0f0)" : "none" }}>
-              <span>{it.product_name} <span style={{ color: "var(--charcoal)" }}>× {it.quantity}</span></span>
-              <span style={{ whiteSpace: "nowrap" }}>{formatPrice(it.price)}</span>
+              <span style={{ minWidth: 0 }}>{cleanProductName(it.product_name)}</span>
+              <span style={{ whiteSpace: "nowrap", color: "var(--charcoal)" }}>
+                {it.quantity} × {formatPrice(it.price)} =
+                <b style={{ color: "var(--ink)", marginLeft: 4 }}>{formatPrice(Number(it.price) * it.quantity)}</b>
+              </span>
             </li>
           ))}
         </ul>
