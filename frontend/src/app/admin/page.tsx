@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import AdminShell from "@/components/AdminShell";
 import { adminFetch } from "@/lib/adminApi";
 import { formatMsk } from "@/lib/format";
+import { useIsMobile } from "@/lib/useIsMobile";
+import HelpHint from "@/components/HelpHint";
 import { IconBox, IconOrders, IconSync } from "@/components/icons";
 import type { ComponentType, SVGProps } from "react";
 
@@ -15,18 +17,19 @@ interface DashboardData {
   last_orders_sync: string | null;
 }
 
-function StatCard({ Icon, label, value }: { Icon: ComponentType<SVGProps<SVGSVGElement>>; label: string; value: string | number }) {
+function StatCard({ Icon, label, value, compact }: { Icon: ComponentType<SVGProps<SVGSVGElement>>; label: string; value: string | number; compact?: boolean }) {
   return (
-    <div style={{ background: "var(--canvas)", borderRadius: "var(--radius-lg)", border: "1px solid var(--hairline-soft)", padding: "24px 28px" }}>
-      <div style={{ color: "var(--primary)", marginBottom: 12 }}><Icon width={22} height={22} /></div>
-      <p style={{ fontSize: 28, fontWeight: 700, letterSpacing: -0.5, marginBottom: 4 }}>{value}</p>
-      <p style={{ fontSize: 14, color: "var(--ink-secondary)" }}>{label}</p>
+    <div style={{ background: "var(--canvas)", borderRadius: "var(--radius-lg)", border: "1px solid var(--hairline-soft)", padding: compact ? "9px 11px" : "24px 28px" }}>
+      <div style={{ color: "var(--primary)", marginBottom: compact ? 3 : 12, lineHeight: 0 }}><Icon width={compact ? 15 : 22} height={compact ? 15 : 22} /></div>
+      <p style={{ fontSize: compact ? 17 : 28, fontWeight: 700, letterSpacing: -0.5, marginBottom: 1, lineHeight: 1.15, wordBreak: "break-word" }}>{value}</p>
+      <p style={{ fontSize: compact ? 11 : 14, color: "var(--ink-secondary)" }}>{label}</p>
     </div>
   );
 }
 
 export default function AdminDashboard() {
   const [data, setData] = useState<DashboardData | null>(null);
+  const isMobile = useIsMobile();
 
   useEffect(() => {
     adminFetch<DashboardData>("/dashboard").then(setData).catch(() => {});
@@ -34,12 +37,17 @@ export default function AdminDashboard() {
 
   return (
     <AdminShell>
-      <h1 style={{ fontSize: 24, fontWeight: 700, marginBottom: 32, letterSpacing: -0.3 }}>Обзор</h1>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: isMobile ? 16 : 32 }}>
+        <h1 style={{ fontSize: 24, fontWeight: 700, letterSpacing: -0.3 }}>Обзор</h1>
+        <HelpHint text="Сводка магазина: сколько товаров и заказов и когда была последняя синхронизация с МойСклад." />
+      </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 16, marginBottom: 40 }}>
-        <StatCard Icon={IconBox} label="Товаров" value={data?.product_count ?? "—"} />
-        <StatCard Icon={IconOrders} label="Заказов" value={data?.order_count ?? "—"} />
-        <StatCard Icon={IconSync} label="Последняя синхр." value={data?.last_sync?.status ?? "—"} />
+      <div style={{ display: "grid",
+        gridTemplateColumns: isMobile ? "repeat(3, minmax(0, 1fr))" : "repeat(auto-fill, minmax(200px, 1fr))",
+        gap: isMobile ? 8 : 16, marginBottom: isMobile ? 20 : 40 }}>
+        <StatCard Icon={IconBox} label="Товаров" value={data?.product_count ?? "—"} compact={isMobile} />
+        <StatCard Icon={IconOrders} label="Заказов" value={data?.order_count ?? "—"} compact={isMobile} />
+        <StatCard Icon={IconSync} label="Последняя синхр." value={data?.last_sync?.status ?? "—"} compact={isMobile} />
       </div>
 
       {/* Когда что последний раз синхронизировалось с МойСклад */}

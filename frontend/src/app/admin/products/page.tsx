@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import AdminShell from "@/components/AdminShell";
+import HelpHint from "@/components/HelpHint";
 import { adminFetch, adminUpload } from "@/lib/adminApi";
 import { formatMsk } from "@/lib/format";
 import { useIsMobile } from "@/lib/useIsMobile";
@@ -41,9 +42,13 @@ export default function AdminProductsPage() {
   }
 
   const selStyle: React.CSSProperties = {
-    height: 38, padding: "0 12px", border: "1px solid var(--hairline-soft)",
-    borderRadius: "var(--radius-md)", fontSize: 13, background: "var(--canvas)",
-    color: "var(--ink)", cursor: "pointer",
+    height: 36, padding: "0 32px 0 12px", border: "1px solid var(--hairline-soft)",
+    borderRadius: "var(--radius-md)", fontSize: 13, color: "var(--ink)", cursor: "pointer",
+    // Белый фон + своя стрелка (нативный вид селекта убираем — «не вылетающий»)
+    appearance: "none", WebkitAppearance: "none", MozAppearance: "none",
+    backgroundColor: "#fff",
+    backgroundImage: "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>\")",
+    backgroundRepeat: "no-repeat", backgroundPosition: "right 10px center",
   };
   const hasFilters = filters.photo || filters.desc || filters.avail;
 
@@ -130,6 +135,7 @@ export default function AdminProductsPage() {
     <AdminShell>
       <div style={{ display: "flex", alignItems: "baseline", gap: 12, marginBottom: 20, flexWrap: "wrap" }}>
         <h1 style={{ fontSize: 24, fontWeight: 700, letterSpacing: -0.3 }}>Товары</h1>
+        <HelpHint text="Каталог загружается из МойСклад. Здесь можно фильтровать товары, скрыть/показать их на сайте и задать фото." />
         <span style={{ fontSize: 14, color: "var(--ink-secondary)" }}>
           {query ? `найдено: ${total}` : `${total} всего`}
         </span>
@@ -150,25 +156,28 @@ export default function AdminProductsPage() {
         )}
       </form>
 
-      <div style={{ display: "flex", gap: 10, marginBottom: 20, flexWrap: "wrap", alignItems: "center" }}>
-        <span style={{ fontSize: 13, color: "var(--ink-secondary)" }}>Фильтры:</span>
-        <select aria-label="Фильтр по картинкам" value={filters.photo} onChange={e => setFilter("photo", e.target.value)} style={selStyle}>
+      <div style={{ display: isMobile ? "grid" : "flex",
+        gridTemplateColumns: isMobile ? "1fr 1fr" : undefined,
+        gap: 10, marginBottom: 20, flexWrap: "wrap", alignItems: "center" }}>
+        {!isMobile && <span style={{ fontSize: 13, color: "var(--ink-secondary)" }}>Фильтры:</span>}
+        <select aria-label="Фильтр по картинкам" value={filters.photo} onChange={e => setFilter("photo", e.target.value)} style={{ ...selStyle, width: isMobile ? "100%" : undefined }}>
           <option value="">Картинки: все</option>
           <option value="with">С фото</option>
           <option value="without">Без фото</option>
         </select>
-        <select aria-label="Фильтр по описанию" value={filters.desc} onChange={e => setFilter("desc", e.target.value)} style={selStyle}>
+        <select aria-label="Фильтр по описанию" value={filters.desc} onChange={e => setFilter("desc", e.target.value)} style={{ ...selStyle, width: isMobile ? "100%" : undefined }}>
           <option value="">Описание: все</option>
           <option value="with">С описанием</option>
           <option value="without">Без описания</option>
         </select>
-        <select aria-label="Фильтр по наличию" value={filters.avail} onChange={e => setFilter("avail", e.target.value)} style={selStyle}>
+        <select aria-label="Фильтр по наличию" value={filters.avail} onChange={e => setFilter("avail", e.target.value)} style={{ ...selStyle, width: isMobile ? "100%" : undefined }}>
           <option value="">Наличие: все</option>
           <option value="yes">В наличии</option>
           <option value="no">Нет в наличии</option>
         </select>
         {hasFilters && (
           <button type="button" className="btn btn--outline btn--sm"
+            style={isMobile ? { gridColumn: "1 / -1" } : undefined}
             onClick={() => { setPage(1); setFilters({ photo: "", desc: "", avail: "" }); }}>Сбросить фильтры</button>
         )}
       </div>

@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import AdminShell from "@/components/AdminShell";
+import HelpHint from "@/components/HelpHint";
 import { adminFetch } from "@/lib/adminApi";
 import { formatMsk } from "@/lib/format";
 import { useIsMobile } from "@/lib/useIsMobile";
@@ -412,6 +413,7 @@ export default function AdminUsersPage() {
     <AdminShell>
       <div style={{ display: "flex", alignItems: "baseline", gap: 12, marginBottom: 16 }}>
         <h1 style={{ fontSize: 24, fontWeight: 700, letterSpacing: -0.3 }}>Покупатели</h1>
+        <HelpHint text={"Новые аккаунты ждут активации. «Активировать как нового» — контрагент создастся в МойСклад при первом заказе. «Как существующего» — впишите «Внешний код» контрагента из МойСклад, и заказы привяжутся к нему. Внешний код меняется кнопкой-карандашом.\n\nЦена: без регистрации — базовая цена МойСклад +10%; зарегистрированный клиент платит базовую цену (0%). В колонке «Скидка %» можно дать клиенту персональную скидку (например −10) или наценку (до +9). 0 — базовая цена."} />
         <span style={{ fontSize: 14, color: "var(--ink-secondary)" }}>
           {query ? `${visible.length} из ${users.length}` : `${users.length} всего`}
         </span>
@@ -419,16 +421,7 @@ export default function AdminUsersPage() {
         {error && <span style={{ fontSize: 13, color: "var(--critical, #c0392b)" }}>{error}</span>}
       </div>
 
-      <p style={{ fontSize: 13, color: "var(--ink-secondary)", margin: "0 0 16px", maxWidth: 820, lineHeight: 1.5 }}>
-        Новые аккаунты ждут активации. «Активировать как нового» — контрагент создастся в МойСклад при первом
-        заказе. «Как существующего» — впишите «Внешний код» контрагента из МойСклад, и заказы привяжутся к нему.
-        Внешний код меняется кнопкой-карандашом.
-      </p>
-      <p style={{ fontSize: 13, color: "var(--ink-secondary)", margin: "0 0 16px", maxWidth: 820, lineHeight: 1.5 }}>
-        <b>Цена:</b> без регистрации — базовая цена МойСклад +10%; зарегистрированный клиент платит
-        базовую цену (0%). В колонке «Скидка %» можно дать клиенту персональную скидку (например −10)
-        или наценку (до +9). 0 — базовая цена.
-      </p>
+      {/* Пояснение перенесено в «?» рядом с заголовком (не занимает место на странице). */}
 
       {/* Единый контрагент для гостевых заказов — компактная строка */}
       <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 20 }}>

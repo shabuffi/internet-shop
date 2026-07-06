@@ -2,6 +2,7 @@
 
 import { Fragment, useEffect, useState } from "react";
 import AdminShell from "@/components/AdminShell";
+import HelpHint from "@/components/HelpHint";
 import { adminFetch } from "@/lib/adminApi";
 import { formatMsk, formatPrice, cleanProductName } from "@/lib/format";
 import { useIsMobile } from "@/lib/useIsMobile";
@@ -98,6 +99,7 @@ export default function AdminOrdersPage() {
     <AdminShell>
       <div style={{ display: "flex", alignItems: "baseline", gap: 12, marginBottom: 16, flexWrap: "wrap" }}>
         <h1 style={{ fontSize: 24, fontWeight: 700, letterSpacing: -0.3 }}>Заказы</h1>
+        <HelpHint text="Заказы, оформленные на сайте. Статус и состав приходят из МойСклад — на сайте они не редактируются." />
         <span style={{ fontSize: 14, color: "var(--ink-secondary)" }}>{total} всего</span>
         {error && <span style={{ fontSize: 13, color: "var(--critical)" }}>{error}</span>}
       </div>

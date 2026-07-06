@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import AdminShell from "@/components/AdminShell";
+import HelpHint from "@/components/HelpHint";
 import BannersEditor from "@/components/BannersEditor";
 import { adminFetch } from "@/lib/adminApi";
 
@@ -34,11 +35,10 @@ export default function AdminBannersPage() {
 
   return (
     <AdminShell>
-      <h1 style={{ fontSize: 24, fontWeight: 700, marginBottom: 8, letterSpacing: -0.3 }}>Баннеры</h1>
-      <p style={{ color: "var(--ink-secondary)", fontSize: 14, marginBottom: 24, maxWidth: 620 }}>
-        Слайдер баннеров показывается вверху каталога. Добавляйте баннеры, загружайте картинки
-        (без картинки — заглушка-градиент), меняйте порядок. Пусто → встроенные Новинки/Акции.
-      </p>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 24 }}>
+        <h1 style={{ fontSize: 24, fontWeight: 700, letterSpacing: -0.3 }}>Баннеры</h1>
+        <HelpHint text={"Слайдер баннеров показывается вверху каталога. Добавляйте баннеры, загружайте картинки (без картинки — заглушка-градиент), меняйте порядок. Пусто → встроенные Новинки/Акции."} />
+      </div>
 
       {!loaded ? (
         <p style={{ color: "var(--ink-secondary)" }}>Загрузка…</p>

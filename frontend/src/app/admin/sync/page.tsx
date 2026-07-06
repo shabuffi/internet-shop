@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import AdminShell from "@/components/AdminShell";
+import HelpHint from "@/components/HelpHint";
 import { adminFetch } from "@/lib/adminApi";
 import { formatMsk } from "@/lib/format";
 import { useIsMobile } from "@/lib/useIsMobile";
@@ -19,11 +20,9 @@ export default function SyncPage() {
 
   return (
     <AdminShell>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 32 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 24 }}>
         <h1 style={{ fontSize: 24, fontWeight: 700, letterSpacing: -0.3 }}>Синхронизация</h1>
-        <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-          <button className="btn btn-ghost" onClick={load} style={{ fontSize: 14 }}>Обновить</button>
-        </div>
+        <HelpHint text="Журнал обменов каталога с МойСклад: когда прошёл обмен и сколько товаров создано/обновлено." />
       </div>
 
       {logs.length === 0 ? (

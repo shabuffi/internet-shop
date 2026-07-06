@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import AdminShell from "@/components/AdminShell";
 import PolicyView, { type PolicyOperator } from "@/components/PolicyView";
 import { adminFetch } from "@/lib/adminApi";
+import { useIsMobile } from "@/lib/useIsMobile";
+import HelpHint from "@/components/HelpHint";
 
 interface PolicyData {
   body: string;
@@ -43,6 +45,7 @@ export default function PolicyPage() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState("");
+  const isMobile = useIsMobile();
 
   useEffect(() => {
     adminFetch<PolicyData>("/policy")
@@ -70,19 +73,15 @@ export default function PolicyPage() {
 
   return (
     <AdminShell>
-      <h1 style={{ fontSize: 24, fontWeight: 700, marginBottom: 8, letterSpacing: -0.3 }}>
-        Политика конфиденциальности
-      </h1>
-      <p style={{ color: "var(--ink-secondary)", fontSize: 14, marginBottom: 28, maxWidth: 640 }}>
-        Реквизиты подставляются в текст по меткам вида <code>{"{{наименование}}"}</code>. Текст можно
-        править напрямую (Markdown-lite: строка <code>## Заголовок</code> — раздел, пустая строка —
-        новый абзац). Справа — как страница увидится покупателю на <code>/offer</code>.
-      </p>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 24 }}>
+        <h1 style={{ fontSize: 24, fontWeight: 700, letterSpacing: -0.3 }}>Политика конфиденциальности</h1>
+        <HelpHint text={"Реквизиты подставляются в текст по меткам вида {{наименование}}. Текст можно править напрямую (Markdown-lite: строка «## Заголовок» — раздел, пустая строка — новый абзац). Справа — как страница увидится покупателю на /offer."} />
+      </div>
 
       {!loaded ? (
         <p style={{ color: "var(--ink-secondary)" }}>Загрузка…</p>
       ) : (
-        <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)", gap: 28, alignItems: "start" }}>
+        <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "minmax(0, 1fr) minmax(0, 1fr)", gap: isMobile ? 20 : 28, alignItems: "start" }}>
           {/* ── Редактор ── */}
           <div>
             <div style={cardStyle}>
@@ -143,11 +142,11 @@ export default function PolicyPage() {
           </div>
 
           {/* ── Превью ── */}
-          <div style={{ position: "sticky", top: 24 }}>
+          <div style={{ position: isMobile ? "static" : "sticky", top: 24 }}>
             <p style={{ fontSize: 12, textTransform: "uppercase", letterSpacing: 0.5, color: "var(--ink-tertiary)", marginBottom: 12 }}>
               Предпросмотр
             </p>
-            <div style={{ ...cardStyle, maxHeight: "calc(100vh - 120px)", overflowY: "auto", lineHeight: 1.6 }}>
+            <div style={{ ...cardStyle, maxHeight: isMobile ? "60vh" : "calc(100vh - 120px)", overflowY: "auto", overflowX: "auto", lineHeight: 1.6 }}>
               <PolicyView body={form.body} operator={form.operator} revision={form.revision} />
             </div>
           </div>

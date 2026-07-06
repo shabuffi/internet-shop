@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import AdminShell from "@/components/AdminShell";
+import HelpHint from "@/components/HelpHint";
 import { adminFetch } from "@/lib/adminApi";
 import PasswordField from "@/components/PasswordField";
 
@@ -151,10 +152,10 @@ export default function SettingsPage() {
 
   return (
     <AdminShell>
-      <h1 style={{ fontSize: 24, fontWeight: 700, marginBottom: 8, letterSpacing: -0.3 }}>Настройки</h1>
-      <p style={{ fontSize: 14, color: "var(--ink-secondary)", marginBottom: 28 }}>
-        Каждый блок сохраняется отдельной кнопкой.
-      </p>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 24 }}>
+        <h1 style={{ fontSize: 24, fontWeight: 700, letterSpacing: -0.3 }}>Настройки</h1>
+        <HelpHint text={"Название и контакты магазина, реквизиты компании, параметры обмена с МойСклад и уведомлений.\n\nКаждый блок сохраняется отдельной кнопкой."} />
+      </div>
 
       {error && <p className="form-error" style={{ maxWidth: 520, marginBottom: 16 }}>{error}</p>}
 
