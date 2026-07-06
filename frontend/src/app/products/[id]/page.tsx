@@ -3,7 +3,7 @@ export const dynamic = 'force-dynamic';
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getProduct, getStoreInfo } from "@/lib/api";
-import { formatPrice, minOrderUnit } from "@/lib/format";
+import { formatPrice, minOrderQtyText, MIN_ORDER_QTY_LABEL } from "@/lib/format";
 import AddToCartButton from "@/components/AddToCartButton";
 import BackButton from "@/components/BackButton";
 import ProductGallery from "@/components/ProductGallery";
@@ -59,8 +59,12 @@ export default async function ProductPage({ params }: Props) {
   const inStock = product.available;
   const stockLabel = product.stock > 0 ? `${product.stock} шт.` : "Нет на складе";
   // Характеристики = модификации/реквизиты из МойСклад + базовые поля товара в одной таблице.
-  const attributes = product.attributes?.filter((item) => item.name && item.value) ?? [];
+  // Поле «минимальное количество» выносим отдельной строкой с понятным названием и показываем
+  // у ВСЕХ товаров (если не задано — «—»), поэтому исключаем его из общего списка реквизитов.
+  const attributes = (product.attributes?.filter((item) => item.name && item.value) ?? [])
+    .filter((x) => !/минимальн.*(единиц.*отгрузк|количеств)/iu.test(x.name));
   const specs: { name: string; value: string }[] = [
+    { name: MIN_ORDER_QTY_LABEL, value: minOrderQtyText(product.attributes) },
     ...attributes,
     ...(product.article ? [{ name: "Артикул", value: product.article }] : []),
     ...(product.category?.name ? [{ name: "Категория", value: product.category.name }] : []),
@@ -104,14 +108,6 @@ export default async function ProductPage({ params }: Props) {
             </div>
 
             <div className="pdp__price">{formatPrice(product.price)}</div>
-
-            {minOrderUnit(product.attributes) && (
-              <div style={{ display: "inline-flex", alignItems: "center", gap: 6, marginBottom: "var(--s-3)",
-                padding: "4px 12px", borderRadius: 999, background: "var(--accent-soft, #e7edff)",
-                color: "var(--accent)", fontWeight: 600, fontSize: "var(--t-sm)" }}>
-                Минимальная партия: {minOrderUnit(product.attributes)} шт.
-              </div>
-            )}
 
             <AddToCartButton product={product} />
 

@@ -40,12 +40,21 @@ export function formatMsk(iso: string | null | undefined): string {
   return d.toLocaleString("ru-RU", { timeZone: "Europe/Moscow" });
 }
 
-/** Значение поля «Минимальная единица отгрузки» (доп. поле МойСклад) из характеристик
- *  товара. Возвращает число (партию) только если оно осмысленно (> 1), иначе null. */
-export function minOrderUnit(attributes?: { name: string; value: string }[] | null): number | null {
+// Как называем поле для покупателя (доп. поле МойСклад «Минимальная единица отгрузки»).
+export const MIN_ORDER_QTY_LABEL = "Минимальное количество для заказа";
+
+/** Значение поля «Минимальное количество для заказа» из характеристик товара
+ *  (доп. поле МойСклад). Число, если задано, иначе null. */
+export function minOrderQty(attributes?: { name: string; value: string }[] | null): number | null {
   if (!attributes) return null;
-  const a = attributes.find((x) => /минимальн.*единиц.*отгрузк/iu.test(x.name || ""));
+  const a = attributes.find((x) => /минимальн.*(единиц.*отгрузк|количеств)/iu.test(x.name || ""));
   if (!a) return null;
   const n = parseInt(String(a.value).replace(/[^\d]/g, ""), 10);
-  return Number.isFinite(n) && n > 1 ? n : null;
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+/** Текст значения для показа: «N шт.» если задано, иначе «—». */
+export function minOrderQtyText(attributes?: { name: string; value: string }[] | null): string {
+  const n = minOrderQty(attributes);
+  return n ? `${n} шт.` : "—";
 }
