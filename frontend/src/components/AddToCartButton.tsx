@@ -3,15 +3,20 @@
 import { useState } from "react";
 import { useCart } from "@/context/CartContext";
 import QtyField from "@/components/QtyField";
+import { minOrderQty } from "@/lib/format";
 import type { Product } from "@/types/product";
 
-/** Блок покупки на карточке товара (PDP): степпер количества + кнопка «В корзину». */
+/** Блок покупки на карточке товара (PDP): степпер количества + кнопка «В корзину».
+ *  Кратность (партия N) из «Минимального количества для заказа»: шаг/минимум = N. */
 export default function AddToCartButton({ product }: { product: Product }) {
   const { addItem, items } = useCart();
-  const [qty, setQty] = useState(1);
+  const step = minOrderQty(product.attributes) ?? 1;
+  const [qty, setQty] = useState(step);
   const [added, setAdded] = useState(false);
   const outOfStock = !product.is_active || !product.available;
   const inCart = items.find((i) => i.id === product.id)?.quantity ?? 0;
+
+  const setQtyRounded = (n: number) => setQty(Math.max(step, Math.round(n / step) * step));
 
   function handleAdd() {
     for (let i = 0; i < qty; i++) {
@@ -26,16 +31,21 @@ export default function AddToCartButton({ product }: { product: Product }) {
     <div>
       <div className="pdp__buy">
         <div className="qty">
-          <button onClick={() => setQty((q) => Math.max(1, q - 1))} disabled={qty <= 1 || outOfStock} aria-label="Меньше">−</button>
-          <QtyField value={qty} onCommit={setQty} disabled={outOfStock} />
-          <button onClick={() => setQty((q) => q + 1)} disabled={outOfStock} aria-label="Больше">+</button>
+          <button onClick={() => setQty((q) => Math.max(step, q - step))} disabled={qty <= step || outOfStock} aria-label="Меньше">−</button>
+          <QtyField value={qty} min={step} onCommit={setQtyRounded} disabled={outOfStock} />
+          <button onClick={() => setQty((q) => q + step)} disabled={outOfStock} aria-label="Больше">+</button>
         </div>
         <button className="btn btn--primary btn--lg" style={{ flex: 1 }} disabled={outOfStock} onClick={handleAdd}>
           {outOfStock ? "Нет в наличии" : added ? "✓ Добавлено" : inCart > 0 ? "Добавить ещё" : "В корзину"}
         </button>
       </div>
+      {step > 1 && (
+        <p style={{ margin: "var(--s-3) 0 0", fontSize: "var(--t-sm)", fontWeight: 600, color: "var(--accent)" }}>
+          Продаётся кратно {step} шт. — добавляется партиями по {step}.
+        </p>
+      )}
       {inCart > 0 && (
-        <p style={{ margin: "var(--s-3) 0 0", fontSize: "var(--t-sm)", fontWeight: 700, color: "var(--stock, #16794a)" }}>
+        <p style={{ margin: "var(--s-2) 0 0", fontSize: "var(--t-sm)", fontWeight: 700, color: "var(--stock, #16794a)" }}>
           ✓ В корзине: {inCart} шт
         </p>
       )}

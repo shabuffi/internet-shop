@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useCart } from "@/context/CartContext";
-import { formatPrice } from "@/lib/format";
+import { formatPrice, minOrderQty } from "@/lib/format";
 import { IconImage } from "@/components/icons";
 import ChestnyZnakBadge from "@/components/ChestnyZnakBadge";
 import type { Product } from "@/types/product";
@@ -42,16 +42,21 @@ function ProductThumb({ product }: { product: Product }) {
   );
 }
 
-// Ячейка количества: − [число] + . Пишет точное число в корзину (на blur / Enter / кнопки).
+// Ячейка количества: − [число] + . Кратность (партия N) — из «Минимального количества для
+// заказа»: шаг и минимум = N, кладём в корзину кратно N; ввод округляется к кратному.
 function QtyCell({ product }: { product: Product }) {
   const { items, setItemQuantity } = useCart();
+  const step = minOrderQty(product.attributes) ?? 1;
   const qty = items.find((i) => i.id === product.id)?.quantity ?? 0;
   const [val, setVal] = useState(qty ? String(qty) : "");
   useEffect(() => { setVal(qty ? String(qty) : ""); }, [qty]);
 
   const disabled = !product.available;
   const item = { id: product.id, name: product.name, article: product.article, price: product.price };
-  const commit = (n: number) => setItemQuantity(item, Number.isFinite(n) ? Math.max(0, Math.floor(n)) : 0);
+  const commit = (n: number) => {
+    if (!Number.isFinite(n) || n <= 0) { setItemQuantity(item, 0); return; }
+    setItemQuantity(item, Math.max(step, Math.round(n / step) * step));
+  };
 
   const btn: React.CSSProperties = {
     width: 30, height: 34, border: "1px solid var(--hairline)", background: "var(--paper)",
@@ -60,19 +65,22 @@ function QtyCell({ product }: { product: Product }) {
   };
 
   return (
-    <div style={{ display: "inline-flex", alignItems: "center", borderRadius: 8, overflow: "hidden", opacity: disabled ? 0.45 : 1 }}>
-      <button type="button" style={{ ...btn, borderRadius: "8px 0 0 8px" }} disabled={disabled || qty <= 0}
-        onClick={() => commit(qty - 1)} aria-label="Меньше">−</button>
-      <input value={val} disabled={disabled} inputMode="numeric"
-        onChange={(e) => setVal(e.target.value.replace(/\D/g, "").slice(0, 5))}
-        onBlur={() => commit(parseInt(val || "0", 10))}
-        onKeyDown={(e) => { if (e.key === "Enter") { commit(parseInt(val || "0", 10)); (e.target as HTMLInputElement).blur(); } }}
-        placeholder="0"
-        style={{ width: 56, height: 34, border: "1px solid var(--hairline)", borderLeft: "none", borderRight: "none",
-          textAlign: "center", fontSize: 14, fontWeight: 600, color: "var(--ink)", outline: "none",
-          background: qty > 0 ? "var(--stock-soft)" : "var(--paper)" }} />
-      <button type="button" style={{ ...btn, borderRadius: "0 8px 8px 0" }} disabled={disabled}
-        onClick={() => commit(qty + 1)} aria-label="Больше">+</button>
+    <div style={{ display: "inline-flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
+      <div style={{ display: "inline-flex", alignItems: "center", borderRadius: 8, overflow: "hidden", opacity: disabled ? 0.45 : 1 }}>
+        <button type="button" style={{ ...btn, borderRadius: "8px 0 0 8px" }} disabled={disabled || qty <= 0}
+          onClick={() => commit(qty - step)} aria-label="Меньше">−</button>
+        <input value={val} disabled={disabled} inputMode="numeric"
+          onChange={(e) => setVal(e.target.value.replace(/\D/g, "").slice(0, 5))}
+          onBlur={() => commit(parseInt(val || "0", 10))}
+          onKeyDown={(e) => { if (e.key === "Enter") { commit(parseInt(val || "0", 10)); (e.target as HTMLInputElement).blur(); } }}
+          placeholder="0"
+          style={{ width: 56, height: 34, border: "1px solid var(--hairline)", borderLeft: "none", borderRight: "none",
+            textAlign: "center", fontSize: 14, fontWeight: 600, color: "var(--ink)", outline: "none",
+            background: qty > 0 ? "var(--stock-soft)" : "var(--paper)" }} />
+        <button type="button" style={{ ...btn, borderRadius: "0 8px 8px 0" }} disabled={disabled}
+          onClick={() => commit(qty === 0 ? step : qty + step)} aria-label="Больше">+</button>
+      </div>
+      {step > 1 && <span style={{ fontSize: 11, fontWeight: 600, color: "var(--accent)", whiteSpace: "nowrap" }}>кратно {step} шт.</span>}
     </div>
   );
 }
