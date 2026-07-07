@@ -13,6 +13,7 @@
     "test:e2e:report": "playwright show-report"
   },
   "dependencies": {
+    "@fontsource/onest": "^5.2.11",
     "next": "15.3.3",
     "react": "19.0.0",
     "react-dom": "19.0.0"
