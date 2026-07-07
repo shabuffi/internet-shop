@@ -50,9 +50,12 @@ def test_register_creates_inactive_with_ext_code(client, db_session):
     assert u.moysklad_ext_code and len(u.moysklad_ext_code) == 16   # сгенерён «Внешний код»
 
 
-def test_register_rejects_google_email(client):
-    r = client.post("/api/v1/auth/register", json={**VALID, "email": "buyer@gmail.com"})
-    assert r.status_code == 422
+def test_register_allows_google_email(client):
+    # Gmail разрешён как логин: закон запрещает лишь авторизацию через иностранные сервисы,
+    # а не e-mail-адрес пользователя.
+    r = client.post("/api/v1/auth/register",
+                    json={**VALID, "email": "buyer@gmail.com", "phone": "+79007654321"})
+    assert r.status_code == 201
 
 
 def test_register_rejects_weak_password(client):

@@ -10,8 +10,6 @@ from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 _EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 # Длина ИНН: ИП — 12 цифр, ООО (юрлицо) — 10 цифр
 _INN_LEN = {"ip": 12, "ooo": 10}
-# Почтовые домены Google: приём регистраций приостановлен (см. валидатор email)
-_GOOGLE_MAIL_DOMAINS = {"gmail.com", "googlemail.com"}
 
 
 def normalize_ru_phone(v: str) -> str:
@@ -56,12 +54,8 @@ class RegisterIn(BaseModel):
         v = v.strip().lower()
         if not _EMAIL_RE.match(v):
             raise ValueError("Некорректный email")
-        if v.rsplit("@", 1)[-1] in _GOOGLE_MAIL_DOMAINS:
-            raise ValueError(
-                "Использование почты Google на российских сервисах приостанавливается "
-                "с 1 сентября 2026 года — укажите, пожалуйста, другой email "
-                "(например, Яндекс или Mail.ru)"
-            )
+        # Gmail и другие иностранные почты РАЗРЕШЕНЫ как логин — закон запрещает только
+        # авторизацию через иностранные сервисы («Войти через Google»), а не e-mail-адрес.
         return v
 
     @field_validator("phone")
