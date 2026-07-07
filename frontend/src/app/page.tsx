@@ -97,7 +97,8 @@ export default async function HomePage() {
   try {
     const [n, s] = await Promise.all([
       getProducts({ page_size: 5, with_photo: true, sort: "name" }),
-      getProducts({ page_size: 5, with_photo: true, sort: "name", category_id: saleIds.length ? saleIds.join(",") : "__none__" }),
+      // Спецпредложения — из «РАСПРОДАЖА»; фото не требуем (у этих товаров его может не быть)
+      getProducts({ page_size: 5, sort: "name", category_id: saleIds.length ? saleIds.join(",") : "__none__" }),
     ]);
     novinki = n.items;
     special = s.items;

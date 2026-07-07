@@ -549,14 +549,14 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .
 
 /* ---------- шапка ---------- */
 .header { position: sticky; top: 0; z-index: 40; background: var(--paper); border-bottom: 1px solid var(--hairline); }
-.header__inner { height: 72px; display: flex; align-items: center; gap: var(--s-8); }
+.header__inner { height: 72px; display: flex; align-items: center; gap: var(--s-5); }
 .brand {
   font-family: var(--font-display); font-size: 24px; font-weight: 600; letter-spacing: -.01em;
   color: var(--ink); cursor: pointer; line-height: 1; white-space: nowrap;
 }
 .brand b { color: var(--accent-2); font-weight: 600; }
-.nav { display: flex; align-items: center; gap: var(--s-2); margin-left: var(--s-4); }
-.nav a { position: relative; padding: var(--s-2) var(--s-3); color: var(--ink); white-space: nowrap; font-size: var(--t-sm); font-weight: 500; cursor: pointer; border-radius: var(--r-sm); }
+.nav { display: flex; align-items: center; gap: 0; margin-left: var(--s-2); }
+.nav a { position: relative; padding: var(--s-2) 9px; color: var(--ink); white-space: nowrap; font-size: var(--t-sm); font-weight: 500; cursor: pointer; border-radius: var(--r-sm); }
 .nav a:hover { color: var(--accent); }
 .nav a.active::after { content: ''; position: absolute; left: var(--s-3); right: var(--s-3); bottom: -2px; height: 2px; background: var(--accent); }
 .header__actions { margin-left: auto; display: flex; align-items: center; gap: var(--s-3); }
@@ -583,7 +583,7 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .
 
 .search {
   display: flex; align-items: center; gap: var(--s-2);
-  height: 42px; padding: 0 var(--s-4); width: 260px;
+  height: 42px; padding: 0 var(--s-4); width: 210px; flex: 0 1 210px; min-width: 120px;
   border: 1.5px solid var(--accent); border-radius: var(--r-pill);
   background: var(--canvas); color: var(--accent);
   transition: border-color .2s ease, box-shadow .2s ease, width .2s ease;
@@ -592,6 +592,13 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .
 .search input::placeholder { color: color-mix(in srgb, var(--accent), #fff 45%); }
 .search:hover { border-color: var(--accent-deep); box-shadow: 0 0 0 3px var(--accent-soft); }
 .search:focus-within { border-color: var(--accent-deep); box-shadow: 0 0 0 4px var(--accent-soft); }
+
+/* Средние экраны: 6 пунктов меню не влезают рядом с поиском/корзиной — прячем
+   горизонтальное меню и показываем «бургер» (поиск и корзину оставляем). */
+@media (max-width: 1180px) {
+  .header .nav.hide-mobile { display: none; }
+  .header .iconbtn.only-mobile { display: inline-flex !important; }
+}
 
 /* ---------- подвал ---------- */
 .footer { background: var(--accent-deep); color: var(--on-ink); margin-top: auto; }
