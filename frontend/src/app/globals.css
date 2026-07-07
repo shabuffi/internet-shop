@@ -976,3 +976,6 @@ textarea.form-input { height: auto; min-height: 90px; padding: var(--s-3) var(--
   padding: 12px 14px; box-shadow: 0 12px 32px rgba(0,0,0,.16); font-size: 13px; line-height: 1.5;
   pointer-events: none;
 }
+
+/* Мелочь: убрать серую подсветку тапа на мобильных (заодно меняет хеш CSS-файла). */
+html { -webkit-tap-highlight-color: transparent; }
