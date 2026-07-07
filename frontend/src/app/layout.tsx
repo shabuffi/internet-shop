@@ -1,5 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+// Шрифт Onest — локально (self-hosted), без обращений к Google Fonts (иностранный сервис)
+import "@fontsource/onest/400.css";
+import "@fontsource/onest/500.css";
+import "@fontsource/onest/600.css";
+import "@fontsource/onest/700.css";
 import "./globals.css";
 import { CartProvider } from "@/context/CartContext";
 import CartIcon from "@/components/CartIcon";
@@ -83,12 +88,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   return (
     <html lang="ru" suppressHydrationWarning>
       <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700&display=swap"
-          rel="stylesheet"
-        />
+        {/* Шрифт Onest подключён локально (см. import @fontsource/onest выше) — без Google Fonts */}
         {/* Цвет темы из админки: переопределяем --accent, производные (color-mix) подхватятся */}
         {themeColor && (
           <style dangerouslySetInnerHTML={{ __html: `:root{--accent:${themeColor};}` }} />

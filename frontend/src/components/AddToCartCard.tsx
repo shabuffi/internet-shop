@@ -35,11 +35,11 @@ export default function AddToCartCard({ product }: { product: Product }) {
         <QtyField value={qty} min={0} onCommit={commit} />
         <button type="button" onClick={() => commit(qty === 0 ? step : qty + step)} aria-label="Больше">+</button>
       </div>
-      {step > 1 && (
-        <span style={{ fontSize: 11, fontWeight: 600, color: "var(--accent)", textAlign: "center" }}>
-          кратно {step} шт.
-        </span>
-      )}
+      {/* Слот подписи резервируем всегда (даже пустой) — чтобы цена/количество в соседних
+          карточках были на одном уровне. */}
+      <span style={{ fontSize: 11, fontWeight: 600, color: "var(--accent)", textAlign: "center", minHeight: 15, lineHeight: "15px" }}>
+        {step > 1 ? `кратно ${step} шт.` : " "}
+      </span>
     </div>
   );
 }
