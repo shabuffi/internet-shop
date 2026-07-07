@@ -30,8 +30,8 @@ export default function CartBar() {
   return (
     <div style={{ position: "fixed", left: 0, right: 0, bottom: 0, zIndex: 30,
       background: "var(--ink)", color: "#fff", boxShadow: "0 -6px 24px rgba(0,0,0,.18)" }}>
-      <div className="container" style={{ display: "flex", alignItems: "center", justifyContent: "space-between",
-        gap: 16, padding: "14px 0", flexWrap: "wrap" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between",
+        gap: 16, padding: "14px clamp(16px, 4vw, 40px)", flexWrap: "wrap" }}>
         <div style={{ fontSize: 15 }}>
           Выбрано <b>{positions}</b> {plural(positions, "позиция", "позиции", "позиций")}
           {" · "}<b>{totalItems}</b> {plural(totalItems, "штука", "штуки", "штук")}

@@ -201,18 +201,18 @@ button, input, textarea, select { font-family: inherit; }
 .trust {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: var(--s-6);
-  padding-top: var(--s-12);
-  padding-bottom: var(--s-12);
+  gap: var(--s-4);
+  padding-top: var(--s-8);
+  padding-bottom: var(--s-8);
 }
 .trust-item {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   text-align: left;
-  gap: 5px;
-  min-height: 156px;
-  padding: var(--s-6);
+  gap: 3px;
+  min-height: 0;
+  padding: var(--s-4) var(--s-5);
   background: var(--paper);
   border: 1px solid var(--hairline);
   border-radius: var(--r-lg);
@@ -225,18 +225,19 @@ button, input, textarea, select { font-family: inherit; }
   border-color: color-mix(in srgb, var(--accent), #fff 65%);
 }
 .trust-item .ic {
-  width: 54px;
-  height: 54px;
-  border-radius: 15px;
-  margin-bottom: 10px;
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  margin-bottom: 6px;
   display: flex;
   align-items: center;
   justify-content: center;
   background: var(--accent-soft);
   color: var(--accent);
 }
+.trust-item .ic svg { width: 22px; height: 22px; }
 .trust-item .big {
-  font-size: 28px;
+  font-size: 23px;
   font-weight: 700;
   letter-spacing: 0;
   color: var(--accent);
@@ -661,6 +662,17 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .
 .quick-cat img { width: 68px; height: 48px; object-fit: cover; border-radius: var(--r-sm); display: block; }
 .quick-cat span { font-size: var(--t-xs); font-weight: 700; text-align: center; line-height: 1.2; }
 .catalog-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--s-6); }
+
+/* Ряды «Новинки» / «Спецпредложения» на главной — сетка карточек (5 в ряд) */
+.promo-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: var(--s-4); }
+.pcard__promo {
+  position: absolute; top: var(--s-4); left: var(--s-4); z-index: 2;
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 38px; height: 38px; padding: 0 10px; border-radius: 999px;
+  font-size: 13px; font-weight: 800; color: #fff; box-shadow: 0 4px 12px rgba(0,0,0,.18);
+}
+.pcard__promo--new { background: var(--accent); }
+.pcard__promo--sale { background: var(--accent-2); }
 .pagination { display: flex; align-items: center; justify-content: center; gap: var(--s-2); margin-top: var(--s-12); }
 .page-dot { min-width: 42px; height: 42px; padding: 0 var(--s-3); border-radius: var(--r-md); border: 1px solid var(--hairline); background: var(--paper); color: var(--ink); font-size: var(--t-sm); font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; text-decoration: none; }
 .page-dot:hover { border-color: var(--steel); }
@@ -794,6 +806,7 @@ textarea.form-input { height: auto; min-height: 90px; padding: var(--s-3) var(--
   .home-about { grid-template-columns: 1fr; gap: var(--s-5); }
   .quick-cats { grid-template-columns: repeat(4, minmax(0, 1fr)); }
   .catalog-grid { grid-template-columns: repeat(3, 1fr); }
+  .promo-grid { grid-template-columns: repeat(3, 1fr); }
 }
 @media (max-width: 768px) {
   .container { padding: 0 var(--s-4); }
@@ -851,6 +864,7 @@ textarea.form-input { height: auto; min-height: 90px; padding: var(--s-3) var(--
   .filters::-webkit-scrollbar { display: none; }
   .result-count { display: none; }
   .catalog-grid { grid-template-columns: 1fr 1fr; gap: var(--s-3); }
+  .promo-grid { grid-template-columns: 1fr 1fr; gap: var(--s-3); }
   .pcard__name { font-size: var(--t-sm); }
   /* Регионы-бегущая строка: на узком экране шире затухание по краям, чтобы плитки
      не выглядели резко обрубленными */

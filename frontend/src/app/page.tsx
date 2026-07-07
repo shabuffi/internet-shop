@@ -1,11 +1,13 @@
 export const dynamic = "force-dynamic";
 
 import Link from "next/link";
-import { getCategories } from "@/lib/api";
+import { getCategories, getProducts } from "@/lib/api";
 import { CATEGORY_GROUPS, normCatName } from "@/lib/categoryGroups";
+import PromoCard from "@/components/PromoCard";
 import DeliveryMap from "@/components/DeliveryMap";
 import RegionsMarquee from "@/components/RegionsMarquee";
 import Reveal from "@/components/Reveal";
+import type { Product } from "@/types/product";
 
 // Плитки категорий. `title` — ключ группы в CATEGORY_GROUPS (там список реальных категорий
 // каталога). `icon` — имя файла картинки в /public/categories/<icon>.png.
@@ -85,6 +87,22 @@ export default async function HomePage() {
     categories = [];
   }
 
+  // ВРЕМЕННО: «Новинки»/«Спецпредложения» наполняем товарами-заглушками (разная сортировка,
+  // чтобы наборы отличались). Когда в МойСклад появятся доп. поля «Новинка»/«Спецпредложение» —
+  // заменим источник на фильтр по этим полям, разметка секций останется прежней.
+  let novinki: Product[] = [];
+  let special: Product[] = [];
+  // «Спецпредложения» — из категории «РАСПРОДАЖА» (ищем по имени среди уже загруженных категорий).
+  const saleIds = categories.filter((c) => (c.name || "").toLowerCase().includes("распродаж")).map((c) => c.id);
+  try {
+    const [n, s] = await Promise.all([
+      getProducts({ page_size: 5, with_photo: true, sort: "name" }),
+      getProducts({ page_size: 5, with_photo: true, sort: "name", category_id: saleIds.length ? saleIds.join(",") : "__none__" }),
+    ]);
+    novinki = n.items;
+    special = s.items;
+  } catch { /* без товаров секции просто не покажем */ }
+
   // Ссылка плитки → каталог, отфильтрованный сразу по группе категорий (CATEGORY_GROUPS).
   // Имена группы резолвим в реальные category_id и склеиваем через запятую (бэкенд понимает
   // список). Если ни одна категория группы не нашлась — fallback на поиск по названию плитки.
@@ -155,6 +173,32 @@ export default async function HomePage() {
           ))}
         </div>
       </div>
+
+      {/* Новинки (пока товары-заглушки, потом — по полю «Новинка» из МойСклад) */}
+      {novinki.length > 0 && (
+        <div id="novinki" className="container section">
+          <div className="section-head">
+            <h2 className="section-title section-title--caps">Новинки</h2>
+            <Link href="/novinki" className="see-all">Посмотреть все <ArrowIcon size={16} /></Link>
+          </div>
+          <div className="promo-grid">
+            {novinki.map(p => <PromoCard key={p.id} p={p} kind="new" />)}
+          </div>
+        </div>
+      )}
+
+      {/* Спецпредложения (пока товары-заглушки, потом — по полю «Спецпредложение» из МойСклад) */}
+      {special.length > 0 && (
+        <div id="special" className="container section" style={{ paddingTop: 0 }}>
+          <div className="section-head">
+            <h2 className="section-title section-title--caps">Спецпредложения</h2>
+            <Link href="/special" className="see-all">Посмотреть все <ArrowIcon size={16} /></Link>
+          </div>
+          <div className="promo-grid">
+            {special.map(p => <PromoCard key={p.id} p={p} kind="sale" />)}
+          </div>
+        </div>
+      )}
 
       {/* Категории */}
       <div className="container section section--cats">

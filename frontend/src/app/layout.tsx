@@ -162,7 +162,11 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                 )}
               </div>
               <div className="footer__bottom">
-                <span>© {new Date().getFullYear()} {store?.company_legal_name || shopName}. Все права защищены.</span>
+                <span>
+                  © {new Date().getFullYear()} {store?.company_legal_name || shopName}. Все права защищены.
+                  {" · "}
+                  <Link href="/admin" style={{ color: "inherit", opacity: 0.55, textDecoration: "none" }}>Вход для сотрудников</Link>
+                </span>
                 <span>Produced by soffit</span>
               </div>
             </div>
