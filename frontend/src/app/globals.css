@@ -696,8 +696,14 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;              /* прячем полосу прокрутки (Firefox) */
   -ms-overflow-style: none;
+  /* Лента вытянута до краёв контейнера (на телефоне = край экрана), а первая карточка
+     остаётся на уровне заголовка. Карточки режутся ровно по борту, без пустого поля справа. */
+  margin-left: calc(-1 * var(--s-8));
+  margin-right: calc(-1 * var(--s-8));
+  padding-left: var(--s-8);
+  padding-right: var(--s-8);
   padding-bottom: var(--s-2);
-  scroll-padding-left: var(--s-1);
+  scroll-padding-left: var(--s-8);
 }
 .promo-grid::-webkit-scrollbar { display: none; }   /* прячем полосу (WebKit/Chrome) */
 .promo-grid > * { flex: 0 0 auto; width: 220px; scroll-snap-align: start; }
@@ -904,7 +910,9 @@ textarea.form-input { height: auto; min-height: 90px; padding: var(--s-3) var(--
   .filters::-webkit-scrollbar { display: none; }
   .result-count { display: none; }
   .catalog-grid { grid-template-columns: 1fr 1fr; gap: var(--s-3); }
-  .promo-grid { gap: var(--s-3); }
+  .promo-grid { gap: var(--s-3);
+    margin-left: calc(-1 * var(--s-4)); margin-right: calc(-1 * var(--s-4));
+    padding-left: var(--s-4); padding-right: var(--s-4); scroll-padding-left: var(--s-4); }
   /* На телефоне карточки в один ряд со свайпом: ~2 в экране + краешек следующей (подсказка) */
   .promo-grid > * { width: 44vw; }
   .pcard__name { font-size: var(--t-sm); }
