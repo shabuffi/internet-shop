@@ -71,6 +71,10 @@ class ParsedProduct:
     # прислать import.xml без offers.xml (например, второй заход — только с картинкой);
     # тогда цену/остаток перезаписывать нельзя, иначе они обнулятся.
     has_offer: bool = False
+    # Присутствовал ли у товара тег <Картинка> в import.xml этого захода (даже пустой).
+    # Нужно, чтобы отличать «фото удалили» (пустой тег → чистим images) от «в этом заходе
+    # тега фото не было вовсе» (обычный import.xml без картинок → images НЕ трогаем).
+    has_image_field: bool = False
 
 
 @dataclass
@@ -339,7 +343,13 @@ def _parse_product(товар, ns: str = "", prop_map: dict[str, str] | None = N
 
     # Все картинки товара (CommerceML может прислать несколько <Картинка>).
     # Файлы картинок приходят отдельными POST'ами обмена; здесь — их имена/пути.
-    images = _texts(товар, "Картинка", ns=ns)
+    # Отдельно фиксируем сам факт наличия тега <Картинка> (в т.ч. пустого): пустой тег
+    # означает «фото удалили в МойСклад», а отсутствие тега — «в этом заходе фото не слали».
+    img_els = товар.findall(_tag("Картинка", ns))
+    if not img_els and ns:
+        img_els = товар.findall("Картинка")  # fallback без namespace
+    has_image_field = len(img_els) > 0
+    images = [e.text.strip() for e in img_els if e.text and e.text.strip()]
 
     return ParsedProduct(
         moysklad_id=product_id,
@@ -351,4 +361,5 @@ def _parse_product(товар, ns: str = "", prop_map: dict[str, str] | None = N
         image_url=images[0] if images else None,
         images=images,
         attributes=attributes,
+        has_image_field=has_image_field,
     )

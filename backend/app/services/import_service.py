@@ -75,13 +75,6 @@ def upsert_catalog(db: Session, catalog: ParsedCatalog, source: str = "commercem
         # SELECT'ов повесили бы обмен и дали таймаут у МойСклад).
         existing_products = {p.moysklad_id: p for p in db.query(Product).all()}
 
-        # Несёт ли ЭТОТ раунд обмена картинки вообще? У этого аккаунта обычный import.xml
-        # идёт БЕЗ <Картинка> (картинки приходят только в отдельных «фото-раундах»). Поэтому
-        # трогаем картинки ТОЛЬКО когда они реально пришли хоть у одного товара — иначе
-        # обычный обмен обнулил бы ВСЕ фото (инцидент 29.06.2026). Внутри фото-раунда пустой
-        # список у товара = картинку удалили в МойСклад → чистим (так удаление всё же работает).
-        round_has_images = any(p.images for p in catalog.products)
-
         for parsed_product in catalog.products:
             product = existing_products.get(parsed_product.moysklad_id)
 
@@ -110,38 +103,53 @@ def upsert_catalog(db: Session, catalog: ParsedCatalog, source: str = "commercem
                 existing_products[parsed_product.moysklad_id] = product
                 created += 1
             else:
-                product.name = parsed_product.name
+                # Считаем «Обновлено» по РЕАЛЬНЫМ изменениям (иначе журнал показывал бы весь
+                # каталог 12555 на каждом обмене, хотя ничего не поменялось). Поле трогаем и
+                # флаг ставим только когда значение отличается.
+                changed = False
+                if product.name != parsed_product.name:
+                    product.name = parsed_product.name; changed = True
                 # Артикул/код обновляем только если пришли — иначе «дозаливка картинок»
                 # вторым import.xml (без артикула) затёрла бы их в None.
-                if parsed_product.article:
-                    product.article = parsed_product.article
-                if parsed_product.code:
-                    product.code = parsed_product.code
-                product.category_id = cat_id
-                product.synced_at = _utcnow()
+                if parsed_product.article and product.article != parsed_product.article:
+                    product.article = parsed_product.article; changed = True
+                if parsed_product.code and product.code != parsed_product.code:
+                    product.code = parsed_product.code; changed = True
+                if product.category_id != cat_id:
+                    product.category_id = cat_id; changed = True
                 # Цену/остаток перезаписываем ТОЛЬКО если они пришли в offers.xml этого
                 # захода. Иначе import.xml без offers (например, второй заход с картинкой)
                 # обнулил бы их. (parsed.has_offer ставится в parse_offers_xml.)
                 if parsed_product.has_offer:
-                    product.price = parsed_product.price
-                    product.stock = parsed_product.stock
+                    if product.price != parsed_product.price:
+                        product.price = parsed_product.price; changed = True
+                    if product.stock != parsed_product.stock:
+                        product.stock = parsed_product.stock; changed = True
                 # Описание приходит в import.xml (<Описание>), картинка — отдельным файлом
                 # обмена (<Картинка> = имя файла). Перезаписываем только если обмен реально
                 # что-то прислал — чтобы пустое значение не затёрло уже сохранённое.
-                if parsed_product.description:
-                    product.description = parsed_product.description
+                if parsed_product.description and product.description != parsed_product.description:
+                    product.description = parsed_product.description; changed = True
                 # Характеристики обновляем только если пришли (как и описание/артикул)
-                if parsed_product.attributes:
-                    product.attributes = parsed_product.attributes
-                # Картинки трогаем ТОЛЬКО в фото-раунде (round_has_images) и если их не ведут
-                # вручную. Обычный import.xml у этого аккаунта идёт без <Картинка> — вне фото-
-                # раунда не трогаем, иначе обнулим все фото (инцидент 29.06.2026). Внутри фото-
-                # раунда пустой список = фото удалили в МойСклад → чистим (удаление работает).
-                if round_has_images and not product.images_manual:
+                if parsed_product.attributes and product.attributes != parsed_product.attributes:
+                    product.attributes = parsed_product.attributes; changed = True
+                # Картинки трогаем ПОФАЙЛОВО — только если У ЭТОГО товара в import.xml реально
+                # был тег <Картинка> (или пришли имена файлов). Раньше решали «по всему раунду»
+                # (round_has_images): если в заходе была хоть одна картинка, у ВСЕХ товаров без
+                # <Картинка> фото затиралось в ноль → 350 осиротевших файлов (инцидент 29.06.2026).
+                # Теперь: тег заполнен → ставим; тег пустой (has_image_field, images=[]) → удаление,
+                # чистим; тега не было → НЕ трогаем (обычный import.xml чужие фото не сбрасывает).
+                if (parsed_product.has_image_field or parsed_product.images) and not product.images_manual:
                     imgs = [image_name(x) for x in parsed_product.images]
-                    product.images = imgs
-                    product.image_url = imgs[0] if imgs else None
-                updated += 1
+                    if product.images != imgs:
+                        product.images = imgs
+                        product.image_url = imgs[0] if imgs else None
+                        changed = True
+                # Отметку последнего обмена ставим всегда (товар «виден» в выгрузке),
+                # а в счётчик «Обновлено» попадают только реально изменившиеся.
+                product.synced_at = _utcnow()
+                if changed:
+                    updated += 1
 
         db.commit()
 

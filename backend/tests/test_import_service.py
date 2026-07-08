@@ -52,6 +52,19 @@ def test_upsert_updates_existing_by_moysklad_id(db_session):
     assert products[0].stock == 2
 
 
+def test_upsert_unchanged_not_counted(db_session):
+    """Повторный импорт того же товара БЕЗ изменений → products_updated = 0
+    (журнал синхронизации не должен показывать «обновлено» весь каталог зря)."""
+    upsert_catalog(db_session, _catalog(
+        products=[ParsedProduct(moysklad_id="p1", name="Крем", price=Decimal("100"), stock=5, has_offer=True)]
+    ))
+    log2 = upsert_catalog(db_session, _catalog(
+        products=[ParsedProduct(moysklad_id="p1", name="Крем", price=Decimal("100"), stock=5, has_offer=True)]
+    ))
+    assert log2.products_created == 0
+    assert log2.products_updated == 0          # ничего не изменилось → не считаем
+
+
 def test_upsert_category_parent_link(db_session):
     """parent_id категории проставляется через внутренние id."""
     upsert_catalog(db_session, _catalog(
@@ -138,6 +151,44 @@ def test_upsert_does_not_overwrite_manual_images(db_session):
     assert p.name == "X2"                 # имя обновилось
     assert p.images == ["manual.png"]     # ручные картинки сохранены
     assert p.image_url == "manual.png"
+
+
+def test_upsert_photo_round_does_not_clear_others(db_session):
+    """Фото ДРУГОГО товара в заходе не должно затирать мои (баг 350 осиротевших фото).
+
+    Раньше: если в заходе была хоть одна картинка, у всех товаров БЕЗ <Картинка> фото
+    обнулялось. Теперь трогаем картинки пофайлово — только у товара с тегом <Картинка>.
+    """
+    # У обоих товаров уже есть фото
+    upsert_catalog(db_session, _catalog(products=[
+        ParsedProduct(moysklad_id="a", name="A", image_url="a.png", images=["a.png"], has_image_field=True),
+        ParsedProduct(moysklad_id="b", name="B", image_url="b.png", images=["b.png"], has_image_field=True),
+    ]))
+    # Заход: фото пришло только у A; у B тега <Картинка> НЕТ (has_image_field=False, images=[])
+    upsert_catalog(db_session, _catalog(products=[
+        ParsedProduct(moysklad_id="a", name="A", images=["a2.png"], has_image_field=True),
+        ParsedProduct(moysklad_id="b", name="B"),   # без тега картинки
+    ]))
+
+    a = db_session.query(Product).filter_by(moysklad_id="a").first()
+    b = db_session.query(Product).filter_by(moysklad_id="b").first()
+    assert a.images == ["a2.png"]        # у A фото обновилось
+    assert b.images == ["b.png"]          # у B фото СОХРАНИЛОСЬ (не затёрто чужим раундом)
+    assert b.image_url == "b.png"
+
+
+def test_upsert_empty_image_tag_clears(db_session):
+    """Пустой тег <Картинка></Картинка> (has_image_field, images=[]) = фото удалили → чистим."""
+    upsert_catalog(db_session, _catalog(products=[
+        ParsedProduct(moysklad_id="p1", name="X", images=["a.png"], has_image_field=True),
+    ]))
+    # МойСклад прислал пустой тег <Картинка> → удаление
+    upsert_catalog(db_session, _catalog(products=[
+        ParsedProduct(moysklad_id="p1", name="X", images=[], has_image_field=True),
+    ]))
+    p = db_session.query(Product).filter_by(moysklad_id="p1").first()
+    assert p.images == []                 # фото очищено
+    assert p.image_url is None
 
 
 def test_upsert_logs_counts(db_session):

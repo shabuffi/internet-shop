@@ -91,6 +91,26 @@ def test_parse_import_multiple_images():
     p = parse_import_xml(xml).products[0]
     assert p.images == ["import_files/a.png", "import_files/b.png"]
     assert p.image_url == "import_files/a.png"
+    assert p.has_image_field is True
+
+
+def test_parse_import_image_field_presence():
+    """has_image_field различает: заполненный тег / пустой тег (удаление) / отсутствие тега.
+
+    Пустой <Картинка></Картинка> = «фото удалили в МойСклад» → images=[] но has_image_field=True.
+    Отсутствие тега = «в этом заходе фото не слали» → has_image_field=False (фото не трогаем).
+    """
+    xml = _import_xml(products=(
+        "<Товар><Ид>filled</Ид><Наименование>С фото</Наименование>"
+        "<Картинка>a.png</Картинка></Товар>"
+        "<Товар><Ид>empty</Ид><Наименование>Удалили фото</Наименование>"
+        "<Картинка></Картинка></Товар>"
+        "<Товар><Ид>none</Ид><Наименование>Без тега</Наименование></Товар>"
+    ))
+    by_id = {p.moysklad_id: p for p in parse_import_xml(xml).products}
+    assert by_id["filled"].has_image_field is True and by_id["filled"].images == ["a.png"]
+    assert by_id["empty"].has_image_field is True and by_id["empty"].images == []
+    assert by_id["none"].has_image_field is False and by_id["none"].images == []
 
 
 def test_parse_import_optional_fields_missing():
