@@ -90,19 +90,6 @@ button, input, textarea, select { font-family: inherit; }
 .band--hero .eyebrow { color: var(--accent); }
 /* только вертикальные отступы — горизонтальные оставляем за .container */
 .section { padding-top: var(--s-16); padding-bottom: var(--s-16); }
-/* Выделенный блок-панель: отделяет Новинки/Спецпредложения/Разделы друг от друга */
-.section--panel {
-  background: var(--cloud);
-  border: 1px solid var(--hairline);
-  border-radius: var(--r-xl);
-  margin-top: var(--s-8);
-  margin-bottom: var(--s-8);
-  padding-left: var(--s-8);
-  padding-right: var(--s-8);
-}
-@media (max-width: 640px) {
-  .section--panel { padding-left: var(--s-4); padding-right: var(--s-4); border-radius: var(--r-lg); }
-}
 .row { display: flex; align-items: center; gap: var(--s-3); }
 
 /* ---------- главная ---------- */
