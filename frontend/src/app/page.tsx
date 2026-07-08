@@ -91,9 +91,10 @@ export default async function HomePage() {
   const saleIds = categories.filter((c) => (c.name || "").toLowerCase().includes("распродаж")).map((c) => c.id);
   try {
     const [n, s] = await Promise.all([
-      getProducts({ page_size: 5, with_photo: true, sort: "name" }),
+      // В ленты берём часть товаров (листаются горизонтально)
+      getProducts({ page_size: 12, with_photo: true, sort: "name" }),
       // Спецпредложения — из «РАСПРОДАЖА»; фото не требуем (у этих товаров его может не быть)
-      getProducts({ page_size: 5, sort: "name", category_id: saleIds.length ? saleIds.join(",") : "__none__" }),
+      getProducts({ page_size: 12, sort: "name", category_id: saleIds.length ? saleIds.join(",") : "__none__" }),
     ]);
     novinki = n.items;
     special = s.items;

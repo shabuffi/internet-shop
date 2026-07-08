@@ -233,7 +233,7 @@ button, input, textarea, select { font-family: inherit; }
   color: var(--accent);
 }
 .trust-item .ic svg { width: 44px; height: 44px; }
-.trust-item .ic img { width: 64px; height: 64px; object-fit: contain; display: block; }
+.trust-item .ic img { width: 82px; height: 82px; object-fit: contain; display: block; }
 .trust-item .big {
   font-size: 23px;
   font-weight: 700;
@@ -669,7 +669,19 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .
 .catalog-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--s-6); }
 
 /* Ряды «Новинки» / «Спецпредложения» на главной — сетка карточек (5 в ряд) */
-.promo-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: var(--s-4); }
+/* Новинки/Спецпредложения — горизонтальная листалка (свайп/скролл), а не сетка */
+.promo-grid {
+  display: flex;
+  gap: var(--s-4);
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-snap-type: x proximity;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  padding-bottom: var(--s-2);
+  scroll-padding-left: var(--s-1);
+}
+.promo-grid > * { flex: 0 0 auto; width: 220px; scroll-snap-align: start; }
 .pcard__promo {
   position: absolute; top: var(--s-3); left: var(--s-3); z-index: 2;
   display: inline-flex; align-items: center; justify-content: center;
@@ -815,7 +827,7 @@ textarea.form-input { height: auto; min-height: 90px; padding: var(--s-3) var(--
   .home-about { grid-template-columns: 1fr; gap: var(--s-5); }
   .quick-cats { grid-template-columns: repeat(4, minmax(0, 1fr)); }
   .catalog-grid { grid-template-columns: repeat(3, 1fr); }
-  .promo-grid { grid-template-columns: repeat(3, 1fr); }
+  .promo-grid > * { width: 200px; }
 }
 @media (max-width: 768px) {
   .container { padding: 0 var(--s-4); }
@@ -839,7 +851,7 @@ textarea.form-input { height: auto; min-height: 90px; padding: var(--s-3) var(--
     padding-top: var(--s-6); padding-bottom: var(--s-6); }
   .trust-item { min-height: 0; padding: var(--s-3); gap: var(--s-2); border-radius: var(--r-md); }
   .trust-item .ic svg { width: 34px; height: 34px; }
-  .trust-item .ic img { width: 50px; height: 50px; }
+  .trust-item .ic img { width: 62px; height: 62px; }
   .trust-item .big { font-size: 17px; }
   .trust-item .small { font-size: 11px; line-height: 1.2; }
   .cat-grid { grid-template-columns: 1fr 1fr; gap: var(--s-3); }
@@ -873,7 +885,9 @@ textarea.form-input { height: auto; min-height: 90px; padding: var(--s-3) var(--
   .filters::-webkit-scrollbar { display: none; }
   .result-count { display: none; }
   .catalog-grid { grid-template-columns: 1fr 1fr; gap: var(--s-3); }
-  .promo-grid { grid-template-columns: 1fr 1fr; gap: var(--s-3); }
+  .promo-grid { gap: var(--s-3); }
+  /* На телефоне карточки в один ряд со свайпом: ~2 в экране + краешек следующей (подсказка) */
+  .promo-grid > * { width: 44vw; }
   .pcard__name { font-size: var(--t-sm); }
   /* Регионы-бегущая строка: на узком экране шире затухание по краям, чтобы плитки
      не выглядели резко обрубленными */
