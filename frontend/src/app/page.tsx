@@ -22,17 +22,12 @@ const TILES = [
   { icon: "cat-hair", title: "Аксессуары для волос" },
 ];
 
-const trustIcon: Record<string, React.ReactNode> = {
-  clock: (<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg>),
-  wallet: (<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M3 8a2 2 0 0 1 2-2h12v4" /><rect x="3" y="8" width="18" height="12" rx="2" /><path d="M16 13h2" /></svg>),
-  box: (<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M3 7l9-4 9 4-9 4-9-4Z" /><path d="M3 7v10l9 4 9-4V7" /><path d="M12 11v10" /></svg>),
-  refresh: (<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7" /><path d="M21 3v6h-6" /></svg>),
-};
-
+// Иконки-преимущества — картинки заказчика, обработанные под белый фон (навы line-art,
+// прозрачный фон). Файлы в /public/trust/<icon>.png.
 const TRUST = [
-  { icon: "clock", big: "24/7", small: "приём заказов на сайте" },
-  { icon: "wallet", big: "от 5 000 ₽", small: "минимальный заказ" },
-  { icon: "box", big: "Тысячи", small: "товаров со склада" },
+  { icon: "order", big: "24/7", small: "приём заказов на сайте" },
+  { icon: "pay", big: "от 5 000 ₽", small: "минимальный заказ" },
+  { icon: "goods", big: "Тысячи", small: "товаров со склада" },
   { icon: "refresh", big: "Остатки", small: "обновляются ежедневно" },
 ];
 
@@ -166,7 +161,7 @@ export default async function HomePage() {
           {TRUST.map((t, i) => (
             <Reveal key={t.small} delay={i * 80}>
               <div className="trust-item">
-                <span className="ic">{trustIcon[t.icon]}</span>
+                <span className="ic"><img src={`/trust/${t.icon}.png`} alt="" aria-hidden="true" /></span>
                 <div className="big">{t.big}</div>
                 <div className="small">{t.small}</div>
               </div>
@@ -179,7 +174,7 @@ export default async function HomePage() {
       {novinki.length > 0 && (
         <div id="novinki" className="container section">
           <div className="section-head">
-            <h2 className="section-title section-title--caps">Новинки</h2>
+            <h2 className="section-title section-title--caps section-title--accent">Новинки</h2>
             <Link href="/novinki" className="see-all">Посмотреть все <ArrowIcon size={16} /></Link>
           </div>
           <div className="promo-grid">
@@ -192,7 +187,7 @@ export default async function HomePage() {
       {special.length > 0 && (
         <div id="special" className="container section" style={{ paddingTop: 0 }}>
           <div className="section-head">
-            <h2 className="section-title section-title--caps">Спецпредложения</h2>
+            <h2 className="section-title section-title--caps section-title--accent">Спецпредложения</h2>
             <Link href="/special" className="see-all">Посмотреть все <ArrowIcon size={16} /></Link>
           </div>
           <div className="promo-grid">
