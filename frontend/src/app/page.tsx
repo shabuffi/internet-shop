@@ -162,8 +162,10 @@ export default async function HomePage() {
             <Reveal key={t.small} delay={i * 80}>
               <div className="trust-item">
                 <span className="ic"><img src={`/trust/${t.icon}.png`} alt="" aria-hidden="true" /></span>
-                <div className="big">{t.big}</div>
-                <div className="small">{t.small}</div>
+                <div className="trust-item__text">
+                  <div className="big">{t.big}</div>
+                  <div className="small">{t.small}</div>
+                </div>
               </div>
             </Reveal>
           ))}

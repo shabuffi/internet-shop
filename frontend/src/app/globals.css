@@ -207,10 +207,10 @@ button, input, textarea, select { font-family: inherit; }
 }
 .trust-item {
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
+  flex-direction: row;              /* иконка слева, текст справа (как на референсе) */
+  align-items: center;
   text-align: left;
-  gap: 3px;
+  gap: var(--s-4);
   min-height: 0;
   padding: var(--s-4) var(--s-5);
   background: var(--paper);
@@ -224,11 +224,12 @@ button, input, textarea, select { font-family: inherit; }
   box-shadow: var(--shadow-2);
   border-color: color-mix(in srgb, var(--accent), #fff 65%);
 }
+.trust-item__text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .trust-item .ic {
   width: 56px;
   height: 56px;
   border-radius: 14px;
-  margin-bottom: 6px;
+  flex: none;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -841,8 +842,8 @@ textarea.form-input { height: auto; min-height: 90px; padding: var(--s-3) var(--
   /* Блоки-преимущества на телефоне: компактные, 2×2, без скролла */
   .trust { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--s-2);
     padding-top: var(--s-6); padding-bottom: var(--s-6); }
-  .trust-item { min-height: 0; padding: var(--s-3); gap: 1px; border-radius: var(--r-md); }
-  .trust-item .ic { width: 44px; height: 44px; border-radius: 11px; margin-bottom: 4px; }
+  .trust-item { min-height: 0; padding: var(--s-3); gap: var(--s-2); border-radius: var(--r-md); }
+  .trust-item .ic { width: 44px; height: 44px; border-radius: 11px; }
   .trust-item .ic svg { width: 29px; height: 29px; }
   .trust-item .ic img { width: 33px; height: 33px; }
   .trust-item .big { font-size: 17px; }
