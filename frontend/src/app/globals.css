@@ -630,10 +630,10 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .
 /* ---------- карточка товара ---------- */
 .pcard {
   display: flex; flex-direction: column; background: var(--paper);
-  border-radius: var(--r-xl); border: none; overflow: hidden;
-  /* лёгкая тень в покое (по гайду), без явной рамки */
-  box-shadow: 0 4px 6px -1px rgba(0,0,0,.10), 0 2px 4px -1px rgba(0,0,0,.06);
-  cursor: pointer; transition: box-shadow .3s ease-in-out, transform .3s ease-in-out;
+  border-radius: var(--r-xl); border: 1px solid var(--hairline); overflow: hidden;
+  /* рамка + заметная мягкая тень — чтобы карточка не сливалась с белым фоном */
+  box-shadow: 0 8px 20px -8px rgba(16,24,40,.16), 0 2px 6px -2px rgba(16,24,40,.08);
+  cursor: pointer; transition: box-shadow .3s ease-in-out, transform .3s ease-in-out, border-color .3s ease;
 }
 .pcard:hover { box-shadow: var(--shadow-2); transform: translateY(-3px); }
 .pcard__media { position: relative; padding: var(--s-4); }
@@ -677,10 +677,12 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .
   overflow-y: hidden;
   scroll-snap-type: x proximity;
   -webkit-overflow-scrolling: touch;
-  scrollbar-width: thin;
+  scrollbar-width: none;              /* прячем полосу прокрутки (Firefox) */
+  -ms-overflow-style: none;
   padding-bottom: var(--s-2);
   scroll-padding-left: var(--s-1);
 }
+.promo-grid::-webkit-scrollbar { display: none; }   /* прячем полосу (WebKit/Chrome) */
 .promo-grid > * { flex: 0 0 auto; width: 220px; scroll-snap-align: start; }
 .pcard__promo {
   position: absolute; top: var(--s-3); left: var(--s-3); z-index: 2;
