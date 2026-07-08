@@ -277,6 +277,7 @@ def notify_order_confirmation(order_id: str):
     """
     from app.db.session import SessionLocal
     from app.db.models.order import Order
+    import app.db.models.user  # noqa: F401 — регистрируем маппер User (у Order есть связь с ним)
     from app.db.models.admin import ShopSettings
     from app.integrations.email import send_email
 
