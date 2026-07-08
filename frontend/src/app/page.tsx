@@ -175,7 +175,7 @@ export default async function HomePage() {
 
       {/* Новинки (пока товары-заглушки, потом — по полю «Новинка» из МойСклад) */}
       {novinki.length > 0 && (
-        <div id="novinki" className="container section">
+        <div id="novinki" className="container section section--panel">
           <div className="section-head">
             <h2 className="section-title section-title--caps section-title--accent">Новинки</h2>
             <Link href="/novinki" className="see-all">Посмотреть все <ArrowIcon size={16} /></Link>
@@ -188,7 +188,7 @@ export default async function HomePage() {
 
       {/* Спецпредложения (пока товары-заглушки, потом — по полю «Спецпредложение» из МойСклад) */}
       {special.length > 0 && (
-        <div id="special" className="container section" style={{ paddingTop: 0 }}>
+        <div id="special" className="container section section--panel">
           <div className="section-head">
             <h2 className="section-title section-title--caps section-title--accent">Спецпредложения</h2>
             <Link href="/special" className="see-all">Посмотреть все <ArrowIcon size={16} /></Link>
@@ -200,7 +200,7 @@ export default async function HomePage() {
       )}
 
       {/* Категории */}
-      <div className="container section section--cats">
+      <div className="container section section--cats section--panel">
         <div className="section-head">
           <div>
             <h2 className="section-title section-title--caps">Популярные разделы</h2>
