@@ -273,6 +273,31 @@ def test_manifest_restore_skips_missing_files_and_manual(db_session, isolate_med
     assert restore_images_from_manifest(db_session) == 0   # файла нет → не восстанавливаем
 
 
+def test_upsert_sets_new_sale_flags(db_session):
+    """Флаги-галочки из доп-полей МойСклад проставляют is_new / is_sale."""
+    upsert_catalog(db_session, _catalog(products=[
+        ParsedProduct(moysklad_id="n", name="Новинка", attributes=[{"name": "Новинка", "value": "true"}]),
+        ParsedProduct(moysklad_id="s", name="Спец", attributes=[{"name": "Распродажа", "value": "да"}]),
+        ParsedProduct(moysklad_id="r", name="Обычный", attributes=[{"name": "Количество штук в коробке", "value": "5"}]),
+        ParsedProduct(moysklad_id="off", name="Снятый", attributes=[{"name": "Новинка", "value": "false"}]),
+    ]))
+    g = lambda ms: db_session.query(Product).filter_by(moysklad_id=ms).first()
+    assert g("n").is_new is True and g("n").is_sale is False
+    assert g("s").is_sale is True and g("s").is_new is False
+    assert g("r").is_new is False and g("r").is_sale is False
+    assert g("off").is_new is False          # value "false" → флаг не стоит
+
+
+def test_upsert_flag_recompute_clears_on_update(db_session):
+    """Снятая в МойСклад галочка снимается и у нас при следующем обмене с доп-полями."""
+    upsert_catalog(db_session, _catalog(products=[
+        ParsedProduct(moysklad_id="p1", name="Т", attributes=[{"name": "Новинка", "value": "true"}])]))
+    assert db_session.query(Product).filter_by(moysklad_id="p1").first().is_new is True
+    upsert_catalog(db_session, _catalog(products=[
+        ParsedProduct(moysklad_id="p1", name="Т", attributes=[{"name": "Количество штук в коробке", "value": "5"}])]))
+    assert db_session.query(Product).filter_by(moysklad_id="p1").first().is_new is False
+
+
 def test_upsert_logs_counts(db_session):
     log = upsert_catalog(db_session, _catalog(products=[
         ParsedProduct(moysklad_id="a", name="A"),

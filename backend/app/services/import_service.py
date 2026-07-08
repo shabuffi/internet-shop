@@ -19,6 +19,23 @@ MAX_IMAGE_CLEARS = 30
 # Сколько последних слепков привязок фото храним (для восстановления без МойСклад).
 IMAGE_MANIFEST_KEEP = 30
 
+# Флаги-галочки из МойСклад (доп-поля). Распознаём по имени поля (частичное совпадение),
+# значение-галочка считается «включённой», если не входит в _FLAG_FALSE.
+_NEW_PATTERNS = ("новин",)
+_SALE_PATTERNS = ("распродаж", "спецпредлож", "акци", "скидк")
+_FLAG_FALSE = {"", "false", "нет", "0", "no", "off", "ложь", "none", "-"}
+
+
+def _attr_flag(attributes, patterns) -> bool:
+    """True, если среди доп-полей есть поле с именем из ``patterns`` и «включённым» значением."""
+    for a in attributes or []:
+        name = (a.get("name") or "").strip().lower()
+        if any(p in name for p in patterns):
+            val = str(a.get("value") or "").strip().lower()
+            if val not in _FLAG_FALSE:
+                return True
+    return False
+
 
 def _utcnow() -> datetime:
     """Наивный UTC-таймстамп (замена устаревшего datetime.utcnow())."""
@@ -183,6 +200,8 @@ def upsert_catalog(db: Session, catalog: ParsedCatalog, source: str = "commercem
                     image_url=image_name(parsed_product.image_url),
                     images=[image_name(x) for x in parsed_product.images],
                     attributes=parsed_product.attributes or None,
+                    is_new=_attr_flag(parsed_product.attributes, _NEW_PATTERNS),
+                    is_sale=_attr_flag(parsed_product.attributes, _SALE_PATTERNS),
                     price=parsed_product.price,
                     stock=parsed_product.stock,
                     category_id=cat_id,
@@ -224,6 +243,15 @@ def upsert_catalog(db: Session, catalog: ParsedCatalog, source: str = "commercem
                 # Характеристики обновляем только если пришли (как и описание/артикул)
                 if parsed_product.attributes and product.attributes != parsed_product.attributes:
                     product.attributes = parsed_product.attributes; changed = True
+                # Флаги «Новинка»/«Распродажа» пересчитываем, когда пришли доп-поля (полный каталог).
+                # Так галочка, снятая в МойСклад, тоже снимется у нас на следующем обмене.
+                if parsed_product.attributes:
+                    new_flag = _attr_flag(parsed_product.attributes, _NEW_PATTERNS)
+                    sale_flag = _attr_flag(parsed_product.attributes, _SALE_PATTERNS)
+                    if product.is_new != new_flag:
+                        product.is_new = new_flag; changed = True
+                    if product.is_sale != sale_flag:
+                        product.is_sale = sale_flag; changed = True
                 # Картинки трогаем ПОФАЙЛОВО — только если У ЭТОГО товара в import.xml реально
                 # был тег <Картинка> (или пришли имена файлов). Раньше решали «по всему раунду»
                 # (round_has_images): если в заходе была хоть одна картинка, у ВСЕХ товаров без

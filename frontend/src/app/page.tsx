@@ -90,14 +90,21 @@ export default async function HomePage() {
   // «Спецпредложения» — из категории «РАСПРОДАЖА» (ищем по имени среди уже загруженных категорий).
   const saleIds = categories.filter((c) => (c.name || "").toLowerCase().includes("распродаж")).map((c) => c.id);
   try {
+    // Основной источник — флаги из МойСклад (доп-поля «Новинка»/«Распродажа»).
     const [n, s] = await Promise.all([
-      // В ленты берём часть товаров (листаются горизонтально)
-      getProducts({ page_size: 12, with_photo: true, sort: "name" }),
-      // Спецпредложения — из «РАСПРОДАЖА»; фото не требуем (у этих товаров его может не быть)
-      getProducts({ page_size: 12, sort: "name", category_id: saleIds.length ? saleIds.join(",") : "__none__" }),
+      getProducts({ page_size: 12, featured: "new" }),
+      getProducts({ page_size: 12, featured: "sale" }),
     ]);
     novinki = n.items;
     special = s.items;
+    // Фолбэк, пока флаги из МойСклад ещё не приехали — чтобы секции не пустовали:
+    // новинки — товары с фото, спецпредложения — из категории «РАСПРОДАЖА».
+    if (novinki.length === 0) {
+      novinki = (await getProducts({ page_size: 12, with_photo: true, sort: "name" })).items;
+    }
+    if (special.length === 0) {
+      special = (await getProducts({ page_size: 12, sort: "name", category_id: saleIds.length ? saleIds.join(",") : "__none__" })).items;
+    }
   } catch { /* без товаров секции просто не покажем */ }
 
   // Ссылка плитки → каталог, отфильтрованный сразу по группе категорий (CATEGORY_GROUPS).

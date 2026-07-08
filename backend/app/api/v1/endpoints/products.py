@@ -149,6 +149,7 @@ def list_products(
     search: str | None = Query(None),
     sort: str | None = Query(None),
     with_photo: bool = Query(False),
+    featured: str | None = Query(None),   # new | sale — фильтр «Новинки» / «Спецпредложения»
     db: Session = Depends(get_db),
     user: User | None = Depends(get_optional_user),
 ):
@@ -197,14 +198,20 @@ def list_products(
     if with_photo:
         query = query.where(Product.image_url.isnot(None), Product.image_url != "")
 
+    # Фильтр «Новинки» / «Спецпредложения» (флаги из МойСклад)
+    if featured == "new":
+        query = query.where(Product.is_new == True)
+    elif featured == "sale":
+        query = query.where(Product.is_sale == True)
+
     # Имя без кода склада «с1/с2 …» и без префикса «ЧЗ» (Честный знак) —
     # для сортировки и оценки релевантности (товар «ЧЗ Апельсины» сортируется под «А»).
     clean_name = func.regexp_replace(Product.name, r"^[сcСC]\s?\d+[.\s]+\s*", "", "i")
     clean_name = func.regexp_replace(clean_name, r"^\s*ЧЗ[\s.:\-]*", "", "i")
     if sort == "price_asc":
-        query = query.order_by(Product.price.asc())
+        order_cols = [Product.price.asc()]
     elif sort == "price_desc":
-        query = query.order_by(Product.price.desc())
+        order_cols = [Product.price.desc()]
     elif search:
         # Релевантность: точное совпадение названия → название начинается с запроса → прочее.
         q = search.strip()
@@ -213,9 +220,14 @@ def list_products(
             (clean_name.op("~*")(rf"^{re.escape(q)}"), 1),
             else_=2,
         )
-        query = query.order_by(relevance, clean_name.asc())
+        order_cols = [relevance, clean_name.asc()]
     else:
-        query = query.order_by(clean_name.asc())
+        order_cols = [clean_name.asc()]
+    # По умолчанию поднимаем наверх новинки, затем спецпредложения (в любой категории/поиске).
+    # При явной сортировке по цене — не вмешиваемся (пользователь хочет чистый порядок по цене).
+    if sort not in ("price_asc", "price_desc"):
+        order_cols = [Product.is_new.desc(), Product.is_sale.desc(), *order_cols]
+    query = query.order_by(*order_cols)
 
     total = db.scalar(select(func.count()).select_from(query.order_by(None).subquery()))
     items = db.scalars(query.offset((page - 1) * page_size).limit(page_size)).all()
