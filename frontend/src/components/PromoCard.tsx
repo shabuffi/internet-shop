@@ -5,10 +5,11 @@ import AddToCartCard from "@/components/AddToCartCard";
 import ChestnyZnakBadge from "@/components/ChestnyZnakBadge";
 import type { Product } from "@/types/product";
 
-/** Карточка товара с бейджем NEW / % — для секций и страниц «Новинки»/«Спецпредложения». */
-export default function PromoCard({ p, kind }: { p: Product; kind: "new" | "sale" }) {
+/** Карточка товара с бейджем NEW / % — для секций и страниц «Новинки»/«Спецпредложения».
+ *  `compact` (только на главной) — экономит место: скрывает категорию и режет название до 2 строк. */
+export default function PromoCard({ p, kind, compact = false }: { p: Product; kind: "new" | "sale"; compact?: boolean }) {
   return (
-    <article className="pcard">
+    <article className={`pcard${compact ? " pcard--compact" : ""}`}>
       <Link href={`/products/${p.id}`} className="pcard__media" aria-label={p.name}>
         <span className={`pcard__promo pcard__promo--${kind}`}>{kind === "new" ? "NEW" : "%"}</span>
         <div className="photo photo--square">
@@ -18,7 +19,7 @@ export default function PromoCard({ p, kind }: { p: Product; kind: "new" | "sale
         </div>
       </Link>
       <div className="pcard__body">
-        <div className="pcard__cat">{p.category?.name ?? " "}</div>
+        {!compact && <div className="pcard__cat">{p.category?.name ?? " "}</div>}
         <div style={{ display: "flex", alignItems: "flex-start", gap: 6 }}>
           {p.chestnyZnak && <ChestnyZnakBadge size={15} />}
           <Link href={`/products/${p.id}`} className="pcard__name">{p.name}</Link>

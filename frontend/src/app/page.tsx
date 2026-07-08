@@ -26,7 +26,7 @@ const TILES = [
 // прозрачный фон). Файлы в /public/trust/<icon>.png.
 const TRUST = [
   { icon: "order", big: "24/7", small: "приём заказов на сайте" },
-  { icon: "pay", big: "от 5 000 ₽", small: "минимальный заказ" },
+  { icon: "pay", big: "от 5 000 ₽", small: "минимальный заказ" },
   { icon: "goods", big: "Тысячи", small: "товаров со склада" },
   { icon: "refresh", big: "Остатки", small: "обновляются ежедневно" },
 ];
@@ -181,7 +181,7 @@ export default async function HomePage() {
             <Link href="/novinki" className="see-all">Посмотреть все <ArrowIcon size={16} /></Link>
           </div>
           <div className="promo-grid">
-            {novinki.map(p => <PromoCard key={p.id} p={p} kind="new" />)}
+            {novinki.map(p => <PromoCard key={p.id} p={p} kind="new" compact />)}
           </div>
         </div>
       )}
@@ -195,7 +195,7 @@ export default async function HomePage() {
               <Link href="/special" className="see-all">Посмотреть все <ArrowIcon size={16} /></Link>
             </div>
             <div className="promo-grid">
-              {special.map(p => <PromoCard key={p.id} p={p} kind="sale" />)}
+              {special.map(p => <PromoCard key={p.id} p={p} kind="sale" compact />)}
             </div>
           </div>
         </div>

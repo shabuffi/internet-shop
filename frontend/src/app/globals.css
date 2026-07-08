@@ -659,6 +659,10 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .
 .pcard__body { padding: var(--s-2) var(--s-5) var(--s-5); display: flex; flex-direction: column; gap: var(--s-2); flex: 1; }
 .pcard__cat { font-size: var(--t-xs); color: var(--graphite); letter-spacing: .04em; }
 .pcard__name { font-size: var(--t-body); font-weight: 600; line-height: 1.3; color: var(--ink); }
+/* Компактная карточка (только главная): название максимум 2 строки — короче по высоте */
+.pcard--compact .pcard__name {
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
 .pcard__sku { font-size: var(--t-xs); color: var(--graphite); font-variant-numeric: tabular-nums; }
 .pcard__stock { font-size: var(--t-xs); color: var(--stock); font-weight: 700; font-variant-numeric: tabular-nums; }
 .pcard__foot { margin-top: auto; padding-top: var(--s-4); display: flex; flex-direction: column; align-items: stretch; gap: var(--s-3); }
