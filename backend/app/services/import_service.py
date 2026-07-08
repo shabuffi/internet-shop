@@ -1,14 +1,97 @@
+import os
+import glob
+import json
 import uuid
 from datetime import datetime, timezone
 from sqlalchemy.orm import Session
+from app.core.config import settings
 from app.db.models.product import Product, Category, SyncLog
 from app.integrations.moysklad.commerceml_parser import ParsedCatalog
 from app.services.media_storage import image_name
 
 
+# Предохранитель: сколько товаров МАКСИМУМ можно «обнулить по фото» за один обмен.
+# Реальные удаления фото в МойСклад идут поштучно; массовое стирание (десятки/сотни) —
+# это признак сбоя выгрузки (как инцидент 29.06.2026), а не настоящих удалений. Такое
+# массовое стирание НЕ применяется, фото сохраняются, в журнал пишется предупреждение.
+MAX_IMAGE_CLEARS = 30
+
+# Сколько последних слепков привязок фото храним (для восстановления без МойСклад).
+IMAGE_MANIFEST_KEEP = 30
+
+
 def _utcnow() -> datetime:
     """Наивный UTC-таймстамп (замена устаревшего datetime.utcnow())."""
     return datetime.now(timezone.utc).replace(tzinfo=None)
+
+
+def _manifest_dir() -> str:
+    return os.path.join(settings.MEDIA_DIR, "manifests")
+
+
+def write_image_manifest(db: Session) -> tuple[str, int]:
+    """Сохраняет слепок привязок фото (moysklad_id → images) в JSON на том медиа-хранилища.
+
+    Файлы картинок и так лежат на диске (том ``media_data``); слепок хранит, КАКОЙ файл
+    к какому товару привязан. Если фото когда-нибудь отвяжется (сбой/затирание), привязку
+    можно восстановить из слепка (:func:`restore_images_from_manifest`) — без повторной
+    выгрузки из МойСклад (которая рискует наплодить дубли). Держим последние N слепков.
+
+    Returns:
+        Пара ``(путь_к_файлу, число_товаров_с_фото)``.
+    """
+    mdir = _manifest_dir()
+    os.makedirs(mdir, exist_ok=True)
+    data = [
+        {"moysklad_id": p.moysklad_id, "image_url": p.image_url, "images": p.images}
+        for p in db.query(Product).all()
+        if p.images
+    ]
+    path = os.path.join(mdir, f"images_{_utcnow():%Y%m%d_%H%M%S}.json")
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False)
+    # ротация — оставляем только последние IMAGE_MANIFEST_KEEP
+    for old in sorted(glob.glob(os.path.join(mdir, "images_*.json")))[:-IMAGE_MANIFEST_KEEP]:
+        try:
+            os.remove(old)
+        except OSError:
+            pass
+    return path, len(data)
+
+
+def restore_images_from_manifest(db: Session, path: str | None = None) -> int:
+    """Восстанавливает привязки фото из слепка (последнего, если ``path`` не задан).
+
+    Возвращает фото товарам, у которых сейчас картинок нет, а в слепке были И файл ещё
+    лежит на диске. Ручные картинки (``images_manual``) и товары, у которых фото уже есть,
+    не трогает. Идемпотентно и безопасно — только добавляет утраченные привязки.
+
+    Returns:
+        Число товаров, которым вернули фото.
+    """
+    if path is None:
+        found = sorted(glob.glob(os.path.join(_manifest_dir(), "images_*.json")))
+        if not found:
+            return 0
+        path = found[-1]
+    with open(path, encoding="utf-8") as f:
+        manifest = json.load(f)
+
+    on_disk = set(os.listdir(settings.MEDIA_DIR)) if os.path.isdir(settings.MEDIA_DIR) else set()
+    by_msid = {p.moysklad_id: p for p in db.query(Product).all()}
+    reattached = 0
+    for row in manifest:
+        p = by_msid.get(row["moysklad_id"])
+        if p is None or p.images_manual or p.images:
+            continue
+        imgs = [x for x in (row.get("images") or []) if x in on_disk]
+        if imgs:
+            p.images = imgs
+            p.image_url = imgs[0]
+            reattached += 1
+    if reattached:
+        db.commit()
+    return reattached
 
 
 def upsert_catalog(db: Session, catalog: ParsedCatalog, source: str = "commerceml") -> SyncLog:
@@ -75,6 +158,12 @@ def upsert_catalog(db: Session, catalog: ParsedCatalog, source: str = "commercem
         # SELECT'ов повесили бы обмен и дали таймаут у МойСклад).
         existing_products = {p.moysklad_id: p for p in db.query(Product).all()}
 
+        # Товары, у которых обмен просит УБРАТЬ фото — не применяем сразу, а копим и в конце
+        # пропускаем через предохранитель (MAX_IMAGE_CLEARS). Добавление/замену фото применяем
+        # сразу (потери нет). images_touched → нужно ли обновить слепок привязок в конце.
+        pending_image_clears: list[Product] = []
+        images_touched = False
+
         for parsed_product in catalog.products:
             product = existing_products.get(parsed_product.moysklad_id)
 
@@ -102,6 +191,8 @@ def upsert_catalog(db: Session, catalog: ParsedCatalog, source: str = "commercem
                 db.add(product)
                 existing_products[parsed_product.moysklad_id] = product
                 created += 1
+                if product.images:
+                    images_touched = True   # новый товар с фото → обновим слепок привязок
             else:
                 # Считаем «Обновлено» по РЕАЛЬНЫМ изменениям (иначе журнал показывал бы весь
                 # каталог 12555 на каждом обмене, хотя ничего не поменялось). Поле трогаем и
@@ -142,22 +233,56 @@ def upsert_catalog(db: Session, catalog: ParsedCatalog, source: str = "commercem
                 if (parsed_product.has_image_field or parsed_product.images) and not product.images_manual:
                     imgs = [image_name(x) for x in parsed_product.images]
                     if product.images != imgs:
-                        product.images = imgs
-                        product.image_url = imgs[0] if imgs else None
-                        changed = True
+                        if imgs:
+                            # добавление/замена фото — применяем сразу, потери нет
+                            product.images = imgs
+                            product.image_url = imgs[0]
+                            images_touched = True
+                            changed = True
+                        elif product.images:
+                            # обмен просит СТЕРЕТЬ фото — откладываем под предохранитель (ниже)
+                            pending_image_clears.append(product)
                 # Отметку последнего обмена ставим всегда (товар «виден» в выгрузке),
                 # а в счётчик «Обновлено» попадают только реально изменившиеся.
                 product.synced_at = _utcnow()
                 if changed:
                     updated += 1
 
+        # ── Предохранитель от массового стирания фото ─────────────────────────
+        # Немного «стираний» (<= MAX_IMAGE_CLEARS) — это реальные удаления, применяем.
+        # Много — это аномалия/сбой выгрузки (инцидент 29.06.2026): НЕ стираем, фото остаются,
+        # пишем предупреждение в журнал. Восстанавливать потом ничего не придётся.
+        image_clear_warning: str | None = None
+        if len(pending_image_clears) <= MAX_IMAGE_CLEARS:
+            for p in pending_image_clears:
+                p.images = []
+                p.image_url = None
+                updated += 1
+                images_touched = True
+        else:
+            image_clear_warning = (
+                f"⚠️ Предохранитель фото: отменено массовое стирание у "
+                f"{len(pending_image_clears)} товаров (похоже на сбой выгрузки, а не реальные "
+                f"удаления). Фото сохранены."
+            )
+            print("upsert_catalog:", image_clear_warning, flush=True)
+
         db.commit()
 
         log.status = "success"
         log.products_created = created
         log.products_updated = updated
+        log.error_message = image_clear_warning
         log.finished_at = _utcnow()
         db.commit()
+
+        # Слепок привязок фото — только если фото в этом обмене реально менялись.
+        # Это наша «страховка»: из него можно восстановить фото без выгрузки из МойСклад.
+        if images_touched:
+            try:
+                write_image_manifest(db)
+            except Exception as exc:   # слепок не критичен — обмен уже зафиксирован
+                print("upsert_catalog: write_image_manifest error:", exc, flush=True)
 
     except Exception as exc:
         db.rollback()

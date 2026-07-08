@@ -1,10 +1,28 @@
 """Тесты upsert_catalog — запись распарсенного каталога в БД (создание + обновление)."""
 
+import glob
+import os
 from decimal import Decimal
 
+import pytest
+
+from app.core.config import settings
 from app.db.models.product import Product, Category
 from app.integrations.moysklad.commerceml_parser import ParsedCatalog, ParsedCategory, ParsedProduct
-from app.services.import_service import upsert_catalog
+from app.services.import_service import (
+    upsert_catalog,
+    restore_images_from_manifest,
+    MAX_IMAGE_CLEARS,
+)
+
+
+@pytest.fixture(autouse=True)
+def isolate_media(tmp_path, monkeypatch):
+    """Изолируем медиа-хранилище/слепки во временную папку — тесты не пишут в /app/media."""
+    d = tmp_path / "media"
+    d.mkdir()
+    monkeypatch.setattr(settings, "MEDIA_DIR", str(d))
+    return d
 
 
 def _catalog(products, categories=None):
@@ -189,6 +207,70 @@ def test_upsert_empty_image_tag_clears(db_session):
     p = db_session.query(Product).filter_by(moysklad_id="p1").first()
     assert p.images == []                 # фото очищено
     assert p.image_url is None
+
+
+def test_mass_image_clear_is_guarded(db_session):
+    """Массовое стирание фото (> MAX_IMAGE_CLEARS) не применяется — фото сохраняются + предупреждение."""
+    n = MAX_IMAGE_CLEARS + 10
+    upsert_catalog(db_session, _catalog(products=[
+        ParsedProduct(moysklad_id=f"p{i}", name=f"T{i}", image_url=f"a{i}.png",
+                      images=[f"a{i}.png"], has_image_field=True) for i in range(n)
+    ]))
+    # обмен присылает пустой <Картинка> у ВСЕХ → попытка массового стирания
+    log = upsert_catalog(db_session, _catalog(products=[
+        ParsedProduct(moysklad_id=f"p{i}", name=f"T{i}", images=[], has_image_field=True) for i in range(n)
+    ]))
+    with_img = [p for p in db_session.query(Product).all() if p.images]
+    assert len(with_img) == n                      # предохранитель сработал — фото целы
+    assert log.error_message and "Предохранитель" in log.error_message
+
+
+def test_small_image_clear_applies(db_session):
+    """Поштучное удаление фото (в пределах порога) применяется нормально."""
+    upsert_catalog(db_session, _catalog(products=[
+        ParsedProduct(moysklad_id="p1", name="A", image_url="a.png", images=["a.png"], has_image_field=True),
+        ParsedProduct(moysklad_id="p2", name="B", image_url="b.png", images=["b.png"], has_image_field=True),
+    ]))
+    # у p1 фото удалили (пустой тег), p2 не трогаем
+    upsert_catalog(db_session, _catalog(products=[
+        ParsedProduct(moysklad_id="p1", name="A", images=[], has_image_field=True),
+    ]))
+    p1 = db_session.query(Product).filter_by(moysklad_id="p1").first()
+    p2 = db_session.query(Product).filter_by(moysklad_id="p2").first()
+    assert p1.images == [] and p1.image_url is None    # удаление применилось
+    assert p2.images == ["b.png"]                       # чужое фото не тронуто
+
+
+def test_image_manifest_write_and_restore(db_session, isolate_media):
+    """Слепок привязок пишется автоматически; из него восстанавливаются отвязавшиеся фото."""
+    for fn in ("a.png", "b.png"):
+        (isolate_media / fn).write_bytes(b"x")
+    upsert_catalog(db_session, _catalog(products=[
+        ParsedProduct(moysklad_id="p1", name="A", image_url="a.png", images=["a.png"], has_image_field=True),
+        ParsedProduct(moysklad_id="p2", name="B", image_url="b.png", images=["b.png"], has_image_field=True),
+    ]))
+    # слепок записан (images_touched)
+    assert glob.glob(os.path.join(str(isolate_media), "manifests", "images_*.json"))
+    # эмулируем «фото отвязалось» у p1
+    p1 = db_session.query(Product).filter_by(moysklad_id="p1").first()
+    p1.images = []; p1.image_url = None
+    db_session.commit()
+    # восстановление из последнего слепка (файл a.png ещё на диске)
+    assert restore_images_from_manifest(db_session) == 1
+    p1 = db_session.query(Product).filter_by(moysklad_id="p1").first()
+    assert p1.images == ["a.png"] and p1.image_url == "a.png"
+
+
+def test_manifest_restore_skips_missing_files_and_manual(db_session, isolate_media):
+    """Восстановление не возвращает фото, если файла нет на диске или картинки ведут вручную."""
+    # файл на диск НЕ кладём
+    upsert_catalog(db_session, _catalog(products=[
+        ParsedProduct(moysklad_id="p1", name="A", image_url="gone.png", images=["gone.png"], has_image_field=True),
+    ]))
+    p1 = db_session.query(Product).filter_by(moysklad_id="p1").first()
+    p1.images = []; p1.image_url = None
+    db_session.commit()
+    assert restore_images_from_manifest(db_session) == 0   # файла нет → не восстанавливаем
 
 
 def test_upsert_logs_counts(db_session):
