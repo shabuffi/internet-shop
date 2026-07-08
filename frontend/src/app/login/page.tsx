@@ -42,10 +42,13 @@ export default function LoginPage() {
           <label>Email <span className="req">*</span></label>
           <input className="input" type="email" required value={form.email} onChange={setField("email")} placeholder="you@example.ru" autoFocus />
         </div>
-        <div className="field" style={{ marginBottom: "var(--s-5)" }}>
+        <div className="field" style={{ marginBottom: "var(--s-2)" }}>
           <label>Пароль <span className="req">*</span></label>
           <PasswordField required value={form.password} onChange={setField("password")} autoComplete="current-password" />
         </div>
+        <p style={{ textAlign: "right", margin: "0 0 var(--s-5)" }}>
+          <Link href="/forgot" className="link">Забыли пароль?</Link>
+        </p>
 
         {error && <p className="form-error" style={{ marginBottom: "var(--s-3)" }}>{error}</p>}
 

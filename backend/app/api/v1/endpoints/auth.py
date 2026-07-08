@@ -4,6 +4,7 @@
 (``customer_token``), недоступной JS — защита от XSS. Отдельно от админских токенов.
 """
 
+import hashlib
 import uuid
 from datetime import datetime, timedelta, timezone
 
@@ -18,13 +19,17 @@ from app.core.rate_limit import rate_limit, client_ip
 from app.db.session import get_db
 from app.db.models.user import User
 from app.db.models.order import Order
-from app.schemas.auth import RegisterIn, LoginIn, UserOut, ChangePasswordIn
+from app.schemas.auth import (
+    RegisterIn, LoginIn, UserOut, ChangePasswordIn,
+    ForgotPasswordIn, ResetPasswordIn,
+)
 from app.schemas.order import OrderOut
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
 
 COOKIE_NAME = "customer_token"
 COOKIE_MAX_AGE = 30 * 24 * 3600  # 30 дней, как и срок жизни JWT
+RESET_TOKEN_TTL = 3600           # ссылка сброса пароля живёт 1 час
 
 
 def _utcnow_naive() -> datetime:
@@ -46,6 +51,41 @@ def _create_token(user_id: str) -> str:
         "exp": datetime.now(timezone.utc) + timedelta(seconds=COOKIE_MAX_AGE),
     }
     return jwt.encode(payload, settings.SECRET_KEY, algorithm="HS256")
+
+
+def _pw_fingerprint(password_hash: str) -> str:
+    """Короткий отпечаток текущего хэша пароля — «привязка» токена сброса к паролю.
+
+    Кладём его в токен; при сбросе сверяем с актуальным. После смены пароля отпечаток
+    меняется → старая ссылка становится недействительной (одноразовость без таблицы в БД)."""
+    return hashlib.sha256(password_hash.encode()).hexdigest()[:16]
+
+
+def _create_reset_token(user: User) -> str:
+    payload = {
+        "sub": user.id,
+        "typ": "pwreset",
+        "pv": _pw_fingerprint(user.password_hash),
+        "exp": datetime.now(timezone.utc) + timedelta(seconds=RESET_TOKEN_TTL),
+    }
+    return jwt.encode(payload, settings.SECRET_KEY, algorithm="HS256")
+
+
+def _user_from_reset_token(token: str, db: Session) -> User | None:
+    """Возвращает пользователя по валидному токену сброса (тип, срок, отпечаток пароля)."""
+    try:
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=["HS256"])
+    except jwt.InvalidTokenError:
+        return None
+    if payload.get("typ") != "pwreset":
+        return None
+    user = db.scalar(select(User).where(User.id == payload.get("sub")))
+    if not user:
+        return None
+    # Отпечаток не совпал → пароль уже меняли этой (или другой) ссылкой → токен недействителен
+    if payload.get("pv") != _pw_fingerprint(user.password_hash):
+        return None
+    return user
 
 
 def _extract_token(request: Request) -> str | None:
@@ -134,6 +174,42 @@ def register(body: RegisterIn, request: Request, response: Response, db: Session
         pass
 
     _set_cookie(response, _create_token(user.id))
+    return user
+
+
+@router.post("/forgot")
+def forgot_password(body: ForgotPasswordIn, request: Request, db: Session = Depends(get_db)):
+    """Запрос восстановления пароля: если email есть — шлём письмо со ссылкой сброса.
+
+    Ответ всегда одинаковый (``{"ok": true}``) — не раскрываем, зарегистрирован ли email.
+    """
+    rate_limit(f"rl:forgot:{client_ip(request)}", limit=5, window_sec=3600)
+    user = db.scalar(select(User).where(User.email == body.email))
+    if user:
+        token = _create_reset_token(user)
+        try:
+            from app.tasks.notify import send_password_reset
+            send_password_reset.delay(user.id, token)
+        except Exception:
+            pass
+    return {"ok": True}
+
+
+@router.post("/reset", response_model=UserOut)
+def reset_password(body: ResetPasswordIn, request: Request, response: Response, db: Session = Depends(get_db)):
+    """Устанавливает новый пароль по токену из письма и сразу авторизует.
+
+    Raises:
+        HTTPException: 400, если ссылка недействительна/устарела/уже использована.
+    """
+    rate_limit(f"rl:reset:{client_ip(request)}", limit=10, window_sec=3600)
+    user = _user_from_reset_token(body.token, db)
+    if not user:
+        raise HTTPException(status_code=400, detail="Ссылка недействительна или устарела. Запросите сброс заново.")
+    user.password_hash = _hash_password(body.new_password)
+    db.commit()
+    db.refresh(user)
+    _set_cookie(response, _create_token(user.id))   # авто-вход после сброса
     return user
 
 

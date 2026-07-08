@@ -145,3 +145,48 @@ def test_rate_limit_blocks_after_limit():
         assert exc.value.status_code == 429
     finally:
         redis_client.delete(key)
+
+
+# ─── восстановление пароля ───────────────────────────────────────────────────
+
+def test_forgot_always_ok(client, db_session):
+    """/forgot отвечает одинаково и для несуществующего, и для реального email."""
+    r1 = client.post("/api/v1/auth/forgot", json={"email": "nobody@yandex.ru"})
+    assert r1.status_code == 200 and r1.json() == {"ok": True}
+    _make_user(db_session, email="who@yandex.ru")
+    r2 = client.post("/api/v1/auth/forgot", json={"email": "who@yandex.ru"})
+    assert r2.status_code == 200 and r2.json() == {"ok": True}
+
+
+def test_reset_with_valid_token_changes_password(client, db_session):
+    from app.api.v1.endpoints.auth import _create_reset_token, _verify_password
+    u = _make_user(db_session, email="r@yandex.ru", password="OldParol1")
+    token = _create_reset_token(u)
+    r = client.post("/api/v1/auth/reset", json={"token": token, "new_password": "NewParol2"})
+    assert r.status_code == 200
+    db_session.refresh(u)
+    assert _verify_password("NewParol2", u.password_hash)
+    assert not _verify_password("OldParol1", u.password_hash)
+
+
+def test_reset_token_single_use(client, db_session):
+    """Повторное использование той же ссылки не проходит (токен привязан к хэшу пароля)."""
+    from app.api.v1.endpoints.auth import _create_reset_token
+    u = _make_user(db_session, email="s@yandex.ru", password="OldParol1")
+    token = _create_reset_token(u)
+    assert client.post("/api/v1/auth/reset", json={"token": token, "new_password": "NewParol2"}).status_code == 200
+    r2 = client.post("/api/v1/auth/reset", json={"token": token, "new_password": "NewParol3"})
+    assert r2.status_code == 400
+
+
+def test_reset_invalid_token(client):
+    r = client.post("/api/v1/auth/reset", json={"token": "garbage.token.here", "new_password": "NewParol2"})
+    assert r.status_code == 400
+
+
+def test_reset_weak_password_rejected(client, db_session):
+    from app.api.v1.endpoints.auth import _create_reset_token
+    u = _make_user(db_session, email="w@yandex.ru", password="OldParol1")
+    token = _create_reset_token(u)
+    r = client.post("/api/v1/auth/reset", json={"token": token, "new_password": "weak"})
+    assert r.status_code == 422   # не прошёл валидатор надёжности

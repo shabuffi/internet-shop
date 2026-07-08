@@ -119,7 +119,12 @@ def create_order(payload: OrderIn, db: Session = Depends(get_db),
 
     # Уведомление владельцу — фоном (заказ в МойСклад уезжает не отсюда: МойСклад сам
     # забирает заказы через обмен CommerceML, см. exchange.py mode=query).
-    from app.tasks.notify import notify_new_order
+    from app.tasks.notify import notify_new_order, notify_order_confirmation
     notify_new_order.delay(order.id)
+    # Письмо-подтверждение покупателю (если оставил email) — тоже фоном.
+    try:
+        notify_order_confirmation.delay(order.id)
+    except Exception:
+        pass
 
     return order

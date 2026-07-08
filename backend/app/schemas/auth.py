@@ -119,6 +119,27 @@ class ChangePasswordIn(BaseModel):
         return validate_password_strength(v)
 
 
+class ForgotPasswordIn(BaseModel):
+    """Запрос восстановления пароля — только email. Ответ всегда одинаковый (не раскрываем аккаунт)."""
+    email: str
+
+    @field_validator("email")
+    @classmethod
+    def _email(cls, v: str) -> str:
+        return v.strip().lower()
+
+
+class ResetPasswordIn(BaseModel):
+    """Установка нового пароля по токену из письма."""
+    token: str
+    new_password: str
+
+    @field_validator("new_password")
+    @classmethod
+    def _new(cls, v: str) -> str:
+        return validate_password_strength(v)
+
+
 class UserOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

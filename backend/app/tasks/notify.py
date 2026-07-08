@@ -260,3 +260,88 @@ def check_exchange_health():
         return {"status": "stale", "age_hours": round(age_h, 1), "alerted": True, "sent": sent}
     finally:
         db.close()
+
+
+def _shop_name(db) -> str:
+    from app.db.models.admin import ShopSettings
+    row = db.get(ShopSettings, "shop_name")
+    return row.value if row and row.value else "Магазин"
+
+
+@celery_app.task(name="app.tasks.notify.notify_order_confirmation")
+def notify_order_confirmation(order_id: str):
+    """Письмо ПОКУПАТЕЛЮ с подтверждением заказа (номер, состав, сумма, контакты магазина).
+
+    Шлётся фоном из ``create_order``. Если у заказа нет email — тихо выходим. Ошибки отправки
+    не пробрасываются (письмо не должно ронять заказ).
+    """
+    from app.db.session import SessionLocal
+    from app.db.models.order import Order
+    from app.db.models.admin import ShopSettings
+    from app.integrations.email import send_email
+
+    db = SessionLocal()
+    try:
+        order = db.get(Order, order_id)
+        if not order or not order.customer_email:
+            return {"sent": False}
+        shop_name = _shop_name(db)
+        phone_row = db.get(ShopSettings, "contact_phone")
+        shop_phone = phone_row.value if phone_row and phone_row.value else ""
+
+        lines = [
+            f"Здравствуйте, {order.customer_name}!", "",
+            f"Спасибо за заказ в «{shop_name}». Мы получили вашу заявку № {order.number}.", "",
+            "Состав заказа:",
+        ]
+        for it in order.items:
+            lines.append(f"• {it.product_name} — {it.quantity} × {it.price:.2f} ₽ = {it.price * it.quantity:.2f} ₽")
+        lines += ["", f"Итого: {order.total_amount:.2f} ₽", ""]
+        if order.delivery_address:
+            lines.append(f"Адрес доставки: {order.delivery_address}")
+        if order.comment:
+            lines.append(f"Комментарий: {order.comment}")
+        lines += ["", "Мы свяжемся с вами для подтверждения заказа."]
+        if shop_phone:
+            lines.append(f"Наш телефон: {shop_phone}")
+        text = "\n".join(lines)
+
+        ok = send_email(order.customer_email, f"Заказ № {order.number} принят — {shop_name}", text, from_name=shop_name)
+        print(f"notify_order_confirmation: {order.number} → покупателю {'отправлено' if ok else 'НЕ отправлено'}", flush=True)
+        return {"sent": bool(ok)}
+    finally:
+        db.close()
+
+
+@celery_app.task(name="app.tasks.notify.send_password_reset")
+def send_password_reset(user_id: str, token: str):
+    """Письмо ПОКУПАТЕЛЮ со ссылкой восстановления пароля (действует 1 час).
+
+    Ссылка ведёт на страницу ``/reset?token=...`` фронта (база — первый ALLOWED_ORIGINS).
+    """
+    from app.db.session import SessionLocal
+    from app.db.models.user import User
+    from app.integrations.email import send_email
+    from app.core.config import settings
+
+    db = SessionLocal()
+    try:
+        user = db.get(User, user_id)
+        if not user or not user.email:
+            return {"sent": False}
+        base = (settings.ALLOWED_ORIGINS[0] if settings.ALLOWED_ORIGINS else "https://td-engineer.ru").rstrip("/")
+        link = f"{base}/reset?token={token}"
+        shop_name = _shop_name(db)
+        text = (
+            f"Здравствуйте!\n\n"
+            f"Вы запросили восстановление пароля на сайте «{shop_name}».\n"
+            f"Чтобы задать новый пароль, перейдите по ссылке (действует 1 час):\n\n"
+            f"{link}\n\n"
+            f"Если вы не запрашивали восстановление — просто проигнорируйте это письмо, "
+            f"пароль останется прежним."
+        )
+        ok = send_email(user.email, f"Восстановление пароля — {shop_name}", text, from_name=shop_name)
+        print(f"send_password_reset: {user.email} → {'отправлено' if ok else 'НЕ отправлено'}", flush=True)
+        return {"sent": bool(ok)}
+    finally:
+        db.close()

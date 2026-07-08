@@ -67,6 +67,16 @@ export function changePassword(body: { current_password: string; new_password: s
   return postJson<{ message: string }>("/change-password", body, "Не удалось изменить пароль");
 }
 
+// Запрос восстановления пароля — бэкенд всегда отвечает ok (не раскрывает, есть ли аккаунт).
+export function forgotPassword(email: string): Promise<{ ok: boolean }> {
+  return postJson<{ ok: boolean }>("/forgot", { email }, "Не удалось отправить письмо");
+}
+
+// Установка нового пароля по токену из письма (после успеха покупатель авторизован).
+export function resetPassword(body: { token: string; new_password: string }): Promise<UserProfile> {
+  return postJson<UserProfile>("/reset", body, "Не удалось сбросить пароль");
+}
+
 export async function logoutUser(): Promise<void> {
   await fetch(`${API}/logout`, { method: "POST", credentials: "same-origin" }).catch(() => {});
 }
