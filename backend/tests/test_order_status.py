@@ -138,3 +138,32 @@ def test_apply_no_item_churn_when_unchanged(db_session):
     db_session.expire_all()
     ids_after = {i.id for i in db_session.get(Order, "o-x").items}
     assert ids_before == ids_after                      # те же строки позиций
+
+
+def test_apply_status_cancelled_marks_order(db_session):
+    """Статус «Отменён» из МойСклад помечает заказ отменённым (status=cancelled), не только ms_status."""
+    from decimal import Decimal
+    import app.db.models.user  # noqa: F401
+    from app.db.models.order import Order
+    from app.api.v1.endpoints.exchange import _apply_order_statuses
+
+    db_session.add(Order(id="o-c", number="ORD-0099", customer_name="И", customer_phone="+79990000000",
+                         total_amount=Decimal("100"), status="new"))
+    db_session.commit()
+
+    xml = (
+        '<?xml version="1.0" encoding="UTF-8"?>'
+        '<КоммерческаяИнформация><Документ>'
+        '<Номер>ORD-0099</Номер>'
+        '<ЗначенияРеквизитов><ЗначениеРеквизита>'
+        '<Наименование>Статус заказа</Наименование><Значение>Отменён</Значение>'
+        '</ЗначениеРеквизита></ЗначенияРеквизитов>'
+        '</Документ></КоммерческаяИнформация>'
+    ).encode("utf-8")
+
+    n = _apply_order_statuses(db_session, xml)
+    assert n == 1
+    db_session.expire_all()
+    o = db_session.get(Order, "o-c")
+    assert o.status == "cancelled"
+    assert o.moysklad_status == "Отменён"

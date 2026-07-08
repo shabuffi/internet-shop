@@ -219,7 +219,11 @@ def _apply_order_statuses(db: Session, body: bytes) -> int:
         if r["ms_number"] and order.moysklad_number != r["ms_number"]:
             order.moysklad_number = r["ms_number"]
             changed = True
-        if r["deleted"] and order.status != "cancelled":
+        # Отмена: либо документ помечен на удаление (ПометкаУдаления), либо статус заказа
+        # в МойСклад стал «Отменён/Отменен». В обоих случаях помечаем заказ отменённым
+        # (показывается красным, у покупателя в кабинете — «Отменён»).
+        is_cancelled = r["deleted"] or ("отмен" in (r["status"] or "").lower())
+        if is_cancelled and order.status != "cancelled":
             order.status = "cancelled"
             changed = True
 
