@@ -218,13 +218,15 @@ button, input, textarea, select { font-family: inherit; }
   padding-top: var(--s-8);
   padding-bottom: var(--s-8);
 }
+/* Обёртка анимации Reveal — тянем на всю высоту ячейки, чтобы плашки были равны */
+.trust > * { height: 100%; }
 .trust-item {
   display: flex;
   flex-direction: row;              /* иконка слева, текст справа (как на референсе) */
   align-items: center;
   text-align: left;
   gap: var(--s-4);
-  min-height: 0;
+  height: 100%;                     /* заполнить обёртку — плашки одного размера */
   padding: var(--s-4) var(--s-5);
   background: var(--paper);
   border: 1px solid var(--hairline);
@@ -656,9 +658,9 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .
 .cartbar__inner { display: flex; align-items: center; justify-content: space-between; gap: 16px;
   padding: 14px clamp(16px, 4vw, 40px); flex-wrap: wrap; }
 .cartbar__info { font-size: 15px; }
-.cartbar__btn { background: var(--accent); color: var(--on-accent); font-weight: 700; font-size: 15px;
+.cartbar__btn { background: var(--accent-2); color: var(--on-accent-2); font-weight: 700; font-size: 15px;
   padding: 10px 22px; border-radius: 10px; text-decoration: none; display: inline-flex; align-items: center; justify-content: center; }
-.cartbar__btn:hover { background: var(--accent-deep); }
+.cartbar__btn:hover { background: var(--accent-2-deep); }
 @media (max-width: 640px) {
   .cartbar__inner { flex-direction: column; align-items: stretch; gap: 10px; padding: 12px 16px; }
   .cartbar__info { font-size: 14px; text-align: center; }
@@ -748,8 +750,8 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .
 .pdp__specs .srow span:last-child { text-align: right; }
 
 .qty { display: inline-flex; align-items: center; border: 1px solid var(--steel); border-radius: var(--r-md); height: 52px; }
-.qty button { width: 46px; height: 100%; border: none; background: transparent; cursor: pointer; color: var(--ink); display: flex; align-items: center; justify-content: center; font-size: 18px; }
-.qty button:hover { background: var(--cloud); }
+.qty button { width: 46px; height: 100%; border: none; background: transparent; cursor: pointer; color: var(--accent); font-weight: 700; display: flex; align-items: center; justify-content: center; font-size: 18px; }
+.qty button:hover { background: var(--accent-soft); }
 .qty button:disabled { color: var(--steel); cursor: not-allowed; }
 .qty span { min-width: 36px; text-align: center; font-weight: 600; font-variant-numeric: tabular-nums; }
 /* ввод количества с клавиатуры: выглядит как прежний span, но редактируется */
