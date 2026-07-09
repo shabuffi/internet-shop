@@ -736,6 +736,10 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .
 .catalog__hero { padding-top: var(--s-12); padding-bottom: var(--s-8); }
 .catalog__hero h1 { font-family: var(--font-display); font-size: var(--t-h1); font-weight: 600; letter-spacing: -.015em; margin: 0; line-height: 1.05; }
 .catalog__hero p { color: var(--charcoal); font-size: var(--t-body-lg); margin: var(--s-3) 0 0; max-width: 52ch; }
+/* На ПК заголовки разделов — меньше (не затмевают лого), но заметнее: акцентный цвет + жирнее */
+@media (min-width: 769px) {
+  .catalog__hero h1 { font-size: var(--t-h2); color: var(--accent); font-weight: 700; }
+}
 .toolbar { display: flex; align-items: center; gap: var(--s-4); margin-bottom: var(--s-6); flex-wrap: wrap; }
 .filters { display: flex; gap: var(--s-2); flex-wrap: wrap; }
 .result-count { margin-left: auto; color: var(--graphite); font-size: var(--t-sm); }
@@ -779,7 +783,9 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .
 /* Карусель товаров: круглые стрелки ‹ › поверх ленты (десктоп) */
 .promo-carousel { position: relative; }
 .promo-nav {
-  position: absolute; top: 42%; transform: translateY(-50%); z-index: 3;
+  /* по вертикали — центр картинки товара (квадрат + равные паддинги => центр = полширины
+     карточки от верха), чтобы стрелка не налезала на название. Карточка на десктопе 220px. */
+  position: absolute; top: 110px; transform: translateY(-50%); z-index: 3;
   width: 44px; height: 44px; border-radius: 999px; cursor: pointer;
   display: flex; align-items: center; justify-content: center;
   background: var(--paper); color: var(--accent); border: 1px solid var(--hairline);
@@ -792,7 +798,8 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .
 .promo-nav--next { right: calc(-1 * var(--s-3)); }
 /* На телефоне стрелки тоже показываем (плюс свайп): чуть компактнее и у краёв экрана */
 @media (max-width: 768px) {
-  .promo-nav { width: 38px; height: 38px; }
+  /* top: 22vw — центр картинки (карточка 44vw, картинка квадрат) => стрелка не на тексте */
+  .promo-nav { width: 38px; height: 38px; top: 22vw; }
   .promo-nav--prev { left: 2px; }
   .promo-nav--next { right: 2px; }
 }
@@ -942,6 +949,7 @@ textarea.form-input { height: auto; min-height: 90px; padding: var(--s-3) var(--
   .quick-cats { grid-template-columns: repeat(4, minmax(0, 1fr)); }
   .catalog-grid { grid-template-columns: repeat(3, 1fr); }
   .promo-grid > * { width: 200px; }
+  .promo-nav { top: 100px; }   /* картинка ~200px карточки */
 }
 @media (max-width: 768px) {
   .container { padding: 0 var(--s-4); }
