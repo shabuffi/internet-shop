@@ -76,18 +76,20 @@ def build_orders_xml(orders, ms_id_by_product: dict[str, str], guest_ext_code: s
         # поэтому «Гость: имя, телефон» уходит в комментарий (см. ниже).
         merged_guest = (not has_user) and bool(guest_ext_code)
 
-        # ─── Комментарий заказа ───
+        # ─── Комментарий заказа = карточка клиента ───
         # ВАЖНО: МойСклад берёт комментарий заказа из ШТАТНОГО тега <Комментарий> прямо в
         # <Документ> (значения из <ЗначенияРеквизитов> для поля комментария он НЕ использует).
-        # Поэтому шлём его здесь; ниже дублируем в реквизит — как подстраховку.
-        comment_parts = []
-        if merged_guest:
-            comment_parts.append(f"Гость: {order.customer_name}, {order.customer_phone}")
-        if order.comment:
-            comment_parts.append(order.comment)
-        comment_text = "\n".join(comment_parts)
-        if comment_text:
-            _sub(doc, "Комментарий", comment_text)
+        # Кладём сюда все контактные данные покупателя (имя, телефон, e-mail, ИНН), чтобы под
+        # общим гостевым контрагентом заказ был опознаваем. Свободный текст покупателя и способ
+        # получения сюда НЕ добавляем (способ получения уходит отдельным реквизитом ниже).
+        who = "Гость" if not has_user else "Покупатель"
+        info_lines = [f"{who}: {order.customer_name}", f"Телефон: {order.customer_phone}"]
+        if order.customer_email:
+            info_lines.append(f"E-mail: {order.customer_email}")
+        if order.customer_inn:
+            info_lines.append(f"ИНН: {order.customer_inn}")
+        comment_text = "\n".join(info_lines)
+        _sub(doc, "Комментарий", comment_text)
 
         # ─── Контрагент (покупатель) ───
         cps = _sub(doc, "Контрагенты")

@@ -50,7 +50,11 @@ def test_build_orders_xml_structure():
     reqs = {r.find("Наименование").text: r.find("Значение").text
             for r in doc.findall("ЗначенияРеквизитов/ЗначениеРеквизита")}
     assert reqs["Адрес доставки"] == "Москва, ул. Ленина 1"
-    assert reqs["Комментарий"] == "код 1234"
+    # Комментарий = карточка клиента (имя/телефон/e-mail); свободный текст «код 1234» в него НЕ входит
+    native = doc.find("Комментарий").text
+    assert "Софья Шабунова" in native and "Телефон: +79622440886" in native and "E-mail: s@mail.ru" in native
+    assert "код 1234" not in native
+    assert reqs["Комментарий"] == native        # дубль в реквизите совпадает со штатным тегом
 
 
 def test_build_orders_xml_skips_unmapped_product():
@@ -139,20 +143,20 @@ def test_guest_order_uses_guest_ext_code_and_tags_comment():
     assert _comment(root).startswith("Гость:")
 
 
-def test_guest_order_without_code_uses_phone_no_tag():
-    """Гость без единого контрагента → <Ид>=телефон (свой контрагент), пометки нет."""
+def test_guest_order_without_code_uses_phone():
+    """Гость без единого контрагента → <Ид>=телефон (свой контрагент); карточка клиента всё равно есть."""
     order = _one_item_order()
     root = etree.fromstring(build_orders_xml([order], {"p-int": "ms-1"}))
     assert root.find("Документ/Контрагенты/Контрагент/Ид").text == order.customer_phone
-    assert _comment(root) is None
+    assert _comment(root).startswith("Гость:")
 
 
-def test_registered_user_uses_own_ext_code_no_tag():
-    """Зарегистрированный → <Ид>=его код контрагента; пометка «Гость» не ставится."""
+def test_registered_user_uses_own_ext_code_labeled_buyer():
+    """Зарегистрированный → <Ид>=его код контрагента; в комментарии карточка «Покупатель: …»."""
     from app.db.models.user import User
     u = User(email="u@ya.ru", phone="+79001234567", customer_type="individual",
              customer_name="К", password_hash="x", moysklad_ext_code="USER-CODE")
     order = _one_item_order(user=u)
     root = etree.fromstring(build_orders_xml([order], {"p-int": "ms-1"}, guest_ext_code="GUEST-1"))
     assert root.find("Документ/Контрагенты/Контрагент/Ид").text == "USER-CODE"
-    assert _comment(root) is None
+    assert _comment(root).startswith("Покупатель:")
