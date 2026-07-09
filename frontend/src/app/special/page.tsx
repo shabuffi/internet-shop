@@ -18,7 +18,6 @@ export default async function SpecialPage({ searchParams }: {
       defaultSort="name"
       params={params}
       sourceCategory="распродаж"
-      heroImage="/heroes/special.jpg"
     />
   );
 }
