@@ -607,8 +607,9 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .
 .search__clear:hover { color: var(--ink); background: var(--cloud); }
 .search:hover { border-color: var(--accent-deep); box-shadow: 0 0 0 3px var(--accent-soft); }
 .search:focus-within { border-color: var(--accent-deep); box-shadow: 0 0 0 4px var(--accent-soft); }
-/* Полноширинный вариант — для мобильного поиска (на странице каталога и в меню) */
-.search--full { width: 100%; flex: 1 1 auto; min-width: 0; }
+/* Полноширинный вариант — для мобильного поиска (каталог, меню). flex:none — чтобы в
+   колоночном меню не растягивался по высоте (иначе pill-радиус превращал его в круг). */
+.search--full { width: 100%; flex: none; min-width: 0; }
 
 /* Средние экраны: 6 пунктов меню не влезают рядом с поиском/корзиной — прячем
    горизонтальное меню и показываем «бургер» (поиск и корзину оставляем). */

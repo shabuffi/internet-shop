@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { getProducts, getCategories } from "@/lib/api";
 import PromoCard from "@/components/PromoCard";
+import HeaderSearch from "@/components/HeaderSearch";
 import CatalogList from "@/components/CatalogList";
 import CartBar from "@/components/CartBar";
 import SortSelect from "@/components/SortSelect";
@@ -91,6 +92,10 @@ export default async function PromoListing({
       </div>
 
       <div className="container section">
+        {/* Поиск на телефоне — рядом с фильтрами (в шапке он скрыт) */}
+        <div className="only-mobile" style={{ marginBottom: "var(--s-4)" }}>
+          <HeaderSearch className="search--full" />
+        </div>
         <div className="toolbar">
           <SortSelect current={sort} view={listView ? "list" : undefined} photo={withPhoto} basePath={basePath} />
           <Link href={mk({ list: listView, photo: !withPhoto })}
