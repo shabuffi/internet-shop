@@ -88,6 +88,14 @@ button, input, textarea, select { font-family: inherit; }
 }
 .band--hero .catalog__hero { position: relative; z-index: 1; }
 .band--hero .eyebrow { color: var(--accent); }
+/* Иллюстрация-фон в hero разделов (каталог/новинки/спец). Картинка задаётся инлайном
+   вместе со светлым слоем-оверлеем (заголовок читается, чёрная виньетка уходит в светлое). */
+.hero-scene { background-size: cover !important; background-position: center !important; background-repeat: no-repeat !important; }
+@media (max-width: 768px) {
+  /* На телефоне убираем описание в этих hero — экономим место, внимание на товары */
+  .hero-scene .catalog__hero p { display: none; }
+  .hero-scene .catalog__hero { padding-top: var(--s-8); padding-bottom: var(--s-8); }
+}
 /* только вертикальные отступы — горизонтальные оставляем за .container */
 .section { padding-top: var(--s-16); padding-bottom: var(--s-16); }
 .row { display: flex; align-items: center; gap: var(--s-3); }
@@ -978,12 +986,9 @@ textarea.form-input { height: auto; min-height: 90px; padding: var(--s-3) var(--
 
 /* Блок «Доставка по регионам» — пилюли с пульсирующей точкой */
 .regions { display: flex; flex-wrap: wrap; gap: var(--s-3); }
-.region-chip { display: inline-flex; align-items: center; gap: var(--s-3); background: var(--paper);
-  border: 1px solid var(--hairline); border-radius: var(--r-pill); padding: 10px 18px 10px 15px;
-  font-weight: 600; color: var(--ink); white-space: nowrap;
-  transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease; }
-.region-chip:hover { transform: translateY(-3px); border-color: var(--accent-2);
-  box-shadow: 0 12px 22px -14px rgba(224,36,36,.5); }
+/* Без рамки: области в бегущей строке — просто точка + название (по просьбе) */
+.region-chip { display: inline-flex; align-items: center; gap: var(--s-3); padding: 6px 10px;
+  font-weight: 600; color: var(--ink); white-space: nowrap; }
 .region-chip .dot { position: relative; width: 9px; height: 9px; border-radius: 999px;
   background: var(--accent-2); flex: none; }
 .region-chip .dot::after { content: ""; position: absolute; inset: 0; border-radius: 999px;

@@ -120,8 +120,9 @@ export default async function CatalogPage({ searchParams }: Props) {
 
   return (
     <div className="page">
-      {/* Hero */}
-      <div className="band band--hero">
+      {/* Hero c фоном-иллюстрацией склада (светлый оверлей — чтобы заголовок читался) */}
+      <div className="band band--hero hero-scene"
+        style={{ backgroundImage: "linear-gradient(rgba(246,245,243,.74), rgba(246,245,243,.86)), url(/heroes/catalog.jpg)" }}>
         <div className="container catalog__hero">
           <h1>{categoryLabel ?? (search ? "Результаты поиска" : "Каталог товаров")}</h1>
           {categoryLabel ? (

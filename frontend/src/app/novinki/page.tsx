@@ -17,6 +17,7 @@ export default async function NovinkiPage({ searchParams }: {
       kind="new"
       defaultSort="name"
       params={params}
+      heroImage="/heroes/novinki.jpg"
     />
   );
 }
