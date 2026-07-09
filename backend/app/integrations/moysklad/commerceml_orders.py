@@ -80,8 +80,9 @@ def build_orders_xml(orders, ms_id_by_product: dict[str, str], guest_ext_code: s
         # ВАЖНО: МойСклад берёт комментарий заказа из ШТАТНОГО тега <Комментарий> прямо в
         # <Документ> (значения из <ЗначенияРеквизитов> для поля комментария он НЕ использует).
         # Кладём сюда все контактные данные покупателя (имя, телефон, e-mail, ИНН), чтобы под
-        # общим гостевым контрагентом заказ был опознаваем. Свободный текст покупателя и способ
-        # получения сюда НЕ добавляем (способ получения уходит отдельным реквизитом ниже).
+        # общим гостевым контрагентом заказ был опознаваем, а следом — свободный текст покупателя
+        # (что он написал в заказе). Способ получения сюда НЕ добавляем — он уходит отдельным
+        # реквизитом ниже.
         who = "Гость" if not has_user else "Покупатель"
         info_lines = [f"{who}: {order.customer_name}", f"Телефон: {order.customer_phone}"]
         if order.customer_email:
@@ -89,6 +90,8 @@ def build_orders_xml(orders, ms_id_by_product: dict[str, str], guest_ext_code: s
         if order.customer_inn:
             info_lines.append(f"ИНН: {order.customer_inn}")
         comment_text = "\n".join(info_lines)
+        if order.comment and order.comment.strip():     # свободный текст покупателя — отдельным блоком
+            comment_text += "\n\n" + order.comment.strip()
         _sub(doc, "Комментарий", comment_text)
 
         # ─── Контрагент (покупатель) ───
