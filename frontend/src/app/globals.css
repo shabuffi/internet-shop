@@ -84,10 +84,10 @@ button, input, textarea, select { font-family: inherit; }
 .band--hero {
   position: relative; overflow: hidden;
   /* Фон-иллюстрация склада на всех hero-разделах (светлый оверлей — заголовок читается).
-     Позиция ~55% — показываем среднюю полосу сцены (грузовик, стеллажи, коробки),
+     Позиция ~62% — показываем полосу сцены с грузовиком целиком (стеллажи, коробки),
      тёмный потолок сверху и пустой пол снизу обрезаем. */
   background: linear-gradient(rgba(246,245,243,.80), rgba(246,245,243,.88)), url(/heroes/scene.jpg);
-  background-size: cover; background-position: center 55%; background-repeat: no-repeat;
+  background-size: cover; background-position: center 62%; background-repeat: no-repeat;
   border-bottom: 1px solid color-mix(in srgb, var(--accent), #fff 80%);
 }
 /* Одинаковая высота hero на всех разделах (картинка всегда одного размера), контент по центру */
@@ -697,13 +697,20 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .
 .pcard__badge { position: absolute; top: var(--s-5); right: var(--s-5); z-index: 2; }
 .pcard__body { padding: var(--s-2) var(--s-5) var(--s-5); display: flex; flex-direction: column; gap: var(--s-2); flex: 1; }
 .pcard__cat { font-size: var(--t-xs); color: var(--graphite); letter-spacing: .04em; }
-/* Название по умолчанию режем до 2 строк (чтобы карточки были ровной высоты),
-   при наведении на карточку — разворачиваем полностью (десктоп; на мобиле тап открывает товар) */
+/* Название по умолчанию режем до 2 строк (чтобы карточки были ровной высоты).
+   При наведении на карточку — полное имя всплывает БЕЛЫМ БЛОКОМ ПОВЕРХ (карточка не
+   растягивается, соседние не сдвигаются). На мобиле тап открывает товар. */
+.pcard__namewrap { position: relative; }
 .pcard__name {
   font-size: var(--t-body); font-weight: 600; line-height: 1.3; color: var(--ink);
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
 }
-.pcard:hover .pcard__name { -webkit-line-clamp: unset; overflow: visible; }
+.pcard:hover .pcard__namewrap .pcard__name {
+  position: absolute; top: -6px; left: -6px; right: -6px; z-index: 6;
+  -webkit-line-clamp: unset; overflow: visible;
+  background: var(--paper); padding: 6px 8px; border-radius: var(--r-md);
+  box-shadow: 0 8px 18px -6px rgba(16,24,40,.22); border: 1px solid var(--hairline);
+}
 /* Компактная карточка (только главная): то же ограничение в 2 строки */
 .pcard--compact .pcard__name { -webkit-line-clamp: 2; }
 .pcard__sku { font-size: var(--t-xs); color: var(--graphite); font-variant-numeric: tabular-nums; }
