@@ -790,8 +790,12 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .
 .promo-nav:hover { background: var(--accent); color: var(--on-accent); box-shadow: 0 8px 22px -4px rgba(16,24,40,.3); }
 .promo-nav--prev { left: calc(-1 * var(--s-3)); }
 .promo-nav--next { right: calc(-1 * var(--s-3)); }
-/* На телефоне стрелки не нужны — там свайп */
-@media (max-width: 768px) { .promo-nav { display: none; } }
+/* На телефоне стрелки тоже показываем (плюс свайп): чуть компактнее и у краёв экрана */
+@media (max-width: 768px) {
+  .promo-nav { width: 38px; height: 38px; }
+  .promo-nav--prev { left: 2px; }
+  .promo-nav--next { right: 2px; }
+}
 .pcard__promo {
   position: absolute; top: var(--s-3); left: var(--s-3); z-index: 2;
   display: inline-flex; align-items: center; justify-content: center;
