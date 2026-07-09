@@ -9,6 +9,7 @@ import { formatPrice } from "@/lib/format";
 import Slider from "@/components/Slider";
 import AddToCartCard from "@/components/AddToCartCard";
 import ChestnyZnakBadge from "@/components/ChestnyZnakBadge";
+import FeaturedBadge from "@/components/FeaturedBadge";
 import CatalogList from "@/components/CatalogList";
 import CartBar from "@/components/CartBar";
 import CategorySelect from "@/components/CategorySelect";
@@ -205,6 +206,7 @@ export default async function CatalogPage({ searchParams }: Props) {
                 {data.items.map((p) => (
                   <article className="pcard" key={p.id}>
                     <Link href={`/products/${p.id}`} className="pcard__media" aria-label={p.name}>
+                      <FeaturedBadge product={p} />
                       <span className="pcard__badge">
                         {p.available && p.stock > 0
                           ? <span className="badge badge--stock"><span className="badge__dot" />{p.stock} шт.</span>
