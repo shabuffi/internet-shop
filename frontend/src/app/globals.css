@@ -636,7 +636,7 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .
 .search-mobile-top { display: none; }
 @media (max-width: 768px) {
   .search-mobile { display: flex; width: 100%; margin-bottom: 0; }
-  .search-mobile-top { display: block; padding-top: var(--s-8); }
+  .search-mobile-top { display: block; padding-top: var(--s-12); }
   .search input { font-size: 16px; }   /* 16px — чтобы iOS не зумил экран при фокусе поиска */
 }
 
