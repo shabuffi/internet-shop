@@ -56,24 +56,6 @@ function TruckIcon() {
   );
 }
 
-function RefreshIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-      strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M21 12a9 9 0 1 1-3-6.7" /><path d="M21 3v6h-6" />
-    </svg>
-  );
-}
-
-function ClockIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-      strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" />
-    </svg>
-  );
-}
-
 export default async function HomePage() {
   // Тянем категории, чтобы плитки вели в конкретный раздел каталога, а не в общий список.
   let categories: { id: string; name: string }[] = [];
@@ -142,11 +124,7 @@ export default async function HomePage() {
                 </Link>
               </div>
               <p className="hero__note">После регистрации вы увидите свои персональные цены</p>
-              <div className="hero__facts">
-                <span className="hero__fact"><TruckIcon />Доставка своим транспортом</span>
-                <span className="hero__fact"><RefreshIcon />Остатки обновляются ежедневно</span>
-                <span className="hero__fact"><ClockIcon />Приём заказов 24/7</span>
-              </div>
+              {/* Текстовые пункты убраны — та же информация показана блоками ниже (полоса доверия) */}
             </div>
             <div className="mapcard hide-mobile">
               <div className="mapcard__cap">
