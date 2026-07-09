@@ -42,8 +42,8 @@ export default function CategorySelect({ categories, current, search, view, sort
     }
     document.addEventListener("mousedown", onDoc);
     document.addEventListener("keydown", onKey);
-    // Фокус в поле поиска при открытии.
-    inputRef.current?.focus();
+    // Автофокус НЕ ставим: на телефоне это сразу открывало бы клавиатуру и «раздвигало»
+    // экран. Пользователь сам тапнет поле поиска категории, если захочет отфильтровать.
     return () => {
       document.removeEventListener("mousedown", onDoc);
       document.removeEventListener("keydown", onKey);
@@ -108,7 +108,7 @@ export default function CategorySelect({ categories, current, search, view, sort
               placeholder="Поиск категории…"
               aria-label="Поиск категории"
               style={{
-                width: "100%", height: 36, padding: "0 12px", fontSize: 14,
+                width: "100%", height: 38, padding: "0 12px", fontSize: 16,   /* 16px — чтобы iOS не зумил экран при фокусе */
                 border: "1px solid var(--hairline)", borderRadius: 8, background: "var(--paper)",
                 color: "var(--ink)", outline: "none",
               }}

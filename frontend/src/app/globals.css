@@ -607,9 +607,16 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .
 .search__clear:hover { color: var(--ink); background: var(--cloud); }
 .search:hover { border-color: var(--accent-deep); box-shadow: 0 0 0 3px var(--accent-soft); }
 .search:focus-within { border-color: var(--accent-deep); box-shadow: 0 0 0 4px var(--accent-soft); }
-/* Полноширинный вариант — для мобильного поиска (каталог, меню). flex:none — чтобы в
-   колоночном меню не растягивался по высоте (иначе pill-радиус превращал его в круг). */
+/* Полноширинный вариант — для мобильного поиска в меню. flex:none — чтобы в колоночном
+   меню не растягивался по высоте (иначе pill-радиус превращал его в круг). */
 .search--full { width: 100%; flex: none; min-width: 0; }
+/* Мобильный поиск над фильтрами (каталог/новинки/спец): скрыт на десктопе, на всю ширину на телефоне.
+   Отдельный класс, т.к. обёртка .only-mobile — inline-flex (для иконок) и сжимала бы поиск. */
+.search-mobile { display: none; }
+@media (max-width: 768px) {
+  .search-mobile { display: flex; width: 100%; margin-bottom: var(--s-4); }
+  .search input { font-size: 16px; }   /* 16px — чтобы iOS не зумил экран при фокусе поиска */
+}
 
 /* Средние экраны: 6 пунктов меню не влезают рядом с поиском/корзиной — прячем
    горизонтальное меню и показываем «бургер» (поиск и корзину оставляем). */

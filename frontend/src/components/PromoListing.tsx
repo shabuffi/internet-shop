@@ -92,10 +92,8 @@ export default async function PromoListing({
       </div>
 
       <div className="container section">
-        {/* Поиск на телефоне — рядом с фильтрами (в шапке он скрыт) */}
-        <div className="only-mobile" style={{ marginBottom: "var(--s-4)" }}>
-          <HeaderSearch className="search--full" />
-        </div>
+        {/* Поиск на телефоне — рядом с фильтрами, во всю ширину (в шапке он скрыт) */}
+        <HeaderSearch className="search-mobile" />
         <div className="toolbar">
           <SortSelect current={sort} view={listView ? "list" : undefined} photo={withPhoto} basePath={basePath} />
           <Link href={mk({ list: listView, photo: !withPhoto })}

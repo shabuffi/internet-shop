@@ -160,10 +160,8 @@ export default async function CatalogPage({ searchParams }: Props) {
       )}
 
       <div className="container section" style={{ paddingTop: banners.length > 0 ? "var(--s-8)" : "var(--s-16)" }}>
-        {/* Поиск на телефоне — здесь, рядом с фильтрами (в шапке он скрыт) */}
-        <div className="only-mobile" style={{ marginBottom: "var(--s-4)" }}>
-          <HeaderSearch className="search--full" />
-        </div>
+        {/* Поиск на телефоне — здесь, рядом с фильтрами, во всю ширину (в шапке он скрыт) */}
+        <HeaderSearch className="search-mobile" />
 
         {/* Тулбар: фильтры + сортировка + переключатель режима + счётчик */}
         <div className="toolbar">
