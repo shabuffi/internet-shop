@@ -721,6 +721,8 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .
 .quick-cat img { width: 68px; height: 48px; object-fit: cover; border-radius: var(--r-sm); display: block; }
 .quick-cat span { font-size: var(--t-xs); font-weight: 700; text-align: center; line-height: 1.2; }
 .catalog-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--s-6); }
+/* Плотная сетка (новинки/спец) — карточки/картинки чуть меньше: больше в ряд */
+.catalog-grid--dense { grid-template-columns: repeat(5, 1fr); gap: var(--s-4); }
 
 /* Ряды «Новинки» / «Спецпредложения» на главной — сетка карточек (5 в ряд) */
 /* Новинки/Спецпредложения — горизонтальная листалка (свайп/скролл), а не сетка */
@@ -889,6 +891,7 @@ textarea.form-input { height: auto; min-height: 90px; padding: var(--s-3) var(--
   .home-about { grid-template-columns: 1fr; gap: var(--s-5); }
   .quick-cats { grid-template-columns: repeat(4, minmax(0, 1fr)); }
   .catalog-grid { grid-template-columns: repeat(3, 1fr); }
+  .catalog-grid--dense { grid-template-columns: repeat(4, 1fr); }
   .promo-grid > * { width: 200px; }
 }
 @media (max-width: 768px) {
@@ -947,6 +950,7 @@ textarea.form-input { height: auto; min-height: 90px; padding: var(--s-3) var(--
   .filters::-webkit-scrollbar { display: none; }
   .result-count { display: none; }
   .catalog-grid { grid-template-columns: 1fr 1fr; gap: var(--s-3); }
+  .catalog-grid--dense { grid-template-columns: repeat(3, 1fr); }   /* новинки/спец на телефоне — мельче */
   .promo-grid { gap: var(--s-3);
     margin-left: calc(-1 * var(--s-4)); margin-right: calc(-1 * var(--s-4));
     padding-left: var(--s-4); padding-right: var(--s-4); scroll-padding-left: var(--s-4); }

@@ -120,8 +120,8 @@ export default async function PromoListing({
         ) : listView ? (
           <CatalogList products={items} />
         ) : (
-          <div className="catalog-grid">
-            {items.map((p) => <PromoCard key={p.id} p={p} kind={kind} />)}
+          <div className="catalog-grid catalog-grid--dense">
+            {items.map((p) => <PromoCard key={p.id} p={p} kind={kind} compact />)}
           </div>
         )}
       </div>
