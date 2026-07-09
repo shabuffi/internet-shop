@@ -102,6 +102,9 @@ button, input, textarea, select { font-family: inherit; }
   .hero--off-mobile .catalog__hero { min-height: 0; padding-top: var(--s-3); padding-bottom: var(--s-1); }
   .hero--off-mobile .catalog__hero h1 { font-size: 22px; }
   .hero--off-mobile .catalog__hero p { display: none; }
+  /* Заголовок раздела и фильтры ближе друг к другу — меньше пустоты сверху секции
+     (!important — перебивает инлайновый paddingTop на каталоге) */
+  .section--listing { padding-top: var(--s-4) !important; }
 }
 /* только вертикальные отступы — горизонтальные оставляем за .container */
 .section { padding-top: var(--s-16); padding-bottom: var(--s-16); }
@@ -633,7 +636,7 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .
 .search-mobile-top { display: none; }
 @media (max-width: 768px) {
   .search-mobile { display: flex; width: 100%; margin-bottom: 0; }
-  .search-mobile-top { display: block; padding-top: var(--s-5); }
+  .search-mobile-top { display: block; padding-top: var(--s-6); }
   .search input { font-size: 16px; }   /* 16px — чтобы iOS не зумил экран при фокусе поиска */
 }
 
@@ -806,7 +809,7 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .
 .pdp__specs .srow span:first-child { color: var(--graphite); flex: none; max-width: 55%; }
 .pdp__specs .srow span:last-child { text-align: right; }
 
-.qty { display: inline-flex; align-items: center; border: 1px solid var(--steel); border-radius: var(--r-md); height: 52px; }
+.qty { display: inline-flex; align-items: center; border: 2px solid var(--steel); border-radius: var(--r-md); height: 52px; }
 .qty button { width: 46px; height: 100%; border: none; background: transparent; cursor: pointer; color: var(--accent); font-weight: 700; display: flex; align-items: center; justify-content: center; font-size: 18px; }
 .qty button:hover { background: var(--accent-soft); }
 .qty button:disabled { color: var(--steel); cursor: not-allowed; }

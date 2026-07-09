@@ -95,7 +95,7 @@ export default async function PromoListing({
         </div>
       </div>
 
-      <div className="container section">
+      <div className="container section section--listing">
         <div className="toolbar">
           <SortSelect current={sort} view={listView ? "list" : undefined} photo={withPhoto} basePath={basePath} />
           <Link href={mk({ list: listView, photo: !withPhoto })}

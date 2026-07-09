@@ -164,7 +164,7 @@ export default async function CatalogPage({ searchParams }: Props) {
         </div>
       )}
 
-      <div className="container section" style={{ paddingTop: banners.length > 0 ? "var(--s-8)" : "var(--s-16)" }}>
+      <div className="container section section--listing" style={{ paddingTop: banners.length > 0 ? "var(--s-8)" : "var(--s-16)" }}>
         {/* Тулбар: фильтры + сортировка + переключатель режима + счётчик */}
         <div className="toolbar">
           <CategorySelect categories={categories} current={categoryId} search={search} view={listView ? "list" : undefined} sort={sort} photo={withPhoto} />
