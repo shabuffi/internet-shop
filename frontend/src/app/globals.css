@@ -83,12 +83,14 @@ button, input, textarea, select { font-family: inherit; }
 .band { background: var(--cloud); }
 .band--hero {
   position: relative; overflow: hidden;
-  /* Фон-иллюстрация склада на всех hero-разделах (светлый оверлей — заголовок читается) */
+  /* Фон-иллюстрация склада на всех hero-разделах (светлый оверлей — заголовок читается).
+     Позиция «низ» — показываем нижнюю часть сцены (пол/грузовик), верх (тёмный потолок) обрезаем. */
   background: linear-gradient(rgba(246,245,243,.80), rgba(246,245,243,.88)), url(/heroes/scene.jpg);
-  background-size: cover; background-position: center; background-repeat: no-repeat;
+  background-size: cover; background-position: center bottom; background-repeat: no-repeat;
   border-bottom: 1px solid color-mix(in srgb, var(--accent), #fff 80%);
 }
-.band--hero .catalog__hero { position: relative; z-index: 1; }
+/* Одинаковая высота hero на всех разделах (картинка всегда одного размера), контент по центру */
+.band--hero .catalog__hero { position: relative; z-index: 1; min-height: 200px; display: flex; flex-direction: column; justify-content: center; }
 .band--hero .eyebrow { color: var(--accent); }
 @media (max-width: 768px) {
   /* На телефоне фон-иллюстрацию не показываем (по просьбе) — обычный светлый hero */
