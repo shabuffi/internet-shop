@@ -218,7 +218,7 @@ export default async function CatalogPage({ searchParams }: Props) {
                       <div className="pcard__cat">{p.category?.name ?? " "}</div>
                       <div style={{ display: "flex", alignItems: "flex-start", gap: 6 }}>
                         {p.chestnyZnak && <ChestnyZnakBadge size={15} />}
-                        <Link href={`/products/${p.id}`} className="pcard__name">{p.name}</Link>
+                        <Link href={`/products/${p.id}`} className="pcard__name" title={p.name}>{p.name}</Link>
                       </div>
                       <div className="pcard__sku">{p.article ? `Арт. ${p.article}` : " "}</div>
                       <div className="pcard__foot">

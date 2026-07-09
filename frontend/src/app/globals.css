@@ -84,9 +84,10 @@ button, input, textarea, select { font-family: inherit; }
 .band--hero {
   position: relative; overflow: hidden;
   /* Фон-иллюстрация склада на всех hero-разделах (светлый оверлей — заголовок читается).
-     Позиция «низ» — показываем нижнюю часть сцены (пол/грузовик), верх (тёмный потолок) обрезаем. */
+     Позиция ~55% — показываем среднюю полосу сцены (грузовик, стеллажи, коробки),
+     тёмный потолок сверху и пустой пол снизу обрезаем. */
   background: linear-gradient(rgba(246,245,243,.80), rgba(246,245,243,.88)), url(/heroes/scene.jpg);
-  background-size: cover; background-position: center bottom; background-repeat: no-repeat;
+  background-size: cover; background-position: center 55%; background-repeat: no-repeat;
   border-bottom: 1px solid color-mix(in srgb, var(--accent), #fff 80%);
 }
 /* Одинаковая высота hero на всех разделах (картинка всегда одного размера), контент по центру */
@@ -95,8 +96,11 @@ button, input, textarea, select { font-family: inherit; }
 @media (max-width: 768px) {
   /* На телефоне фон-иллюстрацию не показываем (по просьбе) — обычный светлый hero */
   .band--hero { background: linear-gradient(118deg, var(--accent-soft) 0%, color-mix(in srgb, var(--accent-soft), #fff 55%) 45%, #fff 100%); }
-  /* На телефоне на Каталог/Новинки/Спец hero-текст (заголовок+описание) убираем — сразу к товарам */
-  .hero--off-mobile { display: none; }
+  /* На телефоне на Каталог/Новинки/Спец hero компактный: маленький заголовок,
+     описание скрываем — почти не занимает места, сразу к товарам */
+  .hero--off-mobile .catalog__hero { min-height: 0; padding-top: var(--s-4); padding-bottom: var(--s-3); }
+  .hero--off-mobile .catalog__hero h1 { font-size: 22px; }
+  .hero--off-mobile .catalog__hero p { display: none; }
 }
 /* только вертикальные отступы — горизонтальные оставляем за .container */
 .section { padding-top: var(--s-16); padding-bottom: var(--s-16); }
@@ -693,11 +697,15 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .
 .pcard__badge { position: absolute; top: var(--s-5); right: var(--s-5); z-index: 2; }
 .pcard__body { padding: var(--s-2) var(--s-5) var(--s-5); display: flex; flex-direction: column; gap: var(--s-2); flex: 1; }
 .pcard__cat { font-size: var(--t-xs); color: var(--graphite); letter-spacing: .04em; }
-.pcard__name { font-size: var(--t-body); font-weight: 600; line-height: 1.3; color: var(--ink); }
-/* Компактная карточка (только главная): название максимум 2 строки — короче по высоте */
-.pcard--compact .pcard__name {
+/* Название по умолчанию режем до 2 строк (чтобы карточки были ровной высоты),
+   при наведении на карточку — разворачиваем полностью (десктоп; на мобиле тап открывает товар) */
+.pcard__name {
+  font-size: var(--t-body); font-weight: 600; line-height: 1.3; color: var(--ink);
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
 }
+.pcard:hover .pcard__name { -webkit-line-clamp: unset; overflow: visible; }
+/* Компактная карточка (только главная): то же ограничение в 2 строки */
+.pcard--compact .pcard__name { -webkit-line-clamp: 2; }
 .pcard__sku { font-size: var(--t-xs); color: var(--graphite); font-variant-numeric: tabular-nums; }
 .pcard__stock { font-size: var(--t-xs); color: var(--stock); font-weight: 700; font-variant-numeric: tabular-nums; }
 .pcard__foot { margin-top: auto; padding-top: var(--s-4); display: flex; flex-direction: column; align-items: stretch; gap: var(--s-3); }
