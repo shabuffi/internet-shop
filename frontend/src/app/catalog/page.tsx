@@ -10,6 +10,7 @@ import Slider from "@/components/Slider";
 import AddToCartCard from "@/components/AddToCartCard";
 import ChestnyZnakBadge from "@/components/ChestnyZnakBadge";
 import FeaturedBadge from "@/components/FeaturedBadge";
+import ProductName from "@/components/ProductName";
 import HeaderSearch from "@/components/HeaderSearch";
 import CatalogList from "@/components/CatalogList";
 import CartBar from "@/components/CartBar";
@@ -120,7 +121,11 @@ export default async function CatalogPage({ searchParams }: Props) {
 
   return (
     <div className="page">
-      {/* Hero (фон глобальный; на телефоне hero-текст скрыт — hero--off-mobile) */}
+      {/* Поиск на телефоне — НАД заголовком раздела (как у DNS); в шапке он скрыт */}
+      <div className="container search-mobile-top">
+        <HeaderSearch className="search-mobile" />
+      </div>
+      {/* Hero (фон глобальный; на телефоне — компактный заголовок без плашки) */}
       <div className="band band--hero hero--off-mobile">
         <div className="container catalog__hero">
           <h1>{categoryLabel ?? (search ? "Результаты поиска" : "Каталог товаров")}</h1>
@@ -160,9 +165,6 @@ export default async function CatalogPage({ searchParams }: Props) {
       )}
 
       <div className="container section" style={{ paddingTop: banners.length > 0 ? "var(--s-8)" : "var(--s-16)" }}>
-        {/* Поиск на телефоне — здесь, рядом с фильтрами, во всю ширину (в шапке он скрыт) */}
-        <HeaderSearch className="search-mobile" />
-
         {/* Тулбар: фильтры + сортировка + переключатель режима + счётчик */}
         <div className="toolbar">
           <CategorySelect categories={categories} current={categoryId} search={search} view={listView ? "list" : undefined} sort={sort} photo={withPhoto} />
@@ -218,7 +220,7 @@ export default async function CatalogPage({ searchParams }: Props) {
                       <div className="pcard__cat">{p.category?.name ?? " "}</div>
                       <div className="pcard__namewrap" style={{ display: "flex", alignItems: "flex-start", gap: 6 }}>
                         {p.chestnyZnak && <ChestnyZnakBadge size={15} />}
-                        <Link href={`/products/${p.id}`} className="pcard__name" title={p.name}>{p.name}</Link>
+                        <ProductName id={p.id} name={p.name} />
                       </div>
                       <div className="pcard__sku">{p.article ? `Арт. ${p.article}` : " "}</div>
                       <div className="pcard__foot">

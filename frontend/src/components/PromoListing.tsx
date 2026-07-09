@@ -84,6 +84,10 @@ export default async function PromoListing({
 
   return (
     <div className="page">
+      {/* Поиск на телефоне — НАД заголовком раздела (как у DNS); в шапке он скрыт */}
+      <div className="container search-mobile-top">
+        <HeaderSearch className="search-mobile" />
+      </div>
       <div className="band band--hero hero--off-mobile">
         <div className="container catalog__hero">
           <h1>{title}</h1>
@@ -92,8 +96,6 @@ export default async function PromoListing({
       </div>
 
       <div className="container section">
-        {/* Поиск на телефоне — рядом с фильтрами, во всю ширину (в шапке он скрыт) */}
-        <HeaderSearch className="search-mobile" />
         <div className="toolbar">
           <SortSelect current={sort} view={listView ? "list" : undefined} photo={withPhoto} basePath={basePath} />
           <Link href={mk({ list: listView, photo: !withPhoto })}
