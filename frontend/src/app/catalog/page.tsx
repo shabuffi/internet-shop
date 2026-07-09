@@ -159,15 +159,7 @@ export default async function CatalogPage({ searchParams }: Props) {
       )}
 
       <div className="container section" style={{ paddingTop: banners.length > 0 ? "var(--s-8)" : "var(--s-16)" }}>
-        {/* Поиск — на мобильных (в шапке он скрыт) */}
-        <form action="/catalog" method="get" className="search only-mobile" style={{ width: "100%", marginBottom: "var(--s-5)" }}>
-          {categoryId && <input type="hidden" name="category_id" value={categoryId} />}
-          {listView && <input type="hidden" name="view" value="list" />}
-          {sort !== "name" && <input type="hidden" name="sort" value={sort} />}
-          {withPhoto && <input type="hidden" name="photo" value="1" />}
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="7" /><line x1="21" y1="21" x2="16.5" y2="16.5" /></svg>
-          <input name="search" defaultValue={search ?? ""} placeholder="Поиск товаров" aria-label="Поиск товаров" />
-        </form>
+        {/* Мобильный поиск теперь постоянной строкой под шапкой (см. layout) — здесь не дублируем */}
 
         {/* Тулбар: фильтры + сортировка + переключатель режима + счётчик */}
         <div className="toolbar">

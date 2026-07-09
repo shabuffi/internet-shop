@@ -583,15 +583,27 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .
 
 .search {
   display: flex; align-items: center; gap: var(--s-2);
-  height: 42px; padding: 0 var(--s-4); width: 210px; flex: 0 1 210px; min-width: 120px;
-  border: 1.5px solid var(--accent); border-radius: var(--r-pill);
+  height: 44px; padding: 0 0 0 var(--s-4); width: 320px; flex: 0 1 320px; min-width: 180px;
+  border: 1.5px solid var(--accent); border-radius: var(--r-pill); overflow: hidden;
   background: var(--canvas); color: var(--accent);
   transition: border-color .2s ease, box-shadow .2s ease, width .2s ease;
 }
 .search input { border: none; outline: none; background: transparent; width: 100%; font-size: var(--t-sm); color: var(--ink); }
-.search input::placeholder { color: color-mix(in srgb, var(--accent), #fff 45%); }
+.search input::placeholder { color: color-mix(in srgb, var(--accent), #fff 40%); }
+/* Явная кнопка «Найти» (лупа) справа — очевидно, что можно нажать, а не только Enter */
+.search__btn {
+  flex: none; height: 100%; padding: 0 16px; border: none; cursor: pointer;
+  background: var(--accent); color: var(--on-accent);
+  display: flex; align-items: center; justify-content: center;
+  transition: background .2s ease;
+}
+.search__btn:hover { background: var(--accent-deep); }
 .search:hover { border-color: var(--accent-deep); box-shadow: 0 0 0 3px var(--accent-soft); }
 .search:focus-within { border-color: var(--accent-deep); box-shadow: 0 0 0 4px var(--accent-soft); }
+/* Полноширинный вариант — для мобильной строки поиска под шапкой */
+.search--full { width: 100%; flex: 1 1 auto; min-width: 0; }
+/* Постоянная строка поиска на телефоне (под шапкой) — чтобы поиск был очевиден на любой странице */
+.header-search-mobile { background: var(--paper); border-bottom: 1px solid var(--hairline); padding: 10px 0; }
 
 /* Средние экраны: 6 пунктов меню не влезают рядом с поиском/корзиной — прячем
    горизонтальное меню и показываем «бургер» (поиск и корзину оставляем). */

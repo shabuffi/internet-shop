@@ -6,6 +6,7 @@ import CartIcon from "@/components/CartIcon";
 import AccountNav from "@/components/AccountNav";
 import MainNav from "@/components/MainNav";
 import MobileMenu from "@/components/MobileMenu";
+import HeaderSearch from "@/components/HeaderSearch";
 import ChatWidget from "@/components/ChatWidget";
 import VkChatWidget from "@/components/VkChatWidget";
 import CookieConsent from "@/components/CookieConsent";
@@ -49,15 +50,6 @@ export async function generateMetadata(): Promise<Metadata> {
       google: store?.seo_google_verification || undefined,
     },
   };
-}
-
-function SearchIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-      strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" style={{ display: "block", flex: "none" }}>
-      <circle cx="11" cy="11" r="7" /><line x1="21" y1="21" x2="16.5" y2="16.5" />
-    </svg>
-  );
 }
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
@@ -107,16 +99,18 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               <MainNav />
 
               <div className="header__actions">
-                <form action="/catalog" method="get" className="search hide-mobile">
-                  <SearchIcon />
-                  <input name="search" placeholder="Поиск товаров" aria-label="Поиск товаров" />
-                </form>
+                <HeaderSearch className="hide-mobile" />
                 <AccountNav />
                 <CartIcon />
                 <MobileMenu />
               </div>
             </div>
           </header>
+
+          {/* Постоянная строка поиска на телефоне (под шапкой) — очевидна на любой странице */}
+          <div className="header-search-mobile only-mobile">
+            <div className="container"><HeaderSearch className="search--full" /></div>
+          </div>
 
           <main className="app-main">{children}</main>
 
