@@ -22,7 +22,7 @@ async function categoryIdsByName(namePart: string): Promise<string[]> {
  *  «С фото», переключатель плитка/список) + сетка карточек (или список — «бланк заказа»).
  *  Пока товары — заглушки (по сортировке); при появлении поля в МойСклад сменим источник. */
 export default async function PromoListing({
-  basePath, title, subtitle, kind, defaultSort, params, sourceCategory, heroImage,
+  basePath, title, subtitle, kind, defaultSort, params, sourceCategory,
 }: {
   basePath: string;
   title: string;
@@ -33,7 +33,6 @@ export default async function PromoListing({
   // Если задано — товары берём из категории с таким именем (напр. «РАСПРОДАЖА»),
   // иначе (заглушка) — просто по сортировке.
   sourceCategory?: string;
-  heroImage?: string;   // фон-иллюстрация в hero (напр. /heroes/novinki.jpg)
 }) {
   const listView = params.view === "list";
   const sort = params.sort === "price_asc" || params.sort === "price_desc" || params.sort === "name"
@@ -85,8 +84,7 @@ export default async function PromoListing({
 
   return (
     <div className="page">
-      <div className={`band band--hero${heroImage ? " hero-illus hero-scene--big" : ""}`}
-        style={heroImage ? { backgroundImage: `url(${heroImage})` } : undefined}>
+      <div className="band band--hero">
         <div className="container catalog__hero">
           <h1>{title}</h1>
           <p>{subtitle}</p>

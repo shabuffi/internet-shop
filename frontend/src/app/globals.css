@@ -83,22 +83,16 @@ button, input, textarea, select { font-family: inherit; }
 .band { background: var(--cloud); }
 .band--hero {
   position: relative; overflow: hidden;
-  background: linear-gradient(118deg, var(--accent-soft) 0%, color-mix(in srgb, var(--accent-soft), #fff 55%) 45%, #fff 100%);
+  /* Фон-иллюстрация склада на всех hero-разделах (светлый оверлей — заголовок читается) */
+  background: linear-gradient(rgba(246,245,243,.80), rgba(246,245,243,.88)), url(/heroes/scene.jpg);
+  background-size: cover; background-position: center; background-repeat: no-repeat;
   border-bottom: 1px solid color-mix(in srgb, var(--accent), #fff 80%);
 }
 .band--hero .catalog__hero { position: relative; z-index: 1; }
 .band--hero .eyebrow { color: var(--accent); }
-/* Иллюстрация-фон в hero разделов (каталог/новинки/спец). Картинка задаётся инлайном
-   вместе со светлым слоем-оверлеем (заголовок читается, чёрная виньетка уходит в светлое). */
-.hero-scene { background-size: cover !important; background-position: center !important; background-repeat: no-repeat !important; }
-/* Крупный фон (новинки/спец) — hero выше, картинки видно больше */
-.hero-scene--big .catalog__hero { min-height: 210px; display: flex; flex-direction: column; justify-content: center; }
-/* Иллюстрация-линии справа (прозрачный PNG, без оверлея) — новинки/спец */
-.hero-illus { background-repeat: no-repeat !important; background-position: right center !important; background-size: auto 96% !important; }
 @media (max-width: 768px) {
-  /* На телефоне фон-картинки НЕ показываем (по просьбе) — обычный hero */
-  .hero-scene, .hero-illus { background-image: none !important; }
-  .hero-scene--big .catalog__hero { min-height: 0; display: block; }
+  /* На телефоне фон-иллюстрацию не показываем (по просьбе) — обычный светлый hero */
+  .band--hero { background: linear-gradient(118deg, var(--accent-soft) 0%, color-mix(in srgb, var(--accent-soft), #fff 55%) 45%, #fff 100%); }
 }
 /* только вертикальные отступы — горизонтальные оставляем за .container */
 .section { padding-top: var(--s-16); padding-bottom: var(--s-16); }
