@@ -582,22 +582,29 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .
 .mmenu__phone { margin-top: var(--s-5); font-weight: 600; color: var(--accent); text-decoration: none; }
 
 .search {
-  display: flex; align-items: center; gap: var(--s-2);
-  height: 44px; padding: 0 0 0 var(--s-4); width: 320px; flex: 0 1 320px; min-width: 180px;
-  border: 1.5px solid var(--accent); border-radius: var(--r-pill); overflow: hidden;
+  display: flex; align-items: center; gap: 4px;
+  height: 44px; padding: 0 5px 0 var(--s-4); width: 320px; flex: 0 1 320px; min-width: 180px;
+  border: 1.5px solid var(--accent); border-radius: var(--r-pill);
   background: var(--canvas); color: var(--accent);
   transition: border-color .2s ease, box-shadow .2s ease, width .2s ease;
 }
 .search input { border: none; outline: none; background: transparent; width: 100%; font-size: var(--t-sm); color: var(--ink); }
 .search input::placeholder { color: color-mix(in srgb, var(--accent), #fff 40%); }
-/* Явная кнопка «Найти» (лупа) справа — очевидно, что можно нажать, а не только Enter */
+/* Круглая кнопка «Найти» (лупа) справа — очевидно, что можно нажать, а не только Enter */
 .search__btn {
-  flex: none; height: 100%; padding: 0 16px; border: none; cursor: pointer;
-  background: var(--accent); color: var(--on-accent);
+  flex: none; width: 34px; height: 34px; border: none; cursor: pointer;
+  background: var(--accent); color: var(--on-accent); border-radius: 50%;
   display: flex; align-items: center; justify-content: center;
   transition: background .2s ease;
 }
 .search__btn:hover { background: var(--accent-deep); }
+/* Крестик очистки ввода — появляется, когда в поле есть текст */
+.search__clear {
+  flex: none; width: 26px; height: 26px; border: none; background: transparent;
+  color: var(--steel); cursor: pointer; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center; transition: color .15s ease, background .15s ease;
+}
+.search__clear:hover { color: var(--ink); background: var(--cloud); }
 .search:hover { border-color: var(--accent-deep); box-shadow: 0 0 0 3px var(--accent-soft); }
 .search:focus-within { border-color: var(--accent-deep); box-shadow: 0 0 0 4px var(--accent-soft); }
 /* Полноширинный вариант — для мобильной строки поиска под шапкой */
