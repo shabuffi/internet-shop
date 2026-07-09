@@ -38,13 +38,20 @@ export default async function PromoListing({
     ? params.sort : defaultSort;
   const withPhoto = params.photo === "1";
 
-  let categoryId: string | undefined;
-  if (sourceCategory) {
-    const ids = await categoryIdsByName(sourceCategory);
-    categoryId = ids.length ? ids.join(",") : "__none__";  // категории нет → пустая выдача
+  // Источник — флаги из МойСклад (доп-поля «Новинка»/«Распродажа»).
+  const featured = kind === "new" ? "new" : "sale";
+  const pageSize = listView ? 100 : 48;
+  let data = await getProducts({ page_size: pageSize, with_photo: withPhoto || undefined, sort, featured });
+  // Фолбэк, пока флагов из МойСклад мало: спец — из категории «РАСПРОДАЖА», новинки — по сортировке.
+  if (data.items.length === 0) {
+    if (sourceCategory) {
+      const ids = await categoryIdsByName(sourceCategory);
+      const categoryId = ids.length ? ids.join(",") : "__none__";
+      data = await getProducts({ page_size: pageSize, with_photo: withPhoto || undefined, sort, category_id: categoryId });
+    } else {
+      data = await getProducts({ page_size: pageSize, with_photo: true, sort });
+    }
   }
-
-  const data = await getProducts({ page_size: listView ? 100 : 48, with_photo: withPhoto || undefined, sort, category_id: categoryId });
   const items = data.items;
 
   // Ссылка для тулбара: желаемое состояние (список? / только с фото?), сортировку сохраняем.

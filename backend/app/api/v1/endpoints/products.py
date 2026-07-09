@@ -3,7 +3,7 @@ import re
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import Response
 from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import select, func, or_, case
+from sqlalchemy import select, func, or_, and_, case
 
 from app.db.session import get_db
 from app.db.models.product import Product, Category
@@ -198,9 +198,10 @@ def list_products(
     if with_photo:
         query = query.where(Product.image_url.isnot(None), Product.image_url != "")
 
-    # Фильтр «Новинки» / «Спецпредложения» (флаги из МойСклад)
+    # Фильтр «Новинки» / «Спецпредложения» (флаги из МойСклад). Приоритет — распродажа:
+    # товар с обоими флагами показываем только в спецпредложениях, а из новинок исключаем.
     if featured == "new":
-        query = query.where(Product.is_new == True)
+        query = query.where(Product.is_new == True, Product.is_sale == False)
     elif featured == "sale":
         query = query.where(Product.is_sale == True)
 
@@ -223,10 +224,16 @@ def list_products(
         order_cols = [relevance, clean_name.asc()]
     else:
         order_cols = [clean_name.asc()]
-    # По умолчанию поднимаем наверх новинки, затем спецпредложения (в любой категории/поиске).
+    # По умолчанию сверху новинки, ниже распродажа, потом остальные (в любой категории/поиске).
+    # Приоритет распродажи: товар с обоими флагами идёт в группу распродажи (не в новинки).
     # При явной сортировке по цене — не вмешиваемся (пользователь хочет чистый порядок по цене).
     if sort not in ("price_asc", "price_desc"):
-        order_cols = [Product.is_new.desc(), Product.is_sale.desc(), *order_cols]
+        featured_rank = case(
+            (and_(Product.is_new == True, Product.is_sale == False), 0),   # только новинка → сверху
+            (Product.is_sale == True, 1),                                   # распродажа (в т.ч. с новинкой)
+            else_=2,                                                        # обычные
+        )
+        order_cols = [featured_rank, *order_cols]
     query = query.order_by(*order_cols)
 
     total = db.scalar(select(func.count()).select_from(query.order_by(None).subquery()))
