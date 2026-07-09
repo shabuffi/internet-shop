@@ -687,6 +687,8 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .
   cursor: pointer; transition: box-shadow .3s ease-in-out, transform .3s ease-in-out, border-color .3s ease;
 }
 .pcard:hover { box-shadow: var(--shadow-2); transform: translateY(-3px); }
+/* Компактная карточка главной — вся карточка одна ссылка на товар */
+.pcard__link { display: flex; flex-direction: column; flex: 1; text-decoration: none; color: inherit; }
 
 /* Липкая панель корзины снизу (бланк заказа) */
 .cartbar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; background: var(--ink); color: #fff;
@@ -708,7 +710,7 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .
 .pcard__body { padding: var(--s-2) var(--s-5) var(--s-5); display: flex; flex-direction: column; gap: var(--s-2); flex: 1; }
 .pcard__cat { font-size: var(--t-xs); color: var(--graphite); letter-spacing: .04em; }
 /* Название: на десктопе — полное имя, обычная ссылка на товар. */
-.pcard__namewrap { position: relative; }
+.pcard__namewrap { position: relative; display: flex; align-items: flex-start; gap: 6px; }
 .pcard__name { font-size: var(--t-body); font-weight: 600; line-height: 1.3; color: var(--ink); }
 /* Компактная карточка (только главная): максимум 2 строки — ровная высота */
 .pcard--compact .pcard__name {
