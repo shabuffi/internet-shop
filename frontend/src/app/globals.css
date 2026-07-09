@@ -1005,6 +1005,16 @@ textarea.form-input { height: auto; min-height: 90px; padding: var(--s-3) var(--
   /* На телефоне карточки в один ряд со свайпом: ~2 в экране + краешек следующей (подсказка) */
   .promo-grid > * { width: 44vw; }
   .pcard__name { font-size: var(--t-sm); }
+  /* Карточки карусели на телефоне — максимально компактные: меньше паддинги и шрифт,
+     цена в одну строку, без большого пустого промежутка (foot сразу под названием) */
+  .promo-grid .pcard__media { padding: var(--s-3); }
+  .promo-grid .pcard__body { padding: var(--s-1) var(--s-3) var(--s-3); gap: 2px; }
+  .promo-grid .pcard__name { font-size: 13px; line-height: 1.25; }
+  .promo-grid .pcard__sku { font-size: 11px; }
+  .promo-grid .price { font-size: 16px; white-space: nowrap; }
+  .promo-grid .pcard__foot { margin-top: var(--s-2); padding-top: var(--s-2); gap: var(--s-2); }
+  .promo-grid .qty--sm { height: 34px; }
+  .promo-grid .qty--sm button { width: 32px; font-size: 15px; }
   /* Регионы-бегущая строка: на узком экране шире затухание по краям, чтобы плитки
      не выглядели резко обрубленными */
   .marquee { padding: var(--s-4) 0;
