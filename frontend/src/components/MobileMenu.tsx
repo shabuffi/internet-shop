@@ -41,6 +41,14 @@ export default function MobileMenu() {
                 <line x1="6" y1="6" x2="18" y2="18" /><line x1="18" y1="6" x2="6" y2="18" />
               </svg>
             </button>
+            {/* Поиск прямо в меню — доступен с любой страницы */}
+            <form action="/catalog" method="get" className="search search--full" role="search"
+              style={{ marginBottom: "var(--s-4)" }} onSubmit={() => setOpen(false)}>
+              <input name="search" placeholder="Поиск товаров…" aria-label="Поиск товаров" autoComplete="off" />
+              <button type="submit" className="search__btn" aria-label="Найти">
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="7" /><line x1="21" y1="21" x2="16.5" y2="16.5" /></svg>
+              </button>
+            </form>
             {LINKS.map((l) => {
               const active = l.href === "/" ? path === "/" : path.startsWith(l.href);
               return (

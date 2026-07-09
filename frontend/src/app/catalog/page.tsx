@@ -10,6 +10,7 @@ import Slider from "@/components/Slider";
 import AddToCartCard from "@/components/AddToCartCard";
 import ChestnyZnakBadge from "@/components/ChestnyZnakBadge";
 import FeaturedBadge from "@/components/FeaturedBadge";
+import HeaderSearch from "@/components/HeaderSearch";
 import CatalogList from "@/components/CatalogList";
 import CartBar from "@/components/CartBar";
 import CategorySelect from "@/components/CategorySelect";
@@ -159,7 +160,10 @@ export default async function CatalogPage({ searchParams }: Props) {
       )}
 
       <div className="container section" style={{ paddingTop: banners.length > 0 ? "var(--s-8)" : "var(--s-16)" }}>
-        {/* Мобильный поиск теперь постоянной строкой под шапкой (см. layout) — здесь не дублируем */}
+        {/* Поиск на телефоне — здесь, рядом с фильтрами (в шапке он скрыт) */}
+        <div className="only-mobile" style={{ marginBottom: "var(--s-4)" }}>
+          <HeaderSearch className="search--full" />
+        </div>
 
         {/* Тулбар: фильтры + сортировка + переключатель режима + счётчик */}
         <div className="toolbar">

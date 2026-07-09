@@ -607,10 +607,8 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .
 .search__clear:hover { color: var(--ink); background: var(--cloud); }
 .search:hover { border-color: var(--accent-deep); box-shadow: 0 0 0 3px var(--accent-soft); }
 .search:focus-within { border-color: var(--accent-deep); box-shadow: 0 0 0 4px var(--accent-soft); }
-/* Полноширинный вариант — для мобильной строки поиска под шапкой */
+/* Полноширинный вариант — для мобильного поиска (на странице каталога и в меню) */
 .search--full { width: 100%; flex: 1 1 auto; min-width: 0; }
-/* Постоянная строка поиска на телефоне (под шапкой) — чтобы поиск был очевиден на любой странице */
-.header-search-mobile { background: var(--paper); border-bottom: 1px solid var(--hairline); padding: 10px 0; }
 
 /* Средние экраны: 6 пунктов меню не влезают рядом с поиском/корзиной — прячем
    горизонтальное меню и показываем «бургер» (поиск и корзину оставляем). */

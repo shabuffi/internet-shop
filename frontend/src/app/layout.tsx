@@ -107,11 +107,6 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             </div>
           </header>
 
-          {/* Постоянная строка поиска на телефоне (под шапкой) — очевидна на любой странице */}
-          <div className="header-search-mobile only-mobile">
-            <div className="container"><HeaderSearch className="search--full" /></div>
-          </div>
-
           <main className="app-main">{children}</main>
 
           <footer className="footer">
