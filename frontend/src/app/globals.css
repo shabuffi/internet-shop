@@ -91,10 +91,12 @@ button, input, textarea, select { font-family: inherit; }
 /* Иллюстрация-фон в hero разделов (каталог/новинки/спец). Картинка задаётся инлайном
    вместе со светлым слоем-оверлеем (заголовок читается, чёрная виньетка уходит в светлое). */
 .hero-scene { background-size: cover !important; background-position: center !important; background-repeat: no-repeat !important; }
+/* Крупный фон (новинки/спец) — hero выше, картинки видно больше */
+.hero-scene--big .catalog__hero { min-height: 210px; display: flex; flex-direction: column; justify-content: center; }
 @media (max-width: 768px) {
-  /* На телефоне убираем описание в этих hero — экономим место, внимание на товары */
-  .hero-scene .catalog__hero p { display: none; }
-  .hero-scene .catalog__hero { padding-top: var(--s-8); padding-bottom: var(--s-8); }
+  /* На телефоне фон-картинку НЕ показываем (по просьбе) — обычный hero */
+  .hero-scene { background-image: none !important; }
+  .hero-scene--big .catalog__hero { min-height: 0; display: block; }
 }
 /* только вертикальные отступы — горизонтальные оставляем за .container */
 .section { padding-top: var(--s-16); padding-bottom: var(--s-16); }
@@ -1013,9 +1015,12 @@ textarea.form-input { height: auto; min-height: 90px; padding: var(--s-3) var(--
 /* Универсальная карточка с подъёмом + иконка-плашка (Контакты, О компании) */
 .lift { transition: transform .2s ease, box-shadow .2s ease; }
 .lift:hover { transform: translateY(-4px); box-shadow: 0 16px 30px -14px rgba(0,0,0,.22); }
-.icon-badge { width: 48px; height: 48px; border-radius: 14px; flex: none;
-  display: flex; align-items: center; justify-content: center;
-  background: var(--accent-soft); color: var(--accent); }
+/* Иконка контакта без плашки-фона, крупнее (по просьбе) */
+.icon-badge { flex: none; display: flex; align-items: center; justify-content: center; color: var(--accent); }
+.icon-badge img { width: 44px; height: 44px; object-fit: contain; display: block; }
+/* Контакты — сетка в 2 колонки (2 строки на 4 карточки); на телефоне — в одну */
+.contacts-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--s-4); }
+@media (max-width: 768px) { .contacts-grid { grid-template-columns: 1fr; } }
 
 @media (prefers-reduced-motion: reduce) {
   .reveal { animation: none; opacity: 1; transform: none; }

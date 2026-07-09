@@ -85,8 +85,8 @@ export default async function PromoListing({
 
   return (
     <div className="page">
-      <div className={`band band--hero${heroImage ? " hero-scene" : ""}`}
-        style={heroImage ? { backgroundImage: `linear-gradient(rgba(246,245,243,.74), rgba(246,245,243,.86)), url(${heroImage})` } : undefined}>
+      <div className={`band band--hero${heroImage ? " hero-scene hero-scene--big" : ""}`}
+        style={heroImage ? { backgroundImage: `linear-gradient(rgba(246,245,243,.52), rgba(246,245,243,.70)), url(${heroImage})` } : undefined}>
         <div className="container catalog__hero">
           <h1>{title}</h1>
           <p>{subtitle}</p>

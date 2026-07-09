@@ -8,7 +8,7 @@ export const metadata: Metadata = { title: "Контакты" };
 
 // Иконки контактов — SVG заказчика (телефон-в-круге, конверт со стрелкой, склад-метка, часы),
 // перекрашены в фирменный синий, viewBox обрезан по содержимому. Файлы в /public/contacts.
-const cIcon = (src: string) => <img src={src} alt="" style={{ width: 26, height: 26, objectFit: "contain", display: "block" }} />;
+const cIcon = (src: string) => <img src={src} alt="" style={{ objectFit: "contain", display: "block" }} />;
 const icon: Record<string, React.ReactNode> = {
   Телефон: cIcon("/contacts/phone.svg"),
   "E-mail": cIcon("/contacts/mail.svg"),
@@ -51,7 +51,7 @@ export default async function ContactsPage() {
 
       <div className="container section">
         {cards.length > 0 ? (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: "var(--s-4)" }}>
+          <div className="contacts-grid">
             {cards.map((c, i) => (
               <Reveal key={c.label} delay={i * 70}>
                 <div className="lift" style={{ background: "var(--paper)", borderRadius: "var(--r-lg)", height: "100%",
