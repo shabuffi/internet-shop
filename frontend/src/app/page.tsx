@@ -4,6 +4,7 @@ import Link from "next/link";
 import { getCategories, getProducts } from "@/lib/api";
 import { CATEGORY_GROUPS, normCatName } from "@/lib/categoryGroups";
 import PromoCard from "@/components/PromoCard";
+import PromoCarousel from "@/components/PromoCarousel";
 import DeliveryMap from "@/components/DeliveryMap";
 import RegionsMarquee from "@/components/RegionsMarquee";
 import Reveal from "@/components/Reveal";
@@ -187,9 +188,9 @@ export default async function HomePage() {
             <h2 className="section-title section-title--caps section-title--accent">Новинки</h2>
             <Link href="/novinki" className="see-all">Посмотреть все <ArrowIcon size={16} /></Link>
           </div>
-          <div className="promo-grid">
+          <PromoCarousel>
             {novinki.map(p => <PromoCard key={p.id} p={p} kind="new" compact />)}
-          </div>
+          </PromoCarousel>
         </div>
       )}
 
@@ -201,9 +202,9 @@ export default async function HomePage() {
               <h2 className="section-title section-title--caps section-title--accent">Спецпредложения</h2>
               <Link href="/special" className="see-all">Посмотреть все <ArrowIcon size={16} /></Link>
             </div>
-            <div className="promo-grid">
+            <PromoCarousel>
               {special.map(p => <PromoCard key={p.id} p={p} kind="sale" compact />)}
-            </div>
+            </PromoCarousel>
           </div>
         </div>
       )}

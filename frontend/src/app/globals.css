@@ -776,6 +776,22 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .
 }
 .promo-grid::-webkit-scrollbar { display: none; }   /* прячем полосу (WebKit/Chrome) */
 .promo-grid > * { flex: 0 0 auto; width: 220px; scroll-snap-align: start; }
+/* Карусель товаров: круглые стрелки ‹ › поверх ленты (десктоп) */
+.promo-carousel { position: relative; }
+.promo-nav {
+  position: absolute; top: 42%; transform: translateY(-50%); z-index: 3;
+  width: 44px; height: 44px; border-radius: 999px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--paper); color: var(--accent); border: 1px solid var(--hairline);
+  box-shadow: 0 6px 18px -4px rgba(16,24,40,.22);
+  transition: background .2s ease, color .2s ease, box-shadow .2s ease;
+}
+.promo-nav[hidden] { display: none; }
+.promo-nav:hover { background: var(--accent); color: var(--on-accent); box-shadow: 0 8px 22px -4px rgba(16,24,40,.3); }
+.promo-nav--prev { left: calc(-1 * var(--s-3)); }
+.promo-nav--next { right: calc(-1 * var(--s-3)); }
+/* На телефоне стрелки не нужны — там свайп */
+@media (max-width: 768px) { .promo-nav { display: none; } }
 .pcard__promo {
   position: absolute; top: var(--s-3); left: var(--s-3); z-index: 2;
   display: inline-flex; align-items: center; justify-content: center;
