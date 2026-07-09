@@ -59,10 +59,7 @@ def build_orders_xml(orders, ms_id_by_product: dict[str, str], guest_ext_code: s
         _sub(doc, "Курс", "1")
         _sub(doc, "Сумма", f"{order.total_amount:.2f}")
 
-        # ─── Контрагент (покупатель) ───
-        cps = _sub(doc, "Контрагенты")
-        cp = _sub(cps, "Контрагент")
-        # <Ид> контрагента → попадает во «Внешний код» в МойСклад (ключ сопоставления).
+        # Контрагента/гостя определяем заранее — нужно и для комментария, и для блока Контрагенты.
         # Приоритет: код пользователя (стабильный/привязка к существующему контрагенту);
         # иначе телефон (гость или аккаунт без кода) — прежнее поведение.
         try:
@@ -75,9 +72,27 @@ def build_orders_xml(orders, ms_id_by_product: dict[str, str], guest_ext_code: s
         # чтобы не плодить нового контрагента на каждый заказ гостя.
         if not ext_code and guest_ext_code:
             ext_code = guest_ext_code
-        # Заказ гостя слит с общим контрагентом → под ним не видно, кто именно заказал.
-        # Ниже добавим «Гость: имя, телефон» в комментарий, чтобы заказ был опознаваем.
+        # Заказ гостя слит с общим контрагентом → под ним не видно, кто именно заказал,
+        # поэтому «Гость: имя, телефон» уходит в комментарий (см. ниже).
         merged_guest = (not has_user) and bool(guest_ext_code)
+
+        # ─── Комментарий заказа ───
+        # ВАЖНО: МойСклад берёт комментарий заказа из ШТАТНОГО тега <Комментарий> прямо в
+        # <Документ> (значения из <ЗначенияРеквизитов> для поля комментария он НЕ использует).
+        # Поэтому шлём его здесь; ниже дублируем в реквизит — как подстраховку.
+        comment_parts = []
+        if merged_guest:
+            comment_parts.append(f"Гость: {order.customer_name}, {order.customer_phone}")
+        if order.comment:
+            comment_parts.append(order.comment)
+        comment_text = "\n".join(comment_parts)
+        if comment_text:
+            _sub(doc, "Комментарий", comment_text)
+
+        # ─── Контрагент (покупатель) ───
+        cps = _sub(doc, "Контрагенты")
+        cp = _sub(cps, "Контрагент")
+        # <Ид> контрагента → попадает во «Внешний код» в МойСклад (ключ сопоставления).
         _sub(cp, "Ид", ext_code or order.customer_phone)
         _sub(cp, "Наименование", order.customer_name)
         _sub(cp, "ПолноеНаименование", order.customer_name)
@@ -116,14 +131,9 @@ def build_orders_xml(orders, ms_id_by_product: dict[str, str], guest_ext_code: s
             r = _sub(reqs, "ЗначениеРеквизита")
             _sub(r, "Наименование", "Адрес доставки")
             _sub(r, "Значение", order.delivery_address)
-        comment_parts = []
-        if merged_guest:
-            comment_parts.append(f"Гость: {order.customer_name}, {order.customer_phone}")
-        if order.comment:
-            comment_parts.append(order.comment)
-        if comment_parts:
+        if comment_text:                                # дубль в реквизит (подстраховка)
             r = _sub(reqs, "ЗначениеРеквизита")
             _sub(r, "Наименование", "Комментарий")
-            _sub(r, "Значение", "\n".join(comment_parts))
+            _sub(r, "Значение", comment_text)
 
     return etree.tostring(root, encoding="UTF-8", xml_declaration=True, pretty_print=True)

@@ -132,6 +132,10 @@ def test_guest_order_uses_guest_ext_code_and_tags_comment():
     order = _one_item_order()
     root = etree.fromstring(build_orders_xml([order], {"p-int": "ms-1"}, guest_ext_code="GUEST-1"))
     assert root.find("Документ/Контрагенты/Контрагент/Ид").text == "GUEST-1"
+    # Штатный тег <Комментарий> прямо в <Документ> — его МойСклад тянет в поле комментария заказа
+    native = root.find("Документ/Комментарий")
+    assert native is not None and native.text.startswith("Гость:")
+    # и дубль в реквизите — подстраховка
     assert _comment(root).startswith("Гость:")
 
 
