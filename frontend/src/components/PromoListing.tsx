@@ -84,7 +84,7 @@ export default async function PromoListing({
 
   return (
     <div className="page">
-      <div className="band band--hero">
+      <div className="band band--hero hero--off-mobile">
         <div className="container catalog__hero">
           <h1>{title}</h1>
           <p>{subtitle}</p>
@@ -118,8 +118,8 @@ export default async function PromoListing({
         ) : listView ? (
           <CatalogList products={items} />
         ) : (
-          <div className="catalog-grid catalog-grid--dense">
-            {items.map((p) => <PromoCard key={p.id} p={p} kind={kind} compact />)}
+          <div className="catalog-grid">
+            {items.map((p) => <PromoCard key={p.id} p={p} kind={kind} />)}
           </div>
         )}
       </div>

@@ -120,8 +120,8 @@ export default async function CatalogPage({ searchParams }: Props) {
 
   return (
     <div className="page">
-      {/* Hero (фон-иллюстрация задаётся глобально в .band--hero) */}
-      <div className="band band--hero">
+      {/* Hero (фон глобальный; на телефоне hero-текст скрыт — hero--off-mobile) */}
+      <div className="band band--hero hero--off-mobile">
         <div className="container catalog__hero">
           <h1>{categoryLabel ?? (search ? "Результаты поиска" : "Каталог товаров")}</h1>
           {categoryLabel ? (
