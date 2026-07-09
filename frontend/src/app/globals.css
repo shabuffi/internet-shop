@@ -99,7 +99,7 @@ button, input, textarea, select { font-family: inherit; }
   /* Каталог/Новинки/Спец: без серой плашки — просто компактный заголовок под поиском
      (как у DNS «Персональная подборка»). Фон/рамку убираем, описание скрываем. */
   .hero--off-mobile { background: none; border-bottom: none; }
-  .hero--off-mobile .catalog__hero { min-height: 0; padding-top: var(--s-3); padding-bottom: var(--s-1); }
+  .hero--off-mobile .catalog__hero { min-height: 0; padding-top: var(--s-4); padding-bottom: var(--s-1); }
   .hero--off-mobile .catalog__hero h1 { font-size: 22px; }
   .hero--off-mobile .catalog__hero p { display: none; }
   /* Заголовок раздела и фильтры ближе друг к другу — меньше пустоты сверху секции
@@ -638,7 +638,7 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .
   .search-mobile { display: flex; width: 100%; margin-bottom: 0; }
   /* .container.search-mobile-top — две-классовая специфичность, иначе мобильный
      .container{padding:0 …} (ниже по файлу) шорткатом обнуляет padding-top */
-  .container.search-mobile-top { display: block; padding-top: var(--s-8); }
+  .container.search-mobile-top { display: block; padding-top: var(--s-4); }
   .search input { font-size: 16px; }   /* 16px — чтобы iOS не зумил экран при фокусе поиска */
 }
 
