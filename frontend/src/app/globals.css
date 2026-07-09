@@ -93,9 +93,11 @@ button, input, textarea, select { font-family: inherit; }
 .hero-scene { background-size: cover !important; background-position: center !important; background-repeat: no-repeat !important; }
 /* Крупный фон (новинки/спец) — hero выше, картинки видно больше */
 .hero-scene--big .catalog__hero { min-height: 210px; display: flex; flex-direction: column; justify-content: center; }
+/* Иллюстрация-линии справа (прозрачный PNG, без оверлея) — новинки/спец */
+.hero-illus { background-repeat: no-repeat !important; background-position: right center !important; background-size: auto 96% !important; }
 @media (max-width: 768px) {
-  /* На телефоне фон-картинку НЕ показываем (по просьбе) — обычный hero */
-  .hero-scene { background-image: none !important; }
+  /* На телефоне фон-картинки НЕ показываем (по просьбе) — обычный hero */
+  .hero-scene, .hero-illus { background-image: none !important; }
   .hero-scene--big .catalog__hero { min-height: 0; display: block; }
 }
 /* только вертикальные отступы — горизонтальные оставляем за .container */
