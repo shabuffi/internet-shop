@@ -215,3 +215,12 @@ export function IconPencil(p: SVGProps<SVGSVGElement>) {
     </svg>
   );
 }
+
+// Заливной огонёк — бейдж «Убойные цены» (мелкий, поэтому fill, а не контур).
+export function IconFlame(p: SVGProps<SVGSVGElement>) {
+  return (
+    <svg width="1em" height="1em" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" {...p}>
+      <path d="M13.4 1.6c.3 3-1 4.7-2.6 6.2C9 9.6 7 11.2 7 14a5 5 0 0 0 10 .2c0-2-.9-3.6-2.2-4.9.3 1.2 0 2.2-.7 2.7.5-2.4-.8-4.8-2.2-6 .8-1.6.9-3.1 1.5-4.4z" />
+    </svg>
+  );
+}

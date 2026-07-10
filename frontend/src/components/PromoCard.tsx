@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { formatPrice } from "@/lib/format";
-import { IconImage } from "@/components/icons";
+import { IconImage, IconFlame } from "@/components/icons";
 import AddToCartCard from "@/components/AddToCartCard";
 import ChestnyZnakBadge from "@/components/ChestnyZnakBadge";
 import ProductName from "@/components/ProductName";
@@ -10,8 +10,11 @@ import type { Product } from "@/types/product";
  *  `compact` (только на главной) — витринный вид: вся карточка ссылка на товар, без степера,
  *  название режется до 2 строк. На страницах — обычный вид со степером и разворотом названия. */
 export default function PromoCard({ p, kind, compact = false }: { p: Product; kind: "new" | "sale" | "hot"; compact?: boolean }) {
-  const label = kind === "hot" ? "🔥" : kind === "new" ? "NEW" : "%";
-  const badge = <span className={`pcard__promo pcard__promo--${kind}`}>{label}</span>;
+  const badge = (
+    <span className={`pcard__promo pcard__promo--${kind}`}>
+      {kind === "hot" ? <IconFlame /> : kind === "new" ? "NEW" : "%"}
+    </span>
+  );
   const media = (
     <div className="photo photo--square">
       {p.image_url
