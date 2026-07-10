@@ -6,7 +6,7 @@ import PromoListing from "@/components/PromoListing";
 export const metadata: Metadata = { title: "Спецпредложения" };
 
 export default async function SpecialPage({ searchParams }: {
-  searchParams: Promise<{ view?: string; sort?: string; photo?: string }>;
+  searchParams: Promise<{ view?: string; sort?: string; photo?: string; search?: string }>;
 }) {
   const params = await searchParams;
   return (

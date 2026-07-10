@@ -29,7 +29,7 @@ export default async function PromoListing({
   subtitle: string;
   kind: "new" | "sale";
   defaultSort: string;
-  params: { view?: string; sort?: string; photo?: string };
+  params: { view?: string; sort?: string; photo?: string; search?: string };
   // Если задано — товары берём из категории с таким именем (напр. «РАСПРОДАЖА»),
   // иначе (заглушка) — просто по сортировке.
   sourceCategory?: string;
@@ -38,13 +38,17 @@ export default async function PromoListing({
   const sort = params.sort === "price_asc" || params.sort === "price_desc" || params.sort === "name"
     ? params.sort : defaultSort;
   const withPhoto = params.photo === "1";
+  // Поиск ищет ВНУТРИ раздела (search + featured комбинируются на бэкенде), а не по всему каталогу.
+  const search = params.search?.trim() || undefined;
 
   // Источник — флаги из МойСклад (доп-поля «Новинка»/«Распродажа»).
   const featured = kind === "new" ? "new" : "sale";
   const pageSize = listView ? 100 : 48;
-  let data = await getProducts({ page_size: pageSize, with_photo: withPhoto || undefined, sort, featured });
+  let data = await getProducts({ page_size: pageSize, with_photo: withPhoto || undefined, sort, featured, search });
   // Фолбэк, пока флагов из МойСклад мало: спец — из категории «РАСПРОДАЖА», новинки — по сортировке.
-  if (data.items.length === 0) {
+  // При активном поиске фолбэк НЕ применяем: иначе «ничего не найдено» подменялось бы
+  // случайными товарами из всего каталога.
+  if (!search && data.items.length === 0) {
     if (sourceCategory) {
       const ids = await categoryIdsByName(sourceCategory);
       const categoryId = ids.length ? ids.join(",") : "__none__";
@@ -55,12 +59,13 @@ export default async function PromoListing({
   }
   const items = data.items;
 
-  // Ссылка для тулбара: желаемое состояние (список? / только с фото?), сортировку сохраняем.
+  // Ссылка для тулбара: желаемое состояние (список? / только с фото?), сортировку и поиск сохраняем.
   const mk = (o: { list?: boolean; photo?: boolean }) => {
     const q = new URLSearchParams();
     if (o.list) q.set("view", "list");
     if (sort !== defaultSort) q.set("sort", sort);
     if (o.photo) q.set("photo", "1");
+    if (search) q.set("search", search);
     const s = q.toString();
     return s ? `${basePath}?${s}` : basePath;
   };
@@ -84,9 +89,10 @@ export default async function PromoListing({
 
   return (
     <div className="page">
-      {/* Поиск на телефоне — НАД заголовком раздела (как у DNS); в шапке он скрыт */}
+      {/* Поиск на телефоне — НАД заголовком раздела (как у DNS); в шапке он скрыт.
+          action = basePath: ищем ВНУТРИ раздела, а не по всему каталогу. */}
       <div className="container search-mobile-top">
-        <HeaderSearch className="search-mobile" />
+        <HeaderSearch className="search-mobile" action={basePath} />
       </div>
       <div className="band band--hero hero--off-mobile">
         <div className="container catalog__hero">
@@ -96,8 +102,14 @@ export default async function PromoListing({
       </div>
 
       <div className="container section section--listing">
+        {search && (
+          <p style={{ margin: "0 0 var(--s-4)", color: "var(--charcoal)" }}>
+            По запросу «{search}» ·{" "}
+            <Link href={basePath} style={{ color: "var(--accent)", textDecoration: "underline" }}>сбросить</Link>
+          </p>
+        )}
         <div className="toolbar">
-          <SortSelect current={sort} view={listView ? "list" : undefined} photo={withPhoto} basePath={basePath} />
+          <SortSelect current={sort} search={search} view={listView ? "list" : undefined} photo={withPhoto} basePath={basePath} />
           <Link href={mk({ list: listView, photo: !withPhoto })}
             style={{ display: "inline-flex", alignItems: "center", gap: 8, height: 40, padding: "0 14px", borderRadius: 10,
               border: "1px solid " + (withPhoto ? "var(--accent)" : "color-mix(in srgb, var(--accent), #fff 55%)"),
@@ -116,7 +128,9 @@ export default async function PromoListing({
         </div>
 
         {items.length === 0 ? (
-          <p style={{ color: "var(--charcoal)" }}>Пока пусто — загляните позже.</p>
+          <p style={{ color: "var(--charcoal)" }}>
+            {search ? `По запросу «${search}» в этом разделе ничего не найдено.` : "Пока пусто — загляните позже."}
+          </p>
         ) : listView ? (
           <CatalogList products={items} />
         ) : (

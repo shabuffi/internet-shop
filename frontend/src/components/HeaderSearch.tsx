@@ -13,14 +13,15 @@ function SearchIcon() {
   );
 }
 
-/** Форма поиска: GET на /catalog. Поле контролируемое — показываем крестик очистки, когда
- *  есть ввод; значение «липкое» (инициализируется текущим запросом из URL). Справа —
+/** Форма поиска: GET на `action` (по умолчанию /catalog; на страницах «Новинки»/«Спец» —
+ *  их же путь, чтобы искать внутри раздела). Поле контролируемое — показываем крестик очистки,
+ *  когда есть ввод; значение «липкое» (инициализируется текущим запросом из URL). Справа —
  *  круглая синяя кнопка-лупа (очевидно, что можно нажать). */
-function SearchForm({ initial, className }: { initial: string; className: string }) {
+function SearchForm({ initial, className, action }: { initial: string; className: string; action: string }) {
   const [value, setValue] = useState(initial);
   const inputRef = useRef<HTMLInputElement>(null);
   return (
-    <form action="/catalog" method="get" className={`search ${className}`.trim()} role="search">
+    <form action={action} method="get" className={`search ${className}`.trim()} role="search">
       <input ref={inputRef} name="search" value={value} onChange={(e) => setValue(e.target.value)}
         placeholder="Поиск: батарейки, носки, ёлка…" aria-label="Поиск товаров" autoComplete="off" />
       {value && (
@@ -36,18 +37,18 @@ function SearchForm({ initial, className }: { initial: string; className: string
   );
 }
 
-function StickySearch({ className }: { className: string }) {
+function StickySearch({ className, action }: { className: string; action: string }) {
   const sp = useSearchParams();
   const initial = sp.get("search") ?? "";
   // key сбрасывает состояние поля на новое значение из URL после перехода (поиск «липкий»)
-  return <SearchForm key={initial} initial={initial} className={className} />;
+  return <SearchForm key={initial} initial={initial} className={className} action={action} />;
 }
 
 /** Поиск в шапке. `useSearchParams` требует Suspense — фолбэк рабочая форма с пустым полем. */
-export default function HeaderSearch({ className = "" }: { className?: string }) {
+export default function HeaderSearch({ className = "", action = "/catalog" }: { className?: string; action?: string }) {
   return (
-    <Suspense fallback={<SearchForm initial="" className={className} />}>
-      <StickySearch className={className} />
+    <Suspense fallback={<SearchForm initial="" className={className} action={action} />}>
+      <StickySearch className={className} action={action} />
     </Suspense>
   );
 }

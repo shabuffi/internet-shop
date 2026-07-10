@@ -6,7 +6,7 @@ import PromoListing from "@/components/PromoListing";
 export const metadata: Metadata = { title: "Новинки" };
 
 export default async function NovinkiPage({ searchParams }: {
-  searchParams: Promise<{ view?: string; sort?: string; photo?: string }>;
+  searchParams: Promise<{ view?: string; sort?: string; photo?: string; search?: string }>;
 }) {
   const params = await searchParams;
   return (
