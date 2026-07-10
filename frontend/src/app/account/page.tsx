@@ -13,8 +13,9 @@ import PasswordField from "@/components/PasswordField";
 // Надёжность пароля — совпадает с бэкендом (validate_password_strength).
 function passwordIssue(p: string): string | null {
   if (p.length < 8) return "Пароль не короче 8 символов";
-  if (!/[a-zа-яё]/.test(p)) return "Нужна строчная буква";
-  if (!/[A-ZА-ЯЁ]/.test(p)) return "Нужна заглавная буква";
+  if (/[а-яё]/i.test(p)) return "Пароль только латиницей — переключите раскладку";
+  if (!/[a-z]/.test(p)) return "Нужна строчная латинская буква";
+  if (!/[A-Z]/.test(p)) return "Нужна заглавная латинская буква";
   if (!/\d/.test(p)) return "Нужна цифра";
   return null;
 }
@@ -192,7 +193,7 @@ function ChangePasswordForm() {
             <PasswordField required value={nw} onChange={(e) => setNw(e.target.value)} autoComplete="new-password" />
             <p style={{ margin: "var(--s-1) 0 0", fontSize: "var(--t-xs)",
               color: issue ? "var(--accent-2, #E02424)" : "var(--graphite)" }}>
-              {nw ? (issue ?? "✓ Надёжный пароль") : "Не короче 8 символов, со строчной и заглавной буквой и цифрой"}
+              {nw ? (issue ?? "✓ Надёжный пароль") : "Латиница, не короче 8 символов: строчная и заглавная буквы и цифра"}
             </p>
           </div>
 

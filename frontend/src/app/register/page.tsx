@@ -21,11 +21,12 @@ function normalizeRuPhone(v: string): string | null {
   return `+7${digits}`;
 }
 
-// Пароль: ≥8 символов, строчная + заглавная буква, цифра (совпадает с бэкендом)
+// Пароль: только латиница, ≥8 символов, строчная + заглавная буква, цифра (совпадает с бэкендом)
 function passwordIssue(p: string): string | null {
   if (p.length < 8) return "Пароль не короче 8 символов";
-  if (!/[a-zа-яё]/.test(p)) return "Добавьте в пароль строчную букву";
-  if (!/[A-ZА-ЯЁ]/.test(p)) return "Добавьте в пароль заглавную букву";
+  if (/[а-яё]/i.test(p)) return "Пароль только латиницей — переключите раскладку";
+  if (!/[a-z]/.test(p)) return "Добавьте строчную латинскую букву";
+  if (!/[A-Z]/.test(p)) return "Добавьте заглавную латинскую букву";
   if (!/\d/.test(p)) return "Добавьте в пароль цифру";
   return null;
 }
@@ -124,9 +125,9 @@ export default function RegisterPage() {
         <div className="field" style={{ marginBottom: "var(--s-4)" }}>
           <label>Пароль <span className="req">*</span></label>
           <PasswordField required value={form.password} onChange={setField("password")} className={"input" + invalidClass("password")}
-            autoComplete="new-password" placeholder="минимум 8 символов, буквы и цифры" />
+            autoComplete="new-password" placeholder="минимум 8 символов, латиница и цифры" />
           <p style={{ margin: "var(--s-1) 0 0", fontSize: "var(--t-xs)", color: form.password && passwordIssue(form.password) ? "var(--accent-2, #E02424)" : "var(--graphite)" }}>
-            {form.password ? (passwordIssue(form.password) ?? "✓ Надёжный пароль") : "Не короче 8 символов, со строчной и заглавной буквой и цифрой"}
+            {form.password ? (passwordIssue(form.password) ?? "✓ Надёжный пароль") : "Латиница, не короче 8 символов: строчная и заглавная буквы и цифра"}
           </p>
         </div>
 

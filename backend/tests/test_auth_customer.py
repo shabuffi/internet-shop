@@ -63,6 +63,15 @@ def test_register_rejects_weak_password(client):
     assert r.status_code == 422
 
 
+def test_register_rejects_cyrillic_password(client):
+    """Пароль только латиницей: «Пароль123» формально силён, но раскладка не та."""
+    r = client.post("/api/v1/auth/register", json={**VALID, "password": "Пароль123"})
+    assert r.status_code == 422
+    msg = r.json()["detail"][0]["msg"]
+    assert "латиниц" in msg.lower()
+    assert "password" in [e["loc"][-1] for e in r.json()["detail"]]
+
+
 def test_register_bad_inn_reports_inn_field(client):
     """Кривой ИНН у ИП → 422 с loc=[…,'inn'], чтобы форма подсветила именно это поле.
 

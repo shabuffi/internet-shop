@@ -37,13 +37,19 @@ def validate_email_format(v: str) -> str:
 
 
 def validate_password_strength(v: str) -> str:
-    """Пароль: минимум 8 символов, строчные и ЗАГЛАВНЫЕ буквы, цифра."""
+    """Пароль: только латиница, минимум 8 символов, строчная и ЗАГЛАВНАЯ буквы, цифра.
+
+    Кириллицу отсекаем отдельной проверкой ДО требований к буквам — иначе на пароле
+    «Пароль123» сообщение было бы про отсутствие латинской буквы, а не про раскладку.
+    """
     if len(v) < 8:
         raise ValueError("Пароль не короче 8 символов")
-    if not re.search(r"[a-zа-яё]", v):
-        raise ValueError("Пароль должен содержать строчную букву")
-    if not re.search(r"[A-ZА-ЯЁ]", v):
-        raise ValueError("Пароль должен содержать заглавную букву")
+    if re.search(r"[а-яё]", v, re.IGNORECASE):
+        raise ValueError("Пароль только латиницей — переключите раскладку")
+    if not re.search(r"[a-z]", v):
+        raise ValueError("Пароль должен содержать строчную латинскую букву")
+    if not re.search(r"[A-Z]", v):
+        raise ValueError("Пароль должен содержать заглавную латинскую букву")
     if not re.search(r"\d", v):
         raise ValueError("Пароль должен содержать цифру")
     return v
