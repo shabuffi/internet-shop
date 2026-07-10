@@ -158,7 +158,7 @@ export default async function CatalogPage({ searchParams }: Props) {
               )}
             </p>
           ) : search ? (
-            <p>По запросу «{search}» · <Link href="/catalog" style={{ color: "var(--accent)", textDecoration: "underline" }}>сбросить</Link></p>
+            <p>Показаны товары по запросу «{search}» во всех категориях.</p>
           ) : (
             <p>Тысячи товаров для дома, дачи, сада и хозяйства. Подберите нужное по категории или через поиск.</p>
           )}
@@ -173,6 +173,18 @@ export default async function CatalogPage({ searchParams }: Props) {
       )}
 
       <div className="container section section--listing" style={{ paddingTop: banners.length > 0 ? "var(--s-8)" : "var(--s-16)" }}>
+        {/* Активный поисковый фильтр — виден всегда (в т.ч. внутри категории и на телефоне),
+            иначе непонятно, почему в категориях пусто. Сбрасывает только поиск. */}
+        {search && (
+          <div className="active-filter">
+            <span>Поиск: <b>«{search}»</b></span>
+            <Link className="active-filter__reset"
+              href={buildHref({ category_id: categoryId, sort, view: listView ? "list" : undefined, photo: withPhoto })}>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" aria-hidden="true"><line x1="6" y1="6" x2="18" y2="18" /><line x1="18" y1="6" x2="6" y2="18" /></svg>
+              Сбросить поиск
+            </Link>
+          </div>
+        )}
         {/* Тулбар: фильтры + сортировка + переключатель режима + счётчик */}
         <div className="toolbar">
           <CategorySelect categories={categories} current={categoryId} search={search} view={listView ? "list" : undefined} sort={sort} photo={withPhoto} />
