@@ -81,6 +81,51 @@ def test_create_order_invalid_phone(client, db_session, no_celery):
     assert resp.status_code == 422
 
 
+def _err_fields(resp) -> list[str]:
+    """Имена полей из 422 — их подсвечивает форма на фронте."""
+    return [e["loc"][-1] for e in resp.json()["detail"]]
+
+
+def test_create_order_invalid_email_reports_field(client, db_session, no_celery):
+    """Кривой e-mail → 422 с указанием поля customer_email (форма подсветит его)."""
+    _make_product(db_session, id="p-1")
+    resp = client.post("/api/v1/orders", json={
+        "customer_name": "Иван",
+        "customer_phone": "+79001234567",
+        "customer_email": "не-почта",
+        "delivery_method": "pickup",
+        "items": [{"product_id": "p-1", "quantity": 1}],
+    })
+    assert resp.status_code == 422
+    assert "customer_email" in _err_fields(resp)
+
+
+def test_create_order_blank_name_reports_field(client, db_session, no_celery):
+    """Имя из пробелов → 422 по полю customer_name."""
+    _make_product(db_session, id="p-1")
+    resp = client.post("/api/v1/orders", json={
+        "customer_name": "   ",
+        "customer_phone": "+79001234567",
+        "delivery_method": "pickup",
+        "items": [{"product_id": "p-1", "quantity": 1}],
+    })
+    assert resp.status_code == 422
+    assert "customer_name" in _err_fields(resp)
+
+
+def test_create_order_empty_email_is_allowed(client, db_session, no_celery):
+    """E-mail необязателен: пустая строка — не ошибка, заказ создаётся."""
+    _make_product(db_session, id="p-1", price=Decimal("3000.00"))   # выше минимальной суммы
+    resp = client.post("/api/v1/orders", json={
+        "customer_name": "Иван",
+        "customer_phone": "+79001234567",
+        "customer_email": "",
+        "delivery_method": "pickup",
+        "items": [{"product_id": "p-1", "quantity": 2}],
+    })
+    assert resp.status_code == 201
+
+
 # ─── остаток не считается ────────────────────────────────────────────────────
 
 def test_create_order_does_not_change_stock(client, db_session, no_celery):

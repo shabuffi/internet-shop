@@ -1,6 +1,8 @@
 // Клиентские обёртки авторизации покупателя. Токен — в httpOnly-куке (ставит бэкенд),
 // в localStorage НЕ храним (защита от XSS): кука едет сама через credentials.
 
+import { parseApiError, type FieldErrors } from "@/lib/formErrors";
+
 export type CustomerType = "individual" | "ip" | "ooo";
 
 export interface UserProfile {
@@ -33,15 +35,14 @@ export const CUSTOMER_TYPE_LABEL: Record<CustomerType, string> = {
   ooo: "Организация (ООО)",
 };
 
-// FastAPI отдаёт detail строкой (наши 401/409) или массивом (ошибки валидации 422).
-function extractError(data: unknown, fallback: string): string {
-  const d = (data as { detail?: unknown })?.detail;
-  if (typeof d === "string") return d;
-  if (Array.isArray(d) && d.length) {
-    const msg = (d[0] as { msg?: string })?.msg;
-    if (msg) return msg.replace(/^Value error,\s*/, "");
+/** Ошибка API: помимо текста несёт разбор по полям (для подсветки инпутов). */
+export class ApiError extends Error {
+  readonly fields: FieldErrors;
+  constructor(message: string, fields: FieldErrors) {
+    super(message);
+    this.name = "ApiError";
+    this.fields = fields;
   }
-  return fallback;
 }
 
 async function postJson<T>(path: string, body: unknown, fallbackErr: string): Promise<T> {
@@ -51,7 +52,10 @@ async function postJson<T>(path: string, body: unknown, fallbackErr: string): Pr
     credentials: "same-origin",
     body: JSON.stringify(body),
   });
-  if (!res.ok) throw new Error(extractError(await res.json().catch(() => ({})), fallbackErr));
+  if (!res.ok) {
+    const { message, fields } = parseApiError(await res.json().catch(() => ({})), fallbackErr);
+    throw new ApiError(message, fields);
+  }
   return res.json();
 }
 

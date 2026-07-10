@@ -8,6 +8,7 @@ import { formatPrice } from "@/lib/format";
 import { MIN_ORDER_AMOUNT } from "@/lib/site";
 import { IconImage, IconCart } from "@/components/icons";
 import ChestnyZnakBadge from "@/components/ChestnyZnakBadge";
+import { FieldError, useFormErrors } from "@/components/FormErrors";
 import { getMe, type UserProfile } from "@/lib/authApi";
 
 const DELIVERY = [
@@ -24,7 +25,7 @@ export default function CheckoutPage() {
   const [form, setForm] = useState({ customer_name: "", customer_phone: "", customer_email: "", delivery_address: "", comment: "" });
   const [delivery, setDelivery] = useState<string>("pickup");
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { message: error, fields, clear, setFromApi, setLocal, invalidClass } = useFormErrors();
 
   useEffect(() => { getMe().then(setUser); }, []);
 
@@ -49,7 +50,7 @@ export default function CheckoutPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setError(null);
+    clear();
     setLoading(true);
     try {
       // Из кабинета данные заказчика берёт сервер из профиля; гость присылает свои.
@@ -69,20 +70,23 @@ export default function CheckoutPage() {
         }),
       });
       if (!res.ok) {
-        const d = await res.json();
+        const d = await res.json().catch(() => ({}));
         if (res.status === 409 && d.detail?.items) {
           const list = d.detail.items
             .map((i: { name: string; available: number }) => `${i.name} (в наличии: ${i.available})`)
             .join(", ");
-          throw new Error(`Недостаточно товара на складе: ${list}`);
+          setLocal(`Недостаточно товара на складе: ${list}`);
+          return;
         }
-        throw new Error(typeof d.detail === "string" ? d.detail : "Ошибка оформления заказа");
+        // 422 → подсветим конкретные поля и покажем, что именно не так
+        setFromApi(d, "Ошибка оформления заказа");
+        return;
       }
       const order = await res.json();
       clearCart();
       router.push(`/checkout/success?order=${order.number}`);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Что-то пошло не так");
+    } catch {
+      setLocal("Не удалось отправить заказ — проверьте соединение и попробуйте ещё раз.");
     } finally {
       setLoading(false);
     }
@@ -110,15 +114,18 @@ export default function CheckoutPage() {
                 <div className="formgrid">
                   <div className="field span2">
                     <label>Наименование заказчика <span className="req">*</span></label>
-                    <input className="input" name="customer_name" value={form.customer_name} onChange={handleChange} required placeholder="ФИО или организация" />
+                    <input className={"input" + invalidClass("customer_name")} name="customer_name" value={form.customer_name} onChange={handleChange} required placeholder="ФИО или организация" />
+                    <FieldError>{fields.customer_name}</FieldError>
                   </div>
                   <div className="field">
                     <label>Телефон <span className="req">*</span></label>
-                    <input className="input" name="customer_phone" value={form.customer_phone} onChange={handleChange} required type="tel" placeholder="+7 999 000-00-00" />
+                    <input className={"input" + invalidClass("customer_phone")} name="customer_phone" value={form.customer_phone} onChange={handleChange} required type="tel" placeholder="+7 999 000-00-00" />
+                    <FieldError>{fields.customer_phone}</FieldError>
                   </div>
                   <div className="field">
                     <label>Email</label>
-                    <input className="input" name="customer_email" value={form.customer_email} onChange={handleChange} type="email" placeholder="mail@example.ru" />
+                    <input className={"input" + invalidClass("customer_email")} name="customer_email" value={form.customer_email} onChange={handleChange} type="email" placeholder="mail@example.ru" />
+                    <FieldError>{fields.customer_email}</FieldError>
                   </div>
                 </div>
                 <p style={{ fontSize: "var(--t-sm)", color: "var(--charcoal)", marginTop: "var(--s-3)" }}>
@@ -146,7 +153,8 @@ export default function CheckoutPage() {
               <div className="formgrid" style={{ marginTop: "var(--s-4)" }}>
                 <div className="field span2">
                   <label>Адрес доставки {delivery === "tk" ? "(город, терминал ТК)" : ""}</label>
-                  <input className="input" name="delivery_address" value={form.delivery_address} onChange={handleChange} placeholder="Город, улица, дом" />
+                  <input className={"input" + invalidClass("delivery_address")} name="delivery_address" value={form.delivery_address} onChange={handleChange} placeholder="Город, улица, дом" />
+                  <FieldError>{fields.delivery_address}</FieldError>
                 </div>
               </div>
             )}

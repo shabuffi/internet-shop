@@ -3,8 +3,9 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { registerUser, type CustomerType } from "@/lib/authApi";
+import { ApiError, registerUser, type CustomerType } from "@/lib/authApi";
 import PasswordField from "@/components/PasswordField";
+import { FieldError, useFormErrors } from "@/components/FormErrors";
 
 const TYPES: { value: CustomerType; label: string }[] = [
   { value: "individual", label: "Физическое лицо" },
@@ -35,7 +36,7 @@ export default function RegisterPage() {
     email: "", phone: "", customer_type: "individual" as CustomerType,
     customer_name: "", inn: "", password: "", consent: false,
   });
-  const [error, setError] = useState("");
+  const { message: error, fields, clear, setErrors, setLocal, invalidClass } = useFormErrors();
   const [loading, setLoading] = useState(false);
 
   const setField = (k: keyof typeof form) =>
@@ -49,15 +50,15 @@ export default function RegisterPage() {
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    setError("");
+    clear();
     const phone = normalizeRuPhone(form.phone);
     if (!phone) {
-      setError("Укажите телефон в формате +7 9XX XXX-XX-XX или 8 9XX XXX-XX-XX");
+      setLocal("Неверно набран номер — укажите в формате +7 9XX XXX-XX-XX или 8 9XX XXX-XX-XX", ["phone"]);
       return;
     }
     const pwIssue = passwordIssue(form.password);
     if (pwIssue) {
-      setError(pwIssue);
+      setLocal(pwIssue, ["password"]);
       return;
     }
     setLoading(true);
@@ -74,7 +75,9 @@ export default function RegisterPage() {
       router.push("/account");
       router.refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Ошибка");
+      // ApiError несёт разбор 422 по полям → подсветим именно их
+      if (err instanceof ApiError) setErrors(err.message, err.fields);
+      else setLocal(err instanceof Error ? err.message : "Не удалось зарегистрироваться");
     } finally {
       setLoading(false);
     }
@@ -90,11 +93,13 @@ export default function RegisterPage() {
       <form onSubmit={submit}>
         <div className="field" style={{ marginBottom: "var(--s-3)" }}>
           <label>Email <span className="req">*</span></label>
-          <input className="input" type="email" required value={form.email} onChange={setField("email")} placeholder="you@example.ru" autoFocus />
+          <input className={"input" + invalidClass("email")} type="email" required value={form.email} onChange={setField("email")} placeholder="you@example.ru" autoFocus />
+          <FieldError>{fields.email}</FieldError>
         </div>
         <div className="field" style={{ marginBottom: "var(--s-3)" }}>
           <label>Телефон <span className="req">*</span></label>
-          <input className="input" type="tel" required value={form.phone} onChange={setField("phone")} placeholder="+7 999 000-00-00" />
+          <input className={"input" + invalidClass("phone")} type="tel" required value={form.phone} onChange={setField("phone")} placeholder="+7 999 000-00-00" />
+          <FieldError>{fields.phone}</FieldError>
         </div>
         <div className="field" style={{ marginBottom: "var(--s-3)" }}>
           <label>Тип заказчика <span className="req">*</span></label>
@@ -104,19 +109,21 @@ export default function RegisterPage() {
         </div>
         <div className="field" style={{ marginBottom: "var(--s-3)" }}>
           <label>{nameLabel} <span className="req">*</span></label>
-          <input className="input" required value={form.customer_name} onChange={setField("customer_name")}
+          <input className={"input" + invalidClass("customer_name")} required value={form.customer_name} onChange={setField("customer_name")}
             placeholder={form.customer_type === "ooo" ? "ООО «Ромашка»" : "Иванов Иван Иванович"} />
+          <FieldError>{fields.customer_name}</FieldError>
         </div>
         {needInn && (
           <div className="field" style={{ marginBottom: "var(--s-3)" }}>
             <label>ИНН <span className="req">*</span></label>
-            <input className="input" required inputMode="numeric" value={form.inn} onChange={setField("inn")}
+            <input className={"input" + invalidClass("inn")} required inputMode="numeric" value={form.inn} onChange={setField("inn")}
               placeholder={`${innLen} цифр`} />
+            <FieldError>{fields.inn}</FieldError>
           </div>
         )}
         <div className="field" style={{ marginBottom: "var(--s-4)" }}>
           <label>Пароль <span className="req">*</span></label>
-          <PasswordField required value={form.password} onChange={setField("password")}
+          <PasswordField required value={form.password} onChange={setField("password")} className={"input" + invalidClass("password")}
             autoComplete="new-password" placeholder="минимум 8 символов, буквы и цифры" />
           <p style={{ margin: "var(--s-1) 0 0", fontSize: "var(--t-xs)", color: form.password && passwordIssue(form.password) ? "var(--accent-2, #E02424)" : "var(--graphite)" }}>
             {form.password ? (passwordIssue(form.password) ?? "✓ Надёжный пароль") : "Не короче 8 символов, со строчной и заглавной буквой и цифрой"}
@@ -130,6 +137,7 @@ export default function RegisterPage() {
           <span>Согласен на обработку персональных данных в соответствии с{" "}
             <Link href="/offer" className="link" target="_blank">политикой обработки ПД</Link>.</span>
         </label>
+        <FieldError>{fields.consent}</FieldError>
 
         {error && <p className="form-error" style={{ marginBottom: "var(--s-3)" }}>{error}</p>}
 

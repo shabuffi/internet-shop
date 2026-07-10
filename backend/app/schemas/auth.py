@@ -26,6 +26,14 @@ def normalize_ru_phone(v: str) -> str:
     return f"+7{digits}"
 
 
+def validate_email_format(v: str) -> str:
+    """Проверяет формат e-mail и нормализует к нижнему регистру. Иначе — ``ValueError``."""
+    v = v.strip().lower()
+    if not _EMAIL_RE.match(v):
+        raise ValueError("Неверный формат e-mail — например, mail@example.ru")
+    return v
+
+
 def validate_password_strength(v: str) -> str:
     """Пароль: минимум 8 символов, строчные и ЗАГЛАВНЫЕ буквы, цифра."""
     if len(v) < 8:
@@ -51,12 +59,9 @@ class RegisterIn(BaseModel):
     @field_validator("email")
     @classmethod
     def _email(cls, v: str) -> str:
-        v = v.strip().lower()
-        if not _EMAIL_RE.match(v):
-            raise ValueError("Некорректный email")
         # Gmail и другие иностранные почты РАЗРЕШЕНЫ как логин — закон запрещает только
         # авторизацию через иностранные сервисы («Войти через Google»), а не e-mail-адрес.
-        return v
+        return validate_email_format(v)
 
     @field_validator("phone")
     @classmethod

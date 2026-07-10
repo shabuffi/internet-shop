@@ -4,7 +4,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 import re
 
-from app.schemas.auth import normalize_ru_phone
+from app.schemas.auth import normalize_ru_phone, validate_email_format
 
 
 class OrderItemIn(BaseModel):
@@ -30,6 +30,22 @@ class OrderIn(BaseModel):
         # Нормализация к +7XXXXXXXXXX (принимает 8/7/+7/без кода). Единый формат важен:
         # история гостевых заказов в админке группируется по точному совпадению телефона.
         return normalize_ru_phone(v)
+
+    @field_validator("customer_name")
+    @classmethod
+    def validate_name(cls, v: str) -> str:
+        v = v.strip()
+        if not v:
+            raise ValueError("Укажите наименование заказчика")
+        return v
+
+    @field_validator("customer_email")
+    @classmethod
+    def validate_email(cls, v: str | None) -> str | None:
+        # E-mail необязателен, но если указан — должен быть корректным.
+        if v is None or not v.strip():
+            return None
+        return validate_email_format(v)
 
     @field_validator("items")
     @classmethod

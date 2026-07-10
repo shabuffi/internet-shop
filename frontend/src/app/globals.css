@@ -921,6 +921,21 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .
 .notice { background: var(--accent-soft); color: var(--accent-deep); border-radius: var(--r-md); padding: var(--s-3) var(--s-4); font-size: var(--t-sm); display: flex; gap: var(--s-3); align-items: center; }
 .form-error { color: var(--error); font-size: var(--t-sm); }
 
+/* ── невалидные поля формы: красная рамка, подсказка снизу, короткая тряска ──
+   Правила идут ПОСЛЕ .input/.input:focus — иначе базовые перебьют их по порядку.
+   Классы shake-a/shake-b чередуются между попытками, чтобы анимация перезапускалась. */
+.input--invalid { border-color: var(--error); background: color-mix(in srgb, var(--error), #fff 94%); }
+.input--invalid:focus { border-color: var(--error); box-shadow: 0 0 0 3px color-mix(in srgb, var(--error), #fff 82%); }
+.field__err { color: var(--error); font-size: var(--t-xs); margin: 4px 0 0; }
+.shake-a, .shake-b { animation: field-shake .4s cubic-bezier(.36, .07, .19, .97); }
+@keyframes field-shake {
+  10%, 90% { transform: translateX(-1px); }
+  20%, 80% { transform: translateX(2px); }
+  30%, 50%, 70% { transform: translateX(-5px); }
+  40%, 60% { transform: translateX(5px); }
+}
+@media (prefers-reduced-motion: reduce) { .shake-a, .shake-b { animation: none; } }
+
 /* ── совместимость старых классов (админка использует их) ── */
 .btn-primary { background: var(--accent); color: var(--on-accent); }
 .btn-primary:hover { background: var(--accent-deep); }
