@@ -1,7 +1,20 @@
 "use client";
 
 import { Suspense, useRef, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
+
+/** Куда отправлять поиск и что писать в подсказке. На страницах «Новинки»/«Спецпредложения»
+ *  ищем внутри раздела (и в шапке тоже), на остальных — по всему каталогу. */
+const SCOPES: Record<string, string> = {
+  "/novinki": "Поиск в новинках…",
+  "/special": "Поиск в спецпредложениях…",
+};
+const DEFAULT_PLACEHOLDER = "Поиск: батарейки, носки, ёлка…";
+
+function scopeFor(pathname: string | null): { action: string; placeholder: string } {
+  const hit = Object.keys(SCOPES).find((p) => pathname?.startsWith(p));
+  return hit ? { action: hit, placeholder: SCOPES[hit] } : { action: "/catalog", placeholder: DEFAULT_PLACEHOLDER };
+}
 
 function SearchIcon() {
   return (
@@ -17,13 +30,15 @@ function SearchIcon() {
  *  их же путь, чтобы искать внутри раздела). Поле контролируемое — показываем крестик очистки,
  *  когда есть ввод; значение «липкое» (инициализируется текущим запросом из URL). Справа —
  *  круглая синяя кнопка-лупа (очевидно, что можно нажать). */
-function SearchForm({ initial, className, action }: { initial: string; className: string; action: string }) {
+function SearchForm({ initial, className, action, placeholder }: {
+  initial: string; className: string; action: string; placeholder: string;
+}) {
   const [value, setValue] = useState(initial);
   const inputRef = useRef<HTMLInputElement>(null);
   return (
     <form action={action} method="get" className={`search ${className}`.trim()} role="search">
       <input ref={inputRef} name="search" value={value} onChange={(e) => setValue(e.target.value)}
-        placeholder="Поиск: батарейки, носки, ёлка…" aria-label="Поиск товаров" autoComplete="off" />
+        placeholder={placeholder} aria-label="Поиск товаров" autoComplete="off" />
       {value && (
         <button type="button" className="search__clear" aria-label="Очистить"
           onClick={() => { setValue(""); inputRef.current?.focus(); }}>
@@ -37,18 +52,23 @@ function SearchForm({ initial, className, action }: { initial: string; className
   );
 }
 
-function StickySearch({ className, action }: { className: string; action: string }) {
+function StickySearch({ className, action, placeholder }: { className: string; action: string; placeholder: string }) {
   const sp = useSearchParams();
   const initial = sp.get("search") ?? "";
   // key сбрасывает состояние поля на новое значение из URL после перехода (поиск «липкий»)
-  return <SearchForm key={initial} initial={initial} className={className} action={action} />;
+  return <SearchForm key={initial} initial={initial} className={className} action={action} placeholder={placeholder} />;
 }
 
-/** Поиск в шапке. `useSearchParams` требует Suspense — фолбэк рабочая форма с пустым полем. */
-export default function HeaderSearch({ className = "", action = "/catalog" }: { className?: string; action?: string }) {
+/** Поиск в шапке и в разделах. Область поиска берём из текущего пути (новинки/спец → внутри
+ *  раздела, иначе весь каталог); `action` можно задать явно. `useSearchParams` требует
+ *  Suspense — фолбэк рабочая форма с пустым полем. */
+export default function HeaderSearch({ className = "", action }: { className?: string; action?: string }) {
+  const scope = scopeFor(usePathname());
+  const target = action ?? scope.action;
+  const placeholder = scope.placeholder;
   return (
-    <Suspense fallback={<SearchForm initial="" className={className} action={action} />}>
-      <StickySearch className={className} action={action} />
+    <Suspense fallback={<SearchForm initial="" className={className} action={target} placeholder={placeholder} />}>
+      <StickySearch className={className} action={target} placeholder={placeholder} />
     </Suspense>
   );
 }
