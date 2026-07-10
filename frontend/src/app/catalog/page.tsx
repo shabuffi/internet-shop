@@ -98,6 +98,14 @@ export default async function CatalogPage({ searchParams }: Props) {
 
   const categoryLabel = resolveCategoryLabel(categoryId, categories);
   const categoryPath = resolveCategoryPath(categoryId, categories);
+
+  // Искали внутри категории и ничего не нашли? Проверим, есть ли товар по этому запросу
+  // вообще — чтобы предложить кнопку «искать во всех категориях» с числом находок.
+  const searchedInCategory = Boolean(search && categoryId);
+  const totalWithoutCategory =
+    searchedInCategory && data.items.length === 0
+      ? (await getProducts({ search, page_size: 1 })).total
+      : 0;
   // Слайдер баннеров — на общем каталоге (без выбранной категории/поиска), только если явно включён.
   const showBanners = !categoryId && !search && store?.banners_enabled === true;
   const banners = showBanners ? parseBanners(store?.home_banners) : [];
@@ -190,8 +198,27 @@ export default async function CatalogPage({ searchParams }: Props) {
           <div className="empty">
             <div className="empty__icon"><IconSearch width="1em" height="1em" /></div>
             <h3>Ничего не найдено</h3>
-            <p>{search ? `По запросу «${search}» товаров нет.` : "В этой категории пока пусто."}</p>
-            <Link href="/catalog" className="btn btn--primary">Сбросить фильтры</Link>
+            {searchedInCategory ? (
+              <>
+                <p>
+                  По запросу «{search}» в категории «{categoryLabel}» ничего нет
+                  {totalWithoutCategory > 0 ? `, но в других категориях найдено: ${totalWithoutCategory}.` : "."}
+                </p>
+                {totalWithoutCategory > 0 ? (
+                  <Link className="btn btn--primary"
+                    href={buildHref({ search, sort, view: listView ? "list" : undefined, photo: withPhoto })}>
+                    Искать во всех категориях ({totalWithoutCategory})
+                  </Link>
+                ) : (
+                  <Link href="/catalog" className="btn btn--primary">Сбросить фильтры</Link>
+                )}
+              </>
+            ) : (
+              <>
+                <p>{search ? `По запросу «${search}» товаров нет.` : "В этой категории пока пусто."}</p>
+                <Link href="/catalog" className="btn btn--primary">Сбросить фильтры</Link>
+              </>
+            )}
           </div>
         ) : (
           <>

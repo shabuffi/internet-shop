@@ -163,7 +163,7 @@ export default async function HomePage() {
       {novinki.length > 0 && (
         <div id="novinki" className="container section">
           <div className="section-head">
-            <h2 className="section-title section-title--caps section-title--accent">Новинки</h2>
+            <h2 className="section-title section-title--caps section-title--xl">Новинки</h2>
             <Link href="/novinki" className="see-all">Посмотреть все <ArrowIcon size={16} /></Link>
           </div>
           <PromoCarousel>
@@ -177,7 +177,7 @@ export default async function HomePage() {
         <div className="band">
           <div id="special" className="container section">
             <div className="section-head">
-              <h2 className="section-title section-title--caps section-title--accent">Спецпредложения</h2>
+              <h2 className="section-title section-title--caps section-title--xl">Спецпредложения</h2>
               <Link href="/special" className="see-all">Посмотреть все <ArrowIcon size={16} /></Link>
             </div>
             <PromoCarousel>
