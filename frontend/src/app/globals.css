@@ -830,6 +830,8 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .
 /* Чуть прозрачные — не «кричат», органичнее лежат на фото */
 .pcard__promo--new { background: color-mix(in srgb, var(--accent) 90%, transparent); }
 .pcard__promo--sale { background: color-mix(in srgb, var(--accent-2) 90%, transparent); }
+/* «Убойные цены» — тёплый красно-оранжевый + чуть крупнее эмодзи-огонёк */
+.pcard__promo--hot { background: color-mix(in srgb, #E4572E 92%, transparent); font-size: 12px; padding: 0 7px; }
 .pagination { display: flex; align-items: center; justify-content: center; gap: var(--s-2); margin-top: var(--s-12); }
 .page-dot { min-width: 42px; height: 42px; padding: 0 var(--s-3); border-radius: var(--r-md); border: 1px solid var(--hairline); background: var(--paper); color: var(--ink); font-size: var(--t-sm); font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; text-decoration: none; }
 .page-dot:hover { border-color: var(--steel); }

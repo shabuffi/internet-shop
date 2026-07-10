@@ -55,10 +55,11 @@ class Product(Base):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     # Наличие товара — управляется вручную в админке (НЕ зависит от количества/остатка)
     available: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
-    # Флаги из МойСклад (доп-поля «Новинка»/«Распродажа» — галочки). Проставляются при обмене;
-    # в каталоге сортируем новинки → спецпредложения → остальные и фильтруем по ним.
+    # Флаги из МойСклад (доп-поля «Новинка»/«Распродажа»/«Убойные цены»). Проставляются при обмене;
+    # в каталоге сортируем убойные → новинки → спецпредложения → остальные и фильтруем по ним.
     is_new: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false", index=True)
     is_sale: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false", index=True)
+    is_hot: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false", index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
     synced_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)

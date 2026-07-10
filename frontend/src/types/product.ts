@@ -19,6 +19,7 @@ export interface Product {
   is_active: boolean;
   is_new?: boolean;    // флаг «Новинка» из МойСклад
   is_sale?: boolean;   // флаг «Распродажа/Спецпредложение» из МойСклад
+  is_hot?: boolean;    // флаг «Убойные цены» из МойСклад
   category: Category | null;
   updated_at: string;
   // Товар с обязательной маркировкой «Честный знак» (вычисляется на границе API).

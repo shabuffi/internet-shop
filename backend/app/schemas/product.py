@@ -28,6 +28,7 @@ class ProductOut(BaseModel):
     is_active: bool
     is_new: bool = False        # флаг «Новинка» из МойСклад
     is_sale: bool = False       # флаг «Распродажа/Спецпредложение» из МойСклад
+    is_hot: bool = False        # флаг «Убойные цены» из МойСклад
     category: CategoryOut | None = None
     updated_at: datetime
 

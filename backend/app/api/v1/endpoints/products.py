@@ -149,7 +149,7 @@ def list_products(
     search: str | None = Query(None),
     sort: str | None = Query(None),
     with_photo: bool = Query(False),
-    featured: str | None = Query(None),   # new | sale — фильтр «Новинки» / «Спецпредложения»
+    featured: str | None = Query(None),   # hot | new | sale — «Убойные цены» / «Новинки» / «Спецпредложения»
     db: Session = Depends(get_db),
     user: User | None = Depends(get_optional_user),
 ):
@@ -198,12 +198,15 @@ def list_products(
     if with_photo:
         query = query.where(Product.image_url.isnot(None), Product.image_url != "")
 
-    # Фильтр «Новинки» / «Спецпредложения» (флаги из МойСклад). Приоритет — распродажа:
-    # товар с обоими флагами показываем только в спецпредложениях, а из новинок исключаем.
-    if featured == "new":
-        query = query.where(Product.is_new == True, Product.is_sale == False)
+    # Фильтр «Убойные цены» / «Новинки» / «Спецпредложения» (флаги из МойСклад).
+    # Приоритет (эксклюзивность секций): убойные > спецпредложения > новинки — товар с
+    # несколькими флагами показываем только в самой «сильной» секции, из остальных исключаем.
+    if featured == "hot":
+        query = query.where(Product.is_hot == True)
     elif featured == "sale":
-        query = query.where(Product.is_sale == True)
+        query = query.where(Product.is_sale == True, Product.is_hot == False)
+    elif featured == "new":
+        query = query.where(Product.is_new == True, Product.is_sale == False, Product.is_hot == False)
 
     # Имя без кода склада «с1/с2 …» и без префикса «ЧЗ» (Честный знак) —
     # для сортировки и оценки релевантности (товар «ЧЗ Апельсины» сортируется под «А»).
@@ -229,9 +232,10 @@ def list_products(
     # При явной сортировке по цене — не вмешиваемся (пользователь хочет чистый порядок по цене).
     if sort not in ("price_asc", "price_desc"):
         featured_rank = case(
-            (and_(Product.is_new == True, Product.is_sale == False), 0),   # только новинка → сверху
+            (Product.is_hot == True, 0),                                    # убойные цены → сверху
             (Product.is_sale == True, 1),                                   # распродажа (в т.ч. с новинкой)
-            else_=2,                                                        # обычные
+            (Product.is_new == True, 2),                                     # только новинка
+            else_=3,                                                        # обычные
         )
         order_cols = [featured_rank, *order_cols]
     query = query.order_by(*order_cols)

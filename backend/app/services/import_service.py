@@ -23,6 +23,7 @@ IMAGE_MANIFEST_KEEP = 30
 # значение-галочка считается «включённой», если не входит в _FLAG_FALSE.
 _NEW_PATTERNS = ("новин",)
 _SALE_PATTERNS = ("распродаж", "спецпредлож", "акци", "скидк")
+_HOT_PATTERNS = ("убойн",)          # «Убойные цены»
 _FLAG_FALSE = {"", "false", "нет", "0", "no", "off", "ложь", "none", "-"}
 
 
@@ -202,6 +203,7 @@ def upsert_catalog(db: Session, catalog: ParsedCatalog, source: str = "commercem
                     attributes=parsed_product.attributes or None,
                     is_new=_attr_flag(parsed_product.attributes, _NEW_PATTERNS),
                     is_sale=_attr_flag(parsed_product.attributes, _SALE_PATTERNS),
+                    is_hot=_attr_flag(parsed_product.attributes, _HOT_PATTERNS),
                     price=parsed_product.price,
                     stock=parsed_product.stock,
                     category_id=cat_id,
@@ -248,10 +250,13 @@ def upsert_catalog(db: Session, catalog: ParsedCatalog, source: str = "commercem
                 if parsed_product.attributes:
                     new_flag = _attr_flag(parsed_product.attributes, _NEW_PATTERNS)
                     sale_flag = _attr_flag(parsed_product.attributes, _SALE_PATTERNS)
+                    hot_flag = _attr_flag(parsed_product.attributes, _HOT_PATTERNS)
                     if product.is_new != new_flag:
                         product.is_new = new_flag; changed = True
                     if product.is_sale != sale_flag:
                         product.is_sale = sale_flag; changed = True
+                    if product.is_hot != hot_flag:
+                        product.is_hot = hot_flag; changed = True
                 # Картинки трогаем ПОФАЙЛОВО — только если У ЭТОГО товара в import.xml реально
                 # был тег <Картинка> (или пришли имена файлов). Раньше решали «по всему раунду»
                 # (round_has_images): если в заходе была хоть одна картинка, у ВСЕХ товаров без

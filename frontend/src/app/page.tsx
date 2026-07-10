@@ -68,20 +68,24 @@ export default async function HomePage() {
   // ВРЕМЕННО: «Новинки»/«Спецпредложения» наполняем товарами-заглушками (разная сортировка,
   // чтобы наборы отличались). Когда в МойСклад появятся доп. поля «Новинка»/«Спецпредложение» —
   // заменим источник на фильтр по этим полям, разметка секций останется прежней.
+  let hot: Product[] = [];
   let novinki: Product[] = [];
   let special: Product[] = [];
   // «Спецпредложения» — из категории «РАСПРОДАЖА» (ищем по имени среди уже загруженных категорий).
   const saleIds = categories.filter((c) => (c.name || "").toLowerCase().includes("распродаж")).map((c) => c.id);
   try {
-    // Основной источник — флаги из МойСклад (доп-поля «Новинка»/«Распродажа»).
-    const [n, s] = await Promise.all([
+    // Основной источник — флаги из МойСклад (доп-поля «Убойные цены»/«Новинка»/«Распродажа»).
+    const [h, n, s] = await Promise.all([
+      getProducts({ page_size: 12, featured: "hot" }),
       getProducts({ page_size: 12, featured: "new" }),
       getProducts({ page_size: 12, featured: "sale" }),
     ]);
+    hot = h.items;
     novinki = n.items;
     special = s.items;
     // Фолбэк, пока флаги из МойСклад ещё не приехали — чтобы секции не пустовали:
     // новинки — товары с фото, спецпредложения — из категории «РАСПРОДАЖА».
+    // «Убойные цены» фолбэком НЕ наполняем — секцию показываем только при реальном флаге.
     if (novinki.length === 0) {
       novinki = (await getProducts({ page_size: 12, with_photo: true, sort: "name" })).items;
     }
@@ -158,6 +162,19 @@ export default async function HomePage() {
           ))}
         </div>
       </div>
+
+      {/* Убойные цены (по полю «Убойные цены» из МойСклад) — первой секцией */}
+      {hot.length > 0 && (
+        <div id="hot" className="container section">
+          <div className="section-head">
+            <h2 className="section-title section-title--caps section-title--xl">Убойные цены</h2>
+            <Link href="/hot" className="see-all">Посмотреть все <ArrowIcon size={16} /></Link>
+          </div>
+          <PromoCarousel>
+            {hot.map(p => <PromoCard key={p.id} p={p} kind="hot" compact />)}
+          </PromoCarousel>
+        </div>
+      )}
 
       {/* Новинки (пока товары-заглушки, потом — по полю «Новинка» из МойСклад) */}
       {novinki.length > 0 && (

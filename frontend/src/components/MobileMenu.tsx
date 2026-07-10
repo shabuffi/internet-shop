@@ -8,6 +8,7 @@ import { getMe } from "@/lib/authApi";
 const LINKS = [
   { href: "/", label: "Главная" },
   { href: "/catalog", label: "Каталог" },
+  { href: "/hot", label: "Убойные цены" },
   { href: "/novinki", label: "Новинки" },
   { href: "/special", label: "Спецпредложения" },
   { href: "/about", label: "О компании" },

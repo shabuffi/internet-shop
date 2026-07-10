@@ -65,7 +65,7 @@ export async function getProducts(params?: {
   category_id?: string;
   sort?: string;          // name | price_asc | price_desc
   with_photo?: boolean;   // только товары с фото
-  featured?: string;      // new | sale — Новинки / Спецпредложения
+  featured?: string;      // hot | new | sale — Убойные цены / Новинки / Спецпредложения
 }): Promise<ProductListResponse> {
   const query = new URLSearchParams();
   if (params?.page) query.set("page", String(params.page));

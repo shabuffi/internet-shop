@@ -274,17 +274,19 @@ def test_manifest_restore_skips_missing_files_and_manual(db_session, isolate_med
 
 
 def test_upsert_sets_new_sale_flags(db_session):
-    """Флаги-галочки из доп-полей МойСклад проставляют is_new / is_sale."""
+    """Флаги-галочки из доп-полей МойСклад проставляют is_new / is_sale / is_hot."""
     upsert_catalog(db_session, _catalog(products=[
         ParsedProduct(moysklad_id="n", name="Новинка", attributes=[{"name": "Новинка", "value": "true"}]),
         ParsedProduct(moysklad_id="s", name="Спец", attributes=[{"name": "Распродажа", "value": "да"}]),
+        ParsedProduct(moysklad_id="h", name="Убой", attributes=[{"name": "Убойные цены", "value": "1"}]),
         ParsedProduct(moysklad_id="r", name="Обычный", attributes=[{"name": "Количество штук в коробке", "value": "5"}]),
         ParsedProduct(moysklad_id="off", name="Снятый", attributes=[{"name": "Новинка", "value": "false"}]),
     ]))
     g = lambda ms: db_session.query(Product).filter_by(moysklad_id=ms).first()
-    assert g("n").is_new is True and g("n").is_sale is False
+    assert g("n").is_new is True and g("n").is_sale is False and g("n").is_hot is False
     assert g("s").is_sale is True and g("s").is_new is False
-    assert g("r").is_new is False and g("r").is_sale is False
+    assert g("h").is_hot is True and g("h").is_new is False and g("h").is_sale is False
+    assert g("r").is_new is False and g("r").is_sale is False and g("r").is_hot is False
     assert g("off").is_new is False          # value "false" → флаг не стоит
 
 

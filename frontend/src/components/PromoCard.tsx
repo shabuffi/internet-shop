@@ -9,8 +9,9 @@ import type { Product } from "@/types/product";
 /** Карточка товара с бейджем NEW / % — для секций и страниц «Новинки»/«Спецпредложения».
  *  `compact` (только на главной) — витринный вид: вся карточка ссылка на товар, без степера,
  *  название режется до 2 строк. На страницах — обычный вид со степером и разворотом названия. */
-export default function PromoCard({ p, kind, compact = false }: { p: Product; kind: "new" | "sale"; compact?: boolean }) {
-  const badge = <span className={`pcard__promo pcard__promo--${kind}`}>{kind === "new" ? "NEW" : "%"}</span>;
+export default function PromoCard({ p, kind, compact = false }: { p: Product; kind: "new" | "sale" | "hot"; compact?: boolean }) {
+  const label = kind === "hot" ? "🔥" : kind === "new" ? "NEW" : "%";
+  const badge = <span className={`pcard__promo pcard__promo--${kind}`}>{label}</span>;
   const media = (
     <div className="photo photo--square">
       {p.image_url
