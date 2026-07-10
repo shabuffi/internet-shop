@@ -5,7 +5,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationInfo, field_validator
 
 _EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 # Длина ИНН: ИП — 12 цифр, ООО (юрлицо) — 10 цифр
@@ -15,14 +15,16 @@ _INN_LEN = {"ip": 12, "ooo": 10}
 def normalize_ru_phone(v: str) -> str:
     """Приводит российский номер к виду ``+7XXXXXXXXXX``.
 
-    Принимает вариативность ввода: ``+7 999 000-00-00``, ``89990000000``,
-    ``79990000000``, ``9990000000``. Иное — ``ValueError``.
+    Принимает вариативность ввода: ``+7 999 000 00 00``, ``89990000000``,
+    ``79990000000``, ``9990000000`` (разделители любые — вырезаем всё, кроме цифр).
+    Иное — ``ValueError``. В тексте ошибки дефисы НЕ используем, чтобы не провоцировать
+    их ввод: пример показываем пробелами.
     """
     digits = re.sub(r"\D", "", v)
     if len(digits) == 11 and digits[0] in "78":
         digits = digits[1:]
     if len(digits) != 10 or digits[0] != "9":
-        raise ValueError("Укажите телефон в формате +7 9XX XXX-XX-XX или 8 9XX XXX-XX-XX")
+        raise ValueError("Неверно набран номер — введите 10 цифр, например +7 999 123 45 67")
     return f"+7{digits}"
 
 
@@ -52,7 +54,9 @@ class RegisterIn(BaseModel):
     phone: str
     customer_type: Literal["individual", "ip", "ooo"]
     customer_name: str
-    inn: str | None = None
+    # validate_default: валидатор должен отработать и когда ИНН вовсе не прислали
+    # (для ИП/ООО он обязателен) — иначе на дефолте None проверка не запустится.
+    inn: str | None = Field(None, validate_default=True)
     password: str
     consent: bool
 
@@ -88,19 +92,24 @@ class RegisterIn(BaseModel):
             raise ValueError("Необходимо согласие на обработку персональных данных")
         return v
 
-    @model_validator(mode="after")
-    def _inn_required(self):
-        """ИНН обязателен и фиксированной длины для ИП/ООО; для физлица — не храним."""
-        need = _INN_LEN.get(self.customer_type)
-        if need:
-            inn = (self.inn or "").strip()
-            if not inn.isdigit() or len(inn) != need:
-                label = "ИП" if self.customer_type == "ip" else "ООО"
-                raise ValueError(f"Для {label} укажите корректный ИНН ({need} цифр)")
-            self.inn = inn
-        else:
-            self.inn = None
-        return self
+    @field_validator("inn")
+    @classmethod
+    def _inn(cls, v: str | None, info: ValidationInfo) -> str | None:
+        """ИНН обязателен и фиксированной длины для ИП/ООО; для физлица — не храним.
+
+        Проверяем как ПОЛЕ (а не модель): ошибка приходит с ``loc=["body","inn"]``,
+        поэтому форма подсвечивает именно поле ИНН. `customer_type` объявлен выше,
+        значит уже разобран и доступен в ``info.data``.
+        """
+        ctype = info.data.get("customer_type")
+        need = _INN_LEN.get(ctype or "")
+        if not need:
+            return None                       # физлицо — ИНН не храним
+        inn = (v or "").strip()
+        if not inn.isdigit() or len(inn) != need:
+            label = "ИП" if ctype == "ip" else "ООО"
+            raise ValueError(f"Для {label} укажите корректный ИНН ({need} цифр)")
+        return inn
 
 
 class LoginIn(BaseModel):

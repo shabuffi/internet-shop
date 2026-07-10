@@ -14,19 +14,22 @@ export function parseApiError(data: unknown, fallback: string): { message: strin
 
   if (Array.isArray(detail) && detail.length > 0) {
     const fields: FieldErrors = {};
+    let firstMsg: string | undefined;
     for (const raw of detail) {
       const item = raw as { loc?: unknown[]; msg?: string };
       // Pydantic v2 префиксит сообщения из ValueError как «Value error, …» — убираем.
       const msg = (item.msg ?? "").replace(/^Value error,\s*/, "").trim();
       if (!msg) continue;
+      if (!firstMsg) firstMsg = msg;
       // loc = ["body", "customer_phone"] или ["body", "items", 0, "quantity"] — берём
-      // последнее строковое имя, кроме служебного "body".
+      // последнее строковое имя, кроме служебного "body". У ошибок уровня модели
+      // (model_validator) loc = ["body"] — поля нет, но текст всё равно показываем.
       const loc = Array.isArray(item.loc) ? item.loc : [];
       const name = [...loc].reverse().find((p) => typeof p === "string" && p !== "body");
       if (typeof name === "string" && !fields[name]) fields[name] = msg;
     }
-    const first = Object.values(fields)[0];
-    if (first) return { message: first, fields };
+    const message = Object.values(fields)[0] ?? firstMsg;
+    if (message) return { message, fields };
   }
 
   return { message: fallback, fields: {} };

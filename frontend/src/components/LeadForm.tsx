@@ -62,7 +62,7 @@ export default function LeadForm({ className, label = "Уточнить усло
                 </div>
                 <div className="field" style={{ marginBottom: "var(--s-3)" }}>
                   <label>Телефон <span className="req">*</span></label>
-                  <input className="input" required type="tel" value={form.phone} onChange={set("phone")} placeholder="+7 999 000-00-00" />
+                  <input className="input" required type="tel" value={form.phone} onChange={set("phone")} placeholder="+7 999 123 45 67" />
                 </div>
                 <div className="field" style={{ marginBottom: "var(--s-3)" }}>
                   <label>Название магазина</label>

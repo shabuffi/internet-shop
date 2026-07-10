@@ -53,7 +53,7 @@ export default function RegisterPage() {
     clear();
     const phone = normalizeRuPhone(form.phone);
     if (!phone) {
-      setLocal("Неверно набран номер — укажите в формате +7 9XX XXX-XX-XX или 8 9XX XXX-XX-XX", ["phone"]);
+      setLocal("Неверно набран номер — введите 10 цифр, например +7 999 123 45 67", ["phone"]);
       return;
     }
     const pwIssue = passwordIssue(form.password);
@@ -98,7 +98,7 @@ export default function RegisterPage() {
         </div>
         <div className="field" style={{ marginBottom: "var(--s-3)" }}>
           <label>Телефон <span className="req">*</span></label>
-          <input className={"input" + invalidClass("phone")} type="tel" required value={form.phone} onChange={setField("phone")} placeholder="+7 999 000-00-00" />
+          <input className={"input" + invalidClass("phone")} type="tel" required value={form.phone} onChange={setField("phone")} placeholder="+7 999 123 45 67" />
           <FieldError>{fields.phone}</FieldError>
         </div>
         <div className="field" style={{ marginBottom: "var(--s-3)" }}>

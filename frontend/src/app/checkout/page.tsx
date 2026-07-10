@@ -119,7 +119,7 @@ export default function CheckoutPage() {
                   </div>
                   <div className="field">
                     <label>Телефон <span className="req">*</span></label>
-                    <input className={"input" + invalidClass("customer_phone")} name="customer_phone" value={form.customer_phone} onChange={handleChange} required type="tel" placeholder="+7 999 000-00-00" />
+                    <input className={"input" + invalidClass("customer_phone")} name="customer_phone" value={form.customer_phone} onChange={handleChange} required type="tel" placeholder="+7 999 123 45 67" />
                     <FieldError>{fields.customer_phone}</FieldError>
                   </div>
                   <div className="field">

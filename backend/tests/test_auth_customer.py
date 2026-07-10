@@ -63,6 +63,32 @@ def test_register_rejects_weak_password(client):
     assert r.status_code == 422
 
 
+def test_register_bad_inn_reports_inn_field(client):
+    """Кривой ИНН у ИП → 422 с loc=[…,'inn'], чтобы форма подсветила именно это поле.
+
+    Раньше проверка жила в model_validator и приходила с loc=['body'] — без имени поля.
+    """
+    r = client.post("/api/v1/auth/register",
+                    json={**VALID, "customer_type": "ip", "inn": "12345"})
+    assert r.status_code == 422
+    assert "inn" in [e["loc"][-1] for e in r.json()["detail"]]
+
+
+def test_register_ip_requires_inn(client):
+    """ИНН вовсе не прислали (ИП) → всё равно ошибка по полю inn (validate_default)."""
+    r = client.post("/api/v1/auth/register", json={**VALID, "customer_type": "ip"})
+    assert r.status_code == 422
+    assert "inn" in [e["loc"][-1] for e in r.json()["detail"]]
+
+
+def test_register_individual_drops_inn(client, db_session):
+    """Физлицу ИНН не храним, даже если прислали."""
+    r = client.post("/api/v1/auth/register", json={**VALID, "inn": "123456789012"})
+    assert r.status_code == 201
+    user = db_session.scalar(select(User).where(User.email == VALID["email"]))
+    assert user.inn is None
+
+
 def test_register_duplicate_email_409(client, db_session):
     client.post("/api/v1/auth/register", json=VALID)
     r = client.post("/api/v1/auth/register", json=VALID)
