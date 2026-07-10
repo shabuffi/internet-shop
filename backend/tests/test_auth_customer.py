@@ -153,6 +153,15 @@ def test_change_password_weak_new_422(client, db_session):
     assert r.status_code == 422
 
 
+def test_change_password_rejects_cyrillic(client, db_session):
+    """Правило «только латиница» действует и при смене пароля (не только при регистрации)."""
+    client.post("/api/v1/auth/register", json=VALID)
+    r = client.post("/api/v1/auth/change-password",
+                    json={"current_password": "Parol123", "new_password": "Пароль123"})
+    assert r.status_code == 422
+    assert "new_password" in [e["loc"][-1] for e in r.json()["detail"]]
+
+
 def test_change_password_requires_auth_401(client):
     r = client.post("/api/v1/auth/change-password",
                     json={"current_password": "Parol123", "new_password": "Novyj456"})
