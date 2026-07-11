@@ -3,33 +3,102 @@
 import { useEffect, useRef, useState } from "react";
 import AdminShell from "@/components/AdminShell";
 import HelpHint from "@/components/HelpHint";
+import PasswordField from "@/components/PasswordField";
 import { adminFetch, adminUpload } from "@/lib/adminApi";
 import { brandImageUrl, type Brand } from "@/lib/brands";
 
-// «Настройка сайта» → Бренды: загрузка логотипов, порядок (стрелки), удаление, сохранение.
+interface ShopSettings {
+  shop_name: string; contact_phone: string; contact_email: string; contact_hours: string;
+  company_legal_name: string; company_inn: string; company_ogrn: string; warehouse_address: string;
+  warehouse_coords: string; delivery_info: string;
+  show_stock_qty: boolean;
+}
+
+const EMPTY: ShopSettings = {
+  shop_name: "", contact_phone: "", contact_email: "", contact_hours: "",
+  company_legal_name: "", company_inn: "", company_ogrn: "", warehouse_address: "",
+  warehouse_coords: "", delivery_info: "", show_stock_qty: true,
+};
+
+const cardStyle: React.CSSProperties = {
+  background: "var(--canvas)", borderRadius: "var(--radius-lg)", border: "1px solid var(--hairline-soft)",
+  padding: "28px 32px", maxWidth: 720, marginBottom: 24,
+};
+const inputStyle = { display: "flex", flexDirection: "column" as const, gap: 6, marginBottom: 16 };
+
+// «Настройка сайта» — всё, что владелец меняет на витрине: магазин/контакты/реквизиты,
+// показ остатка, логотипы брендов, а также смена пароля входа в админку.
 export default function AdminSitePage() {
+  // ── Магазин + показ остатка ──
+  const [form, setForm] = useState<ShopSettings>(EMPTY);
+  const [savedSection, setSavedSection] = useState<string | null>(null);
+  const [savingSection, setSavingSection] = useState<string | null>(null);
+  const [error, setError] = useState("");
+
+  // ── Бренды ──
   const [brands, setBrands] = useState<Brand[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
-  const [error, setError] = useState("");
+  const [savingBrands, setSavingBrands] = useState(false);
+  const [savedBrands, setSavedBrands] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
+  // ── Пароль админа ──
+  const [pw, setPw] = useState({ current_password: "", new_password: "" });
+  const [pwMsg, setPwMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [pwLoading, setPwLoading] = useState(false);
+
   useEffect(() => {
+    adminFetch<ShopSettings>("/settings")
+      .then(d => setForm({
+        shop_name: d.shop_name || "", contact_phone: d.contact_phone || "", contact_email: d.contact_email || "",
+        contact_hours: d.contact_hours || "", company_legal_name: d.company_legal_name || "",
+        company_inn: d.company_inn || "", company_ogrn: d.company_ogrn || "",
+        warehouse_address: d.warehouse_address || "", warehouse_coords: d.warehouse_coords || "",
+        delivery_info: d.delivery_info || "", show_stock_qty: d.show_stock_qty !== false,
+      }))
+      .catch(() => {});
     adminFetch<{ brands: Brand[] }>("/brands")
       .then((d) => { setBrands(d.brands || []); setLoaded(true); })
       .catch(() => setLoaded(true));
   }, []);
 
-  function markUnsaved() { setSaved(false); }
+  const set = (k: keyof ShopSettings) => (e: React.ChangeEvent<HTMLInputElement>) => setForm(p => ({ ...p, [k]: e.target.value }));
 
+  // Сохраняет поля одного блока (значения приводим к строке; булев show_stock_qty → «1»/«0»)
+  async function saveSection(e: React.FormEvent, id: string, keys: (keyof ShopSettings)[]) {
+    e.preventDefault();
+    setError(""); setSavedSection(null); setSavingSection(id);
+    const body: Record<string, string> = {};
+    for (const k of keys) {
+      const v = form[k];
+      body[k] = typeof v === "boolean" ? (v ? "1" : "0") : String(v ?? "");
+    }
+    try {
+      await adminFetch("/settings", { method: "POST", body: JSON.stringify(body) });
+      setSavedSection(id);
+      setTimeout(() => setSavedSection(s => (s === id ? null : s)), 3000);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Ошибка");
+    } finally { setSavingSection(null); }
+  }
+
+  function saveRow(id: string) {
+    return (
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 8 }}>
+        <button className="btn btn-primary" type="submit" disabled={savingSection === id}>
+          {savingSection === id ? "Сохраняем…" : "Сохранить"}
+        </button>
+        {savedSection === id && <span style={{ color: "var(--stock)", fontWeight: 600, fontSize: 13 }}>✓ Сохранено</span>}
+      </div>
+    );
+  }
+
+  // ── Бренды: загрузка (множественная), порядок, удаление, сохранение ──
   async function onUpload(files?: FileList | null) {
     const list = files ? Array.from(files) : [];
     if (list.length === 0) return;
     setUploading(true); setError("");
-    // Эндпоинт принимает по одному файлу — грузим последовательно, сохраняя порядок выбора.
-    // Успешные добавляем к списку даже если часть не прошла; про сбойные сообщаем по именам.
     const added: Brand[] = [];
     const failed: string[] = [];
     for (const file of list) {
@@ -41,13 +110,13 @@ export default function AdminSitePage() {
         failed.push(file.name);
       }
     }
-    if (added.length) { setBrands((prev) => [...prev, ...added]); markUnsaved(); }
+    if (added.length) { setBrands((prev) => [...prev, ...added]); setSavedBrands(false); }
     if (failed.length) setError(`Не удалось загрузить: ${failed.join(", ")}`);
     setUploading(false);
     if (fileRef.current) fileRef.current.value = "";
   }
 
-  function move(i: number, dir: -1 | 1) {
+  function moveBrand(i: number, dir: -1 | 1) {
     setBrands((prev) => {
       const j = i + dir;
       if (j < 0 || j >= prev.length) return prev;
@@ -55,27 +124,39 @@ export default function AdminSitePage() {
       [next[i], next[j]] = [next[j], next[i]];
       return next;
     });
-    markUnsaved();
+    setSavedBrands(false);
   }
 
-  function remove(i: number) {
+  function removeBrand(i: number) {
     setBrands((prev) => prev.filter((_, k) => k !== i));
-    markUnsaved();
+    setSavedBrands(false);
   }
 
-  async function save() {
-    setSaving(true); setError("");
+  async function saveBrands() {
+    setSavingBrands(true); setError("");
     try {
       const d = await adminFetch<{ brands: Brand[] }>("/brands", {
         method: "POST", body: JSON.stringify({ brands }),
       });
       setBrands(d.brands || []);
-      setSaved(true); setTimeout(() => setSaved(false), 3000);
+      setSavedBrands(true); setTimeout(() => setSavedBrands(false), 3000);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Не удалось сохранить");
     } finally {
-      setSaving(false);
+      setSavingBrands(false);
     }
+  }
+
+  async function handleChangePassword(e: React.FormEvent) {
+    e.preventDefault();
+    setPwMsg(null); setPwLoading(true);
+    try {
+      await adminFetch("/change-password", { method: "POST", body: JSON.stringify(pw) });
+      setPwMsg({ ok: true, text: "Пароль изменён" });
+      setPw({ current_password: "", new_password: "" });
+    } catch (err) {
+      setPwMsg({ ok: false, text: err instanceof Error ? err.message : "Ошибка" });
+    } finally { setPwLoading(false); }
   }
 
   const iconBtn: React.CSSProperties = {
@@ -86,23 +167,109 @@ export default function AdminSitePage() {
 
   return (
     <AdminShell>
-      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 24 }}>
         <h1 style={{ fontSize: 24, fontWeight: 700, letterSpacing: -0.3 }}>Настройка сайта</h1>
+        <HelpHint text={"Всё, что видно покупателю: название и контакты магазина, реквизиты, показ остатка, логотипы брендов. Здесь же — смена пароля входа в админку.\n\nКаждый блок сохраняется своей кнопкой."} />
       </div>
 
-      <div style={{ maxWidth: 720 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "18px 0 6px" }}>
-          <h2 style={{ fontSize: 18, fontWeight: 600 }}>Бренды</h2>
+      {error && <p className="form-error" style={{ maxWidth: 520, marginBottom: 16 }}>{error}</p>}
+
+      {/* Магазин */}
+      <form style={cardStyle} onSubmit={e => saveSection(e, "shop", ["shop_name", "contact_phone", "contact_email", "contact_hours", "company_legal_name", "company_inn", "company_ogrn", "warehouse_address", "warehouse_coords", "delivery_info"])}>
+        <p style={{ fontWeight: 600, fontSize: 16, marginBottom: 16 }}>Магазин</p>
+        <div style={inputStyle}>
+          <label className="form-label">Название магазина</label>
+          <input className="form-input" value={form.shop_name} onChange={set("shop_name")} placeholder="Магазин" />
+          <p style={{ fontSize: 12, color: "var(--ink-secondary)" }}>В футере и на вкладке браузера; в шапке — если не задан логотип</p>
+        </div>
+        <div style={inputStyle}>
+          <label className="form-label">Телефон (футер сайта)</label>
+          <input className="form-input" value={form.contact_phone} onChange={set("contact_phone")} placeholder="+7 999 123-45-67" />
+        </div>
+        <div style={inputStyle}>
+          <label className="form-label">Email для покупателей (футер сайта)</label>
+          <input className="form-input" type="email" value={form.contact_email} onChange={set("contact_email")} placeholder="shop@example.ru" />
+        </div>
+        <div style={inputStyle}>
+          <label className="form-label">Часы работы (футер сайта)</label>
+          <input className="form-input" value={form.contact_hours} onChange={set("contact_hours")} placeholder="Пн–Пт · 10:00–19:00" />
+        </div>
+        <div style={inputStyle}>
+          <label className="form-label">Юр. наименование</label>
+          <input className="form-input" value={form.company_legal_name} onChange={set("company_legal_name")} placeholder="ООО «Инженер» / ИП Иванов И. И." />
+          <p style={{ fontSize: 12, color: "var(--ink-secondary)" }}>Страницы «О компании» / «Контакты» и подвал.</p>
+        </div>
+        <div style={inputStyle}>
+          <label className="form-label">ИНН</label>
+          <input className="form-input" value={form.company_inn} onChange={set("company_inn")} placeholder="7700000000" />
+        </div>
+        <div style={inputStyle}>
+          <label className="form-label">ОГРН / ОГРНИП</label>
+          <input className="form-input" value={form.company_ogrn} onChange={set("company_ogrn")} placeholder="необязательно" />
+        </div>
+        <div style={inputStyle}>
+          <label className="form-label">Адрес склада</label>
+          <input className="form-input" value={form.warehouse_address} onChange={set("warehouse_address")} placeholder="г. Тверь, ул. …, д. …" />
+          <p style={{ fontSize: 12, color: "var(--ink-secondary)" }}>Покажется на «Контактах» с картой.</p>
+        </div>
+        <div style={inputStyle}>
+          <label className="form-label">Координаты для метки на карте</label>
+          <input className="form-input" value={form.warehouse_coords} onChange={set("warehouse_coords")} placeholder="например: 56.859611, 35.911896" />
+          <p style={{ fontSize: 12, color: "var(--ink-secondary)" }}>
+            Необязательно. Откройте <a href="https://yandex.ru/maps" target="_blank" rel="noopener noreferrer" style={{ color: "var(--accent)" }}>Яндекс.Карты</a>,
+            правый клик по нужной точке → «Что здесь?» → скопируйте координаты (широта, долгота).
+            С координатами карта покажет аккуратную метку без кнопок поиска. Пусто — карта ищет по адресу.
+          </p>
+        </div>
+        <div style={inputStyle}>
+          <label className="form-label">Доставка (на странице товара)</label>
+          <input className="form-input" value={form.delivery_info} onChange={set("delivery_info")} placeholder="например, 1–3 дня по России" />
+          <p style={{ fontSize: 12, color: "var(--ink-secondary)" }}>Один текст для всех товаров. Пусто — строка не показывается.</p>
+        </div>
+        {saveRow("shop")}
+      </form>
+
+      {/* Показ остатка на витрине */}
+      <form style={cardStyle} onSubmit={e => saveSection(e, "stock", ["show_stock_qty"])}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+          <p style={{ fontWeight: 600, fontSize: 16, margin: 0 }}>Показ остатка</p>
+          <HelpHint text={"Как показывать наличие товара на карточках и в списке каталога. Выберите одно — точное число или просто «В наличии» (чтобы не дублировать)."} />
+        </div>
+        <p style={{ fontSize: 13, color: "var(--ink-secondary)", marginBottom: 12 }}>
+          Что видит покупатель у товара в наличии.
+        </p>
+        <label style={{ display: "flex", gap: 10, alignItems: "flex-start", padding: "10px 12px", borderRadius: 10,
+          border: "1px solid " + (form.show_stock_qty ? "var(--accent, #003399)" : "var(--hairline-soft)"), marginBottom: 8, cursor: "pointer" }}>
+          <input type="radio" name="stock_mode" checked={form.show_stock_qty} onChange={() => setForm(p => ({ ...p, show_stock_qty: true }))} style={{ marginTop: 3 }} />
+          <span>
+            <b>Точный остаток</b> — например «12 шт.»
+            <span style={{ display: "block", fontSize: 12, color: "var(--ink-secondary)" }}>Покупатель видит, сколько штук на складе.</span>
+          </span>
+        </label>
+        <label style={{ display: "flex", gap: 10, alignItems: "flex-start", padding: "10px 12px", borderRadius: 10,
+          border: "1px solid " + (!form.show_stock_qty ? "var(--accent, #003399)" : "var(--hairline-soft)"), marginBottom: 4, cursor: "pointer" }}>
+          <input type="radio" name="stock_mode" checked={!form.show_stock_qty} onChange={() => setForm(p => ({ ...p, show_stock_qty: false }))} style={{ marginTop: 3 }} />
+          <span>
+            <b>Только «В наличии»</b> — без числа
+            <span style={{ display: "block", fontSize: 12, color: "var(--ink-secondary)" }}>Показываем только факт наличия.</span>
+          </span>
+        </label>
+        {saveRow("stock")}
+      </form>
+
+      {/* Бренды */}
+      <div style={cardStyle}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+          <p style={{ fontWeight: 600, fontSize: 16, margin: 0 }}>Бренды</p>
           <HelpHint text={"Логотипы брендов показываются слайдером над футером главной. Можно выбрать сразу несколько файлов (PNG лучше с прозрачным фоном, или JPG); порядок задаётся стрелками."} />
         </div>
 
-        {/* Рекомендации по загрузке */}
         <div style={{ background: "var(--surface, #f5f6f8)", borderRadius: 10, padding: "12px 14px",
           fontSize: 13, lineHeight: 1.6, color: "var(--ink-secondary, #4b5563)", marginBottom: 16 }}>
           <b style={{ color: "var(--ink)" }}>Рекомендации к логотипам:</b>
           <ul style={{ margin: "6px 0 0", paddingLeft: 18 }}>
             <li><b>PNG с прозрачным фоном</b> — покажется на фоне сайта; <b>JPG</b> — как есть (свой фон).</li>
-            <li>Все логотипы выравниваются по одной высоте, ширина — по пропорциям.</li>
+            <li>Все логотипы выравниваются по высоте, ряд подстраивается под самый высокий.</li>
             <li>Желательно: высота от 100&nbsp;px, горизонтальная ориентация, вес до&nbsp;~300&nbsp;КБ.</li>
           </ul>
         </div>
@@ -111,7 +278,6 @@ export default function AdminSitePage() {
           <p style={{ color: "var(--ink-secondary)" }}>Загрузка…</p>
         ) : (
           <>
-            {/* Загрузка */}
             <label style={{ display: "inline-flex", alignItems: "center", gap: 8, cursor: "pointer",
               padding: "9px 16px", borderRadius: 10, border: "1px dashed var(--accent, #003399)",
               color: "var(--accent, #003399)", fontWeight: 600, fontSize: 14, marginBottom: 16 }}>
@@ -121,7 +287,6 @@ export default function AdminSitePage() {
                 onChange={(e) => onUpload(e.target.files)} />
             </label>
 
-            {/* Список логотипов */}
             {brands.length === 0 ? (
               <p style={{ color: "var(--ink-secondary)", fontSize: 14, marginBottom: 16 }}>
                 Логотипов пока нет — загрузите первый.
@@ -133,15 +298,14 @@ export default function AdminSitePage() {
                     padding: "8px 12px", borderRadius: 10, border: "1px solid var(--hairline-soft, #e5e7eb)",
                     background: "var(--canvas, #fff)" }}>
                     <span style={{ color: "var(--ink-secondary)", fontSize: 13, width: 20, textAlign: "center" }}>{i + 1}</span>
-                    {/* превью на клетчатом фоне, чтобы видеть прозрачность */}
                     <span style={{ height: 44, width: 120, display: "inline-flex", alignItems: "center", justifyContent: "center",
                       borderRadius: 6, background: "repeating-conic-gradient(#eee 0% 25%, #fff 0% 50%) 50% / 12px 12px" }}>
                       <img src={brandImageUrl(b.image)} alt="" style={{ maxHeight: 40, maxWidth: 112, objectFit: "contain", display: "block" }} />
                     </span>
                     <span style={{ marginLeft: "auto", display: "inline-flex", gap: 6 }}>
-                      <button type="button" style={iconBtn} onClick={() => move(i, -1)} disabled={i === 0} aria-label="Выше" title="Выше">↑</button>
-                      <button type="button" style={iconBtn} onClick={() => move(i, 1)} disabled={i === brands.length - 1} aria-label="Ниже" title="Ниже">↓</button>
-                      <button type="button" style={{ ...iconBtn, color: "var(--danger, #c0392b)" }} onClick={() => remove(i)} aria-label="Удалить" title="Удалить">✕</button>
+                      <button type="button" style={iconBtn} onClick={() => moveBrand(i, -1)} disabled={i === 0} aria-label="Выше" title="Выше">↑</button>
+                      <button type="button" style={iconBtn} onClick={() => moveBrand(i, 1)} disabled={i === brands.length - 1} aria-label="Ниже" title="Ниже">↓</button>
+                      <button type="button" style={{ ...iconBtn, color: "var(--danger, #c0392b)" }} onClick={() => removeBrand(i)} aria-label="Удалить" title="Удалить">✕</button>
                     </span>
                   </div>
                 ))}
@@ -149,17 +313,41 @@ export default function AdminSitePage() {
             )}
 
             <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-              <button onClick={save} disabled={saving} type="button" style={{
-                padding: "11px 24px", borderRadius: "var(--radius-md)", border: "none",
-                background: "var(--primary, #003399)", color: "#fff", fontWeight: 600, fontSize: 14,
-                cursor: saving ? "default" : "pointer", opacity: saving ? 0.7 : 1,
-              }}>{saving ? "Сохранение…" : "Сохранить"}</button>
-              {saved && <span style={{ color: "var(--stock, #16794a)", fontSize: 14, fontWeight: 600 }}>✓ Сохранено</span>}
-              {error && <span style={{ color: "var(--danger, #c0392b)", fontSize: 14 }}>{error}</span>}
+              <button onClick={saveBrands} disabled={savingBrands} type="button" className="btn btn-primary">
+                {savingBrands ? "Сохранение…" : "Сохранить бренды"}
+              </button>
+              {savedBrands && <span style={{ color: "var(--stock, #16794a)", fontSize: 14, fontWeight: 600 }}>✓ Сохранено</span>}
             </div>
           </>
         )}
       </div>
+
+      {/* Смена пароля админа */}
+      <form style={cardStyle} onSubmit={handleChangePassword}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
+          <p style={{ fontWeight: 600, fontSize: 16, margin: 0 }}>Пароль входа в админку</p>
+          <HelpHint text={"Пароль, которым вы входите в эту панель управления. Это не пароль обмена с МойСклад."} />
+        </div>
+        <div style={inputStyle}>
+          <label className="form-label">Текущий пароль</label>
+          <PasswordField className="form-input" value={pw.current_password}
+            onChange={e => setPw(p => ({ ...p, current_password: e.target.value }))} autoComplete="current-password" required />
+        </div>
+        <div style={inputStyle}>
+          <label className="form-label">Новый пароль</label>
+          <PasswordField className="form-input" value={pw.new_password}
+            onChange={e => setPw(p => ({ ...p, new_password: e.target.value }))} autoComplete="new-password" required minLength={8} />
+          <p style={{ fontSize: 12, color: "var(--ink-secondary)" }}>Минимум 8 символов</p>
+        </div>
+        {pwMsg && (
+          <p style={{ fontSize: 14, marginBottom: 8, color: pwMsg.ok ? "var(--stock)" : "var(--danger, #c0392b)" }}>
+            {pwMsg.ok ? "✓ " : "✕ "}{pwMsg.text}
+          </p>
+        )}
+        <button className="btn btn-primary" type="submit" disabled={pwLoading} style={{ marginTop: 8 }}>
+          {pwLoading ? "Меняем..." : "Сменить пароль"}
+        </button>
+      </form>
     </AdminShell>
   );
 }

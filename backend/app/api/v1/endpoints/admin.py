@@ -522,6 +522,8 @@ def get_settings(db: Session = Depends(get_db), _=Depends(_get_current_admin)):
         # «Техническую часть» канала (ключ ВК / SMTP) задал разработчик?
         "vk_ready":           bool(vk["vk_token"]),
         "email_ready":        bool(smtp["host"] and smtp["user"] and smtp["password"]),
+        # Показ остатка на витрине: «N шт.» (по умолчанию) или только «В наличии»
+        "show_stock_qty":     _get_setting(db, "show_stock_qty", "1") != "0",
     }
 
 
@@ -550,6 +552,8 @@ def save_settings(body: dict, db: Session = Depends(get_db), _=Depends(_get_curr
         "vk_peer_id", "notify_email",
         # единый контрагент для гостевых заказов (внешний код из МойСклад)
         "guest_moysklad_ext_code",
+        # показ остатка на витрине («1» — «N шт.», «0» — «В наличии»)
+        "show_stock_qty",
     }
     # Настройки сайта (чат/соцсети/SEO/тема) перенесены на dev-страницу — см. save_dev_settings.
     for key, value in body.items():
@@ -992,6 +996,8 @@ def store_info_public(db: Session = Depends(get_db)):
         "home_banners":       _get_setting(db, "home_banners"),
         # Логотипы брендов для слайдера на главной (JSON-массив [{id, image}])
         "brands":             _get_setting(db, "brands"),
+        # Показывать точный остаток «N шт.» (1, по умолчанию) или только «В наличии» (0)
+        "show_stock_qty":     _get_setting(db, "show_stock_qty", "1") != "0",
     }
 
 

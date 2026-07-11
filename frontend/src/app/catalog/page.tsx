@@ -1,7 +1,7 @@
 export const dynamic = 'force-dynamic';
 
 import Link from "next/link";
-import { getProducts, getCategories } from "@/lib/api";
+import { getProducts, getCategories, getStoreInfo } from "@/lib/api";
 import { CATEGORY_GROUPS, normCatName } from "@/lib/categoryGroups";
 import type { Category } from "@/types/product";
 import { formatPrice } from "@/lib/format";
@@ -87,11 +87,14 @@ export default async function CatalogPage({ searchParams }: Props) {
   const sort = params.sort === "price_asc" || params.sort === "price_desc" ? params.sort : "name";
   const withPhoto = params.photo === "1";
 
-  const [data, categories] = await Promise.all([
+  const [data, categories, store] = await Promise.all([
     // В списке («бланк заказа») показываем больше товаров на странице
     getProducts({ category_id: categoryId, search, page, sort, with_photo: withPhoto, page_size: listView ? 100 : undefined }),
     getCategories(),
+    getStoreInfo().catch(() => null),
   ]);
+  // Показ остатка: «N шт.» (по умолчанию) или только «В наличии» — настройка сайта.
+  const showQty = store?.show_stock_qty !== false;
 
   const categoryLabel = resolveCategoryLabel(categoryId, categories);
   const categoryPath = resolveCategoryPath(categoryId, categories);
@@ -221,7 +224,7 @@ export default async function CatalogPage({ searchParams }: Props) {
         ) : (
           <>
             {listView ? (
-              <CatalogList products={data.items} />
+              <CatalogList products={data.items} showQty={showQty} />
             ) : (
               <div className="catalog-grid">
                 {data.items.map((p) => (
@@ -230,7 +233,7 @@ export default async function CatalogPage({ searchParams }: Props) {
                       <FeaturedBadge product={p} />
                       <span className="pcard__badge">
                         {p.available && p.stock > 0
-                          ? <span className="badge badge--stock"><span className="badge__dot" />{p.stock} шт.</span>
+                          ? <span className="badge badge--stock"><span className="badge__dot" />{showQty ? `${p.stock} шт.` : "В наличии"}</span>
                           : p.available
                           ? <span className="badge badge--stock"><span className="badge__dot" />В наличии</span>
                           : <span className="badge badge--out"><span className="badge__dot" />Нет</span>}

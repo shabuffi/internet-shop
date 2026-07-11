@@ -58,6 +58,9 @@ export default async function ProductPage({ params }: Props) {
   const chatUrl = (store?.chat_mode || "button") === "button" && isChatReady(chat)
     ? buildChatUrl(chat.service, chat.value) : "";
   const inStock = product.available;
+  // Показ остатка: «N шт.» (по умолчанию) или только «В наличии» — настройка сайта. В режиме
+  // «только В наличии» точное число не показываем (иначе дублирует бейдж «В наличии»).
+  const showQty = store?.show_stock_qty !== false;
   const stockLabel = product.stock > 0 ? `${product.stock} шт.` : "Нет на складе";
   // Характеристики = модификации/реквизиты из МойСклад + базовые поля товара в одной таблице.
   // Поле «минимальное количество» выносим отдельной строкой с понятным названием и показываем
@@ -71,7 +74,7 @@ export default async function ProductPage({ params }: Props) {
     ...attributes,
     ...(product.article ? [{ name: "Артикул", value: product.article }] : []),
     ...(product.category?.name ? [{ name: "Категория", value: product.category.name }] : []),
-    { name: "Остаток на складе", value: stockLabel },
+    ...(showQty ? [{ name: "Остаток на складе", value: stockLabel }] : []),
     { name: "Наличие", value: inStock ? "В наличии" : "Нет в наличии" },
     ...(store?.delivery_info ? [{ name: "Доставка", value: store.delivery_info }] : []),
   ];
@@ -107,7 +110,7 @@ export default async function ProductPage({ params }: Props) {
               {inStock
                 ? <span className="badge badge--stock"><span className="badge__dot" />В наличии</span>
                 : <span className="badge badge--out"><span className="badge__dot" />Нет в наличии</span>}
-              <span className="pdp__sku">Остаток: {stockLabel}</span>
+              {showQty && inStock && <span className="pdp__sku">Остаток: {stockLabel}</span>}
             </div>
 
             <div className="pdp__price">{formatPrice(product.price)}</div>

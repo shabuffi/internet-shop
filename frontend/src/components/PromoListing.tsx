@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { getProducts } from "@/lib/api";
+import { getProducts, getStoreInfo } from "@/lib/api";
 import PromoCard from "@/components/PromoCard";
 import HeaderSearch from "@/components/HeaderSearch";
 import CatalogList from "@/components/CatalogList";
@@ -33,6 +33,8 @@ export default async function PromoListing({
   const pageSize = listView ? 100 : 48;
   const data = await getProducts({ page_size: pageSize, with_photo: withPhoto || undefined, sort, featured, search });
   const items = data.items;
+  // Показ остатка (для списочного вида) — «N шт.» или только «В наличии»: настройка сайта.
+  const showQty = (await getStoreInfo().catch(() => null))?.show_stock_qty !== false;
 
   // Ссылка для тулбара: желаемое состояние (список? / только с фото?), сортировку и поиск сохраняем.
   const mk = (o: { list?: boolean; photo?: boolean }) => {
@@ -107,7 +109,7 @@ export default async function PromoListing({
             {search ? `По запросу «${search}» в этом разделе ничего не найдено.` : "Пока пусто — загляните позже."}
           </p>
         ) : listView ? (
-          <CatalogList products={items} />
+          <CatalogList products={items} showQty={showQty} />
         ) : (
           <div className="catalog-grid">
             {items.map((p) => <PromoCard key={p.id} p={p} kind={kind} />)}

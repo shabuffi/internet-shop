@@ -112,6 +112,8 @@ export interface StoreInfo {
   home_banners?: string;
   // Логотипы брендов для слайдера на главной (JSON-массив [{id, image}])
   brands?: string;
+  // Показ остатка: true — «N шт.», false — только «В наличии» (по умолчанию true)
+  show_stock_qty?: boolean;
 }
 
 export async function getStoreInfo(): Promise<StoreInfo> {

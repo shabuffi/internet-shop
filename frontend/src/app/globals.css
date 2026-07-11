@@ -1198,14 +1198,15 @@ textarea.form-input { height: auto; min-height: 90px; padding: var(--s-3) var(--
 }
 .brands__viewport::-webkit-scrollbar { display: none; }
 .brands__viewport:active { cursor: grabbing; }
-.brands__track { display: flex; align-items: center; gap: var(--s-12); width: max-content; padding: 0 var(--s-8); }
-.brands__item { flex: none; display: inline-flex; align-items: center; justify-content: center; height: 56px; }
-.brands__item img { height: 52px; width: auto; max-width: 200px; object-fit: contain; display: block; user-select: none; -webkit-user-drag: none; }
+.brands__track { display: flex; align-items: center; gap: var(--s-16); width: max-content; padding: 0 var(--s-8); }
+/* Высота ряда НЕ фиксирована — item подстраивается под свою картинку, а ряд (align-items:center)
+   становится по самой высокой. Логотипы — по max-height (аспект сохраняется, без искажений). */
+.brands__item { flex: none; display: inline-flex; align-items: center; justify-content: center; }
+.brands__item img { height: auto; max-height: 84px; width: auto; max-width: 280px; object-fit: contain; display: block; user-select: none; -webkit-user-drag: none; }
 @media (max-width: 768px) {
   .brands { padding: var(--s-8) 0 var(--s-12); }
-  .brands__track { gap: var(--s-8); padding: 0 var(--s-4); }
-  .brands__item { height: 44px; }
-  .brands__item img { height: 40px; max-width: 150px; }
+  .brands__track { gap: var(--s-12); padding: 0 var(--s-4); }
+  .brands__item img { max-height: 60px; max-width: 200px; }
 }
 
 /* Универсальная карточка с подъёмом + иконка-плашка (Контакты, О компании) */
