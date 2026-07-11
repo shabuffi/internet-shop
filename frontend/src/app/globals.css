@@ -82,21 +82,46 @@ button, input, textarea, select { font-family: inherit; }
 .app-main { flex: 1 1 auto; }
 .band { background: var(--cloud); }
 
-/* Инфо-плашка «оформление — только зарегистрированным»: полоса между шапкой и контентом */
-.regnotice { background: var(--accent-soft); border-bottom: 1px solid color-mix(in srgb, var(--accent), #fff 80%); }
-.regnotice__inner { display: flex; align-items: flex-start; gap: var(--s-4); padding: var(--s-3) 0; }
-.regnotice__text { margin: 0; flex: 1 1 auto; font-size: var(--t-sm); line-height: 1.5; color: var(--ink); }
-.regnotice__link { color: var(--accent); font-weight: 600; text-decoration: underline; text-underline-offset: 2px; white-space: nowrap; }
-.regnotice__link:hover { color: var(--accent-deep); }
+/* Инфо-баннер «оформление — только зарегистрированным»: акцентная полоса между шапкой и контентом.
+   Показывается гостю раз за визит (см. RegisterNotice.tsx). */
+.regnotice {
+  background: linear-gradient(100deg, var(--accent) 0%, var(--accent-deep) 100%);
+  color: var(--on-accent, #fff);
+  box-shadow: inset 0 -1px 0 rgba(255,255,255,.10), 0 6px 16px -10px rgba(0,0,0,.45);
+  animation: regnotice-in .35s cubic-bezier(.4,0,.2,1);
+}
+@keyframes regnotice-in { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .regnotice { animation: none; } }
+.regnotice__inner { display: flex; align-items: center; gap: var(--s-4); padding: var(--s-4) 0; }
+.regnotice__icon {
+  flex: none; display: inline-flex; align-items: center; justify-content: center;
+  width: 40px; height: 40px; border-radius: 999px;
+  background: rgba(255,255,255,.14); color: #fff;
+}
+.regnotice__text { margin: 0; flex: 1 1 auto; font-size: var(--t-sm); line-height: 1.5; color: rgba(255,255,255,.94); }
+.regnotice__link { color: #fff; font-weight: 600; text-decoration: underline; text-underline-offset: 2px; }
+.regnotice__link:hover { color: rgba(255,255,255,.85); }
+/* CTA-кнопка на тёмном фоне — белая с акцентным текстом (перебиваем базовый .btn) */
+.regnotice__cta {
+  flex: none; background: #fff; color: var(--accent); font-weight: 700; white-space: nowrap;
+  border: none;
+}
+.regnotice__cta:hover { background: rgba(255,255,255,.9); color: var(--accent-deep); }
 .regnotice__close {
   flex: none; display: inline-flex; align-items: center; justify-content: center;
-  width: 30px; height: 30px; border-radius: 999px; border: none; cursor: pointer;
-  background: transparent; color: var(--accent); transition: background .2s ease;
+  width: 40px; height: 40px; border-radius: 999px; border: none; cursor: pointer;
+  background: transparent; color: rgba(255,255,255,.9); transition: background .2s ease;
 }
-.regnotice__close:hover { background: color-mix(in srgb, var(--accent), #fff 78%); }
+.regnotice__close:hover { background: rgba(255,255,255,.16); color: #fff; }
 @media (max-width: 768px) {
-  .regnotice__inner { padding: var(--s-3) 0; gap: var(--s-2); }
-  .regnotice__text { font-size: var(--t-xs); }
+  /* На телефоне — колонка; крестик в правом верхнем углу с большой зоной нажатия,
+     не перекрывает текст (у текста запас справа под крестик) */
+  .regnotice { position: relative; }
+  .regnotice__inner { flex-direction: column; align-items: stretch; gap: var(--s-3); padding: var(--s-4) 0; }
+  .regnotice__icon { display: none; }
+  .regnotice__text { font-size: var(--t-xs); padding-right: 34px; }
+  .regnotice__cta { align-self: flex-start; }
+  .regnotice__close { position: absolute; top: 4px; right: 4px; }
 }
 .band--hero {
   position: relative; overflow: hidden;
