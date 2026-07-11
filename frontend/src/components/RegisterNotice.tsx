@@ -2,7 +2,11 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { getMe } from "@/lib/authApi";
+
+// Страницы, где баннер «зарегистрируйтесь» лишний — сам регистрация/вход/восстановление пароля.
+const HIDDEN_ON = ["/register", "/login", "/forgot", "/reset"];
 
 // Информационный баннер «оформление заказов — только зарегистрированным». Полоса между
 // шапкой и контентом (в потоке, не перекрывает страницу). Логика показа:
@@ -23,6 +27,9 @@ function dismissedThisVisit(): boolean {
 export default function RegisterNotice() {
   const [show, setShow] = useState(false);
   const [expanded, setExpanded] = useState(false);   // на мобиле баннер раскладной
+  const pathname = usePathname();
+  // Прячем на страницах регистрации/входа (и обновляется при клиентском переходе).
+  const hiddenHere = HIDDEN_ON.some((p) => pathname?.startsWith(p));
 
   useEffect(() => {
     // На сервере/до монтирования не рендерим (sessionStorage — только в браузере).
@@ -38,7 +45,7 @@ export default function RegisterNotice() {
     setShow(false);
   }
 
-  if (!show) return null;
+  if (!show || hiddenHere) return null;
 
   return (
     <aside className={`regnotice${expanded ? " regnotice--open" : ""}`} role="region" aria-label="Информация о регистрации">
