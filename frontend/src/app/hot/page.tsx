@@ -17,7 +17,6 @@ export default async function HotPage({ searchParams }: {
       kind="hot"
       defaultSort="name"
       params={params}
-      sourceCategory="убойн"
     />
   );
 }

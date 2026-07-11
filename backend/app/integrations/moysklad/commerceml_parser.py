@@ -81,6 +81,11 @@ class ParsedProduct:
 class ParsedCatalog:
     categories: list[ParsedCategory] = field(default_factory=list)
     products: list[ParsedProduct] = field(default_factory=list)
+    # Имена доп-полей (свойств классификатора) из <Классификатор><Свойства> ЭТОГО обмена.
+    # Пусто у «дозаливки» без схемы (второй import.xml с картинкой). Нужно, чтобы понять,
+    # что обмен принёс схему доп-полей и флаги («Распродажа»/«Новинка»/«Убойные») можно
+    # ПЕРЕСЧИТАТЬ — в т.ч. СБРОСИТЬ снятые в МойСклад (у товара значение свойства исчезает).
+    property_names: set[str] = field(default_factory=set)
 
 
 # Пространство имён CommerceML (опционально — МойСклад может не включать его)
@@ -143,6 +148,8 @@ def parse_import_xml(xml_bytes: bytes) -> ParsedCatalog:
             catalog.categories = _parse_groups(groups_el, parent_id=None, ns=ns)
         # Карта свойств классификатора (Ид → название) для характеристик товара
         prop_map = _parse_properties(classifier, ns=ns)
+        # Имена доп-полей этого обмена — сигнал «пришла схема свойств» (см. ParsedCatalog).
+        catalog.property_names = set(prop_map.values())
 
     # ─── Товары ───────────────────────────────────────────────────────────────
     catalog_el = root.find(_tag("Каталог", ns))

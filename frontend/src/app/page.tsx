@@ -70,16 +70,13 @@ export default async function HomePage() {
   // Логотипы брендов для слайдера над футером (из настроек сайта).
   const brands = parseBrands((await getStoreInfo().catch(() => null))?.brands);
 
-  // ВРЕМЕННО: «Новинки»/«Спецпредложения» наполняем товарами-заглушками (разная сортировка,
-  // чтобы наборы отличались). Когда в МойСклад появятся доп. поля «Новинка»/«Спецпредложение» —
-  // заменим источник на фильтр по этим полям, разметка секций останется прежней.
+  // Промо-ленты на главной наполняются ТОЛЬКО по флагам из МойСклад (доп-поля «Убойные
+  // цены»/«Новинка»/«Распродажа»). Фолбэка-подмены больше нет: если по флагу товаров нет —
+  // секцию на главной просто НЕ показываем (пункт остаётся в меню, но пустой лентой не мозолит).
   let hot: Product[] = [];
   let novinki: Product[] = [];
   let special: Product[] = [];
-  // «Спецпредложения» — из категории «РАСПРОДАЖА» (ищем по имени среди уже загруженных категорий).
-  const saleIds = categories.filter((c) => (c.name || "").toLowerCase().includes("распродаж")).map((c) => c.id);
   try {
-    // Основной источник — флаги из МойСклад (доп-поля «Убойные цены»/«Новинка»/«Распродажа»).
     const [h, n, s] = await Promise.all([
       getProducts({ page_size: 12, featured: "hot" }),
       getProducts({ page_size: 12, featured: "new" }),
@@ -88,15 +85,6 @@ export default async function HomePage() {
     hot = h.items;
     novinki = n.items;
     special = s.items;
-    // Фолбэк, пока флаги из МойСклад ещё не приехали — чтобы секции не пустовали:
-    // новинки — товары с фото, спецпредложения — из категории «РАСПРОДАЖА».
-    // «Убойные цены» фолбэком НЕ наполняем — секцию показываем только при реальном флаге.
-    if (novinki.length === 0) {
-      novinki = (await getProducts({ page_size: 12, with_photo: true, sort: "name" })).items;
-    }
-    if (special.length === 0) {
-      special = (await getProducts({ page_size: 12, sort: "name", category_id: saleIds.length ? saleIds.join(",") : "__none__" })).items;
-    }
   } catch { /* без товаров секции просто не покажем */ }
 
   // Ссылка плитки → каталог, отфильтрованный сразу по группе категорий (CATEGORY_GROUPS).
@@ -181,7 +169,7 @@ export default async function HomePage() {
         </div>
       )}
 
-      {/* Новинки (пока товары-заглушки, потом — по полю «Новинка» из МойСклад) */}
+      {/* Новинки (по полю «Новинка» из МойСклад; нет флага — секции нет) */}
       {novinki.length > 0 && (
         <div id="novinki" className="container section">
           <div className="section-head">
@@ -194,7 +182,7 @@ export default async function HomePage() {
         </div>
       )}
 
-      {/* Спецпредложения (пока товары-заглушки, потом — по полю «Спецпредложение» из МойСклад) */}
+      {/* Спецпредложения (по полю «Распродажа/Спецпредложение» из МойСклад; нет флага — секции нет) */}
       {special.length > 0 && (
         <div className="band">
           <div id="special" className="container section">

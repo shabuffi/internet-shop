@@ -38,6 +38,21 @@ def _attr_flag(attributes, patterns) -> bool:
     return False
 
 
+def _prop_defined(property_names, patterns) -> bool:
+    """True, если в схеме доп-полей обмена (``property_names``) есть поле из ``patterns``.
+
+    Отличает «полный каталог со схемой свойств» (флаг можно пересчитывать, в т.ч. СБРОСИТЬ
+    снятый в МойСклад) от «дозаливки» без свойств (флаги не трогаем). Раньше пересчёт был
+    завязан на наличие любых атрибутов у самого товара и залипал (флаг оставался True),
+    если снятое доп-поле было у товара единственным — атрибуты пустели, пересчёт пропускался.
+    """
+    for name in property_names or ():
+        low = (name or "").strip().lower()
+        if any(p in low for p in patterns):
+            return True
+    return False
+
+
 def _utcnow() -> datetime:
     """Наивный UTC-таймстамп (замена устаревшего datetime.utcnow())."""
     return datetime.now(timezone.utc).replace(tzinfo=None)
@@ -176,6 +191,13 @@ def upsert_catalog(db: Session, catalog: ParsedCatalog, source: str = "commercem
         # SELECT'ов повесили бы обмен и дали таймаут у МойСклад).
         existing_products = {p.moysklad_id: p for p in db.query(Product).all()}
 
+        # Пришла ли в ЭТОМ обмене схема флаг-доп-полей (по классификатору). Если да — флаг
+        # пересчитываем для КАЖДОГО товара, в т.ч. сбрасываем снятый в МойСклад (значение
+        # свойства у товара исчезает из выгрузки). «Дозаливка» без схемы флаги не трогает.
+        new_defined = _prop_defined(catalog.property_names, _NEW_PATTERNS)
+        sale_defined = _prop_defined(catalog.property_names, _SALE_PATTERNS)
+        hot_defined = _prop_defined(catalog.property_names, _HOT_PATTERNS)
+
         # Товары, у которых обмен просит УБРАТЬ фото — не применяем сразу, а копим и в конце
         # пропускаем через предохранитель (MAX_IMAGE_CLEARS). Добавление/замену фото применяем
         # сразу (потери нет). images_touched → нужно ли обновить слепок привязок в конце.
@@ -245,18 +267,19 @@ def upsert_catalog(db: Session, catalog: ParsedCatalog, source: str = "commercem
                 # Характеристики обновляем только если пришли (как и описание/артикул)
                 if parsed_product.attributes and product.attributes != parsed_product.attributes:
                     product.attributes = parsed_product.attributes; changed = True
-                # Флаги «Новинка»/«Распродажа» пересчитываем, когда пришли доп-поля (полный каталог).
-                # Так галочка, снятая в МойСклад, тоже снимется у нас на следующем обмене.
-                if parsed_product.attributes:
-                    new_flag = _attr_flag(parsed_product.attributes, _NEW_PATTERNS)
-                    sale_flag = _attr_flag(parsed_product.attributes, _SALE_PATTERNS)
-                    hot_flag = _attr_flag(parsed_product.attributes, _HOT_PATTERNS)
-                    if product.is_new != new_flag:
-                        product.is_new = new_flag; changed = True
-                    if product.is_sale != sale_flag:
-                        product.is_sale = sale_flag; changed = True
-                    if product.is_hot != hot_flag:
-                        product.is_hot = hot_flag; changed = True
+                # Флаги «Новинка»/«Распродажа»/«Убойные» пересчитываем, когда обмен принёс схему
+                # этого доп-поля (`*_defined`) — тогда снятая в МойСклад галочка тоже снимется у нас.
+                # Плюс запасной случай: товар несёт включённый флаг в атрибутах, даже если схему
+                # почему-то не прислали (тогда только СТАВИМ True, снять без схемы не рискуем).
+                new_flag = _attr_flag(parsed_product.attributes, _NEW_PATTERNS)
+                sale_flag = _attr_flag(parsed_product.attributes, _SALE_PATTERNS)
+                hot_flag = _attr_flag(parsed_product.attributes, _HOT_PATTERNS)
+                if (new_defined or new_flag) and product.is_new != new_flag:
+                    product.is_new = new_flag; changed = True
+                if (sale_defined or sale_flag) and product.is_sale != sale_flag:
+                    product.is_sale = sale_flag; changed = True
+                if (hot_defined or hot_flag) and product.is_hot != hot_flag:
+                    product.is_hot = hot_flag; changed = True
                 # Картинки трогаем ПОФАЙЛОВО — только если У ЭТОГО товара в import.xml реально
                 # был тег <Картинка> (или пришли имена файлов). Раньше решали «по всему раунду»
                 # (round_has_images): если в заходе была хоть одна картинка, у ВСЕХ товаров без

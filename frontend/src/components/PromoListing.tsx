@@ -1,28 +1,16 @@
 import Link from "next/link";
-import { getProducts, getCategories } from "@/lib/api";
+import { getProducts } from "@/lib/api";
 import PromoCard from "@/components/PromoCard";
 import HeaderSearch from "@/components/HeaderSearch";
 import CatalogList from "@/components/CatalogList";
 import CartBar from "@/components/CartBar";
 import SortSelect from "@/components/SortSelect";
 
-/** id категорий, чьё название содержит подстроку (регистронезависимо). Для источника
- *  товаров по категории (напр. «РАСПРОДАЖА»). Возвращает пусто, если совпадений нет. */
-async function categoryIdsByName(namePart: string): Promise<string[]> {
-  try {
-    const cats = await getCategories();
-    const q = namePart.toLowerCase();
-    return cats.filter((c) => (c.name || "").toLowerCase().includes(q)).map((c) => c.id);
-  } catch {
-    return [];
-  }
-}
-
-/** Общая витрина для страниц «Новинки»/«Спецпредложения»: шапка + тулбар (сортировка,
- *  «С фото», переключатель плитка/список) + сетка карточек (или список — «бланк заказа»).
- *  Пока товары — заглушки (по сортировке); при появлении поля в МойСклад сменим источник. */
+/** Общая витрина для страниц «Убойные цены»/«Новинки»/«Спецпредложения»: шапка + тулбар
+ *  (сортировка, «С фото», переключатель плитка/список) + сетка карточек (или список —
+ *  «бланк заказа»). Источник — ТОЛЬКО флаг из МойСклад (kind); нет товаров — пустое состояние. */
 export default async function PromoListing({
-  basePath, title, subtitle, kind, defaultSort, params, sourceCategory,
+  basePath, title, subtitle, kind, defaultSort, params,
 }: {
   basePath: string;
   title: string;
@@ -30,9 +18,6 @@ export default async function PromoListing({
   kind: "new" | "sale" | "hot";
   defaultSort: string;
   params: { view?: string; sort?: string; photo?: string; search?: string };
-  // Если задано — товары берём из категории с таким именем (напр. «РАСПРОДАЖА»),
-  // иначе (заглушка) — просто по сортировке.
-  sourceCategory?: string;
 }) {
   const listView = params.view === "list";
   const sort = params.sort === "price_asc" || params.sort === "price_desc" || params.sort === "name"
@@ -41,22 +26,12 @@ export default async function PromoListing({
   // Поиск ищет ВНУТРИ раздела (search + featured комбинируются на бэкенде), а не по всему каталогу.
   const search = params.search?.trim() || undefined;
 
-  // Источник — флаги из МойСклад («Убойные цены»/«Новинка»/«Распродажа»). kind = значение featured.
+  // Источник — ТОЛЬКО флаг из МойСклад («Убойные цены»/«Новинка»/«Распродажа»). kind = featured.
+  // Фолбэка на категорию/сортировку больше нет: если по флагу пусто — показываем пустое
+  // состояние, а не подменяем чужими товарами (иначе снятый в МС флаг «не убирал» товар с сайта).
   const featured = kind;
   const pageSize = listView ? 100 : 48;
-  let data = await getProducts({ page_size: pageSize, with_photo: withPhoto || undefined, sort, featured, search });
-  // Фолбэк, пока флагов из МойСклад мало: спец — из категории «РАСПРОДАЖА», новинки — по сортировке.
-  // При активном поиске фолбэк НЕ применяем: иначе «ничего не найдено» подменялось бы
-  // случайными товарами из всего каталога.
-  if (!search && data.items.length === 0) {
-    if (sourceCategory) {
-      const ids = await categoryIdsByName(sourceCategory);
-      const categoryId = ids.length ? ids.join(",") : "__none__";
-      data = await getProducts({ page_size: pageSize, with_photo: withPhoto || undefined, sort, category_id: categoryId });
-    } else {
-      data = await getProducts({ page_size: pageSize, with_photo: true, sort });
-    }
-  }
+  const data = await getProducts({ page_size: pageSize, with_photo: withPhoto || undefined, sort, featured, search });
   const items = data.items;
 
   // Ссылка для тулбара: желаемое состояние (список? / только с фото?), сортировку и поиск сохраняем.

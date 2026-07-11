@@ -17,7 +17,6 @@ export default async function SpecialPage({ searchParams }: {
       kind="sale"
       defaultSort="name"
       params={params}
-      sourceCategory="распродаж"
     />
   );
 }

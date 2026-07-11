@@ -25,8 +25,9 @@ def isolate_media(tmp_path, monkeypatch):
     return d
 
 
-def _catalog(products, categories=None):
-    return ParsedCatalog(categories=categories or [], products=products)
+def _catalog(products, categories=None, property_names=None):
+    return ParsedCatalog(categories=categories or [], products=products,
+                         property_names=property_names or set())
 
 
 def test_upsert_creates_new(db_session):
@@ -291,13 +292,46 @@ def test_upsert_sets_new_sale_flags(db_session):
 
 
 def test_upsert_flag_recompute_clears_on_update(db_session):
-    """Снятая в МойСклад галочка снимается и у нас при следующем обмене с доп-полями."""
+    """Снятая в МойСклад галочка снимается и у нас при следующем обмене со схемой доп-полей."""
     upsert_catalog(db_session, _catalog(products=[
         ParsedProduct(moysklad_id="p1", name="Т", attributes=[{"name": "Новинка", "value": "true"}])]))
     assert db_session.query(Product).filter_by(moysklad_id="p1").first().is_new is True
-    upsert_catalog(db_session, _catalog(products=[
-        ParsedProduct(moysklad_id="p1", name="Т", attributes=[{"name": "Количество штук в коробке", "value": "5"}])]))
+    # Следующий полный каталог: доп-поле «Новинка» всё ещё в схеме, но значения у товара нет.
+    upsert_catalog(db_session, _catalog(
+        products=[ParsedProduct(moysklad_id="p1", name="Т",
+                                attributes=[{"name": "Количество штук в коробке", "value": "5"}])],
+        property_names={"Новинка", "Количество штук в коробке"}))
     assert db_session.query(Product).filter_by(moysklad_id="p1").first().is_new is False
+
+
+def test_upsert_flag_clears_when_it_was_only_attribute(db_session):
+    """Регресс: снятая галочка сбрасывает флаг, даже если доп-поле было у товара единственным.
+
+    Раньше пересчёт был под ``if parsed_product.attributes:`` — при снятии единственного
+    доп-поля атрибуты товара пустели, пересчёт пропускался и is_sale залипал True. Теперь
+    сигнал «пришла схема доп-полей» — ``property_names`` из классификатора, а не атрибуты товара.
+    """
+    upsert_catalog(db_session, _catalog(
+        products=[ParsedProduct(moysklad_id="p", name="Т", attributes=[{"name": "Распродажа", "value": "1"}])],
+        property_names={"Распродажа"}))
+    assert db_session.query(Product).filter_by(moysklad_id="p").first().is_sale is True
+    # Галочку сняли → у товара НЕТ атрибутов, но схема доп-поля в обмене есть → флаг сбрасываем.
+    upsert_catalog(db_session, _catalog(
+        products=[ParsedProduct(moysklad_id="p", name="Т", attributes=[])],
+        property_names={"Распродажа"}))
+    assert db_session.query(Product).filter_by(moysklad_id="p").first().is_sale is False
+
+
+def test_upsert_flag_not_cleared_without_schema(db_session):
+    """«Дозаливка» без схемы доп-полей (напр. второй import.xml с картинкой) флаги НЕ трогает."""
+    upsert_catalog(db_session, _catalog(
+        products=[ParsedProduct(moysklad_id="p", name="Т", attributes=[{"name": "Распродажа", "value": "1"}])],
+        property_names={"Распродажа"}))
+    assert db_session.query(Product).filter_by(moysklad_id="p").first().is_sale is True
+    # Обмен без схемы (property_names пуст) — is_sale остаётся, чтобы не обнулить по ошибке.
+    upsert_catalog(db_session, _catalog(
+        products=[ParsedProduct(moysklad_id="p", name="Т", attributes=[], has_image_field=True)]))
+    assert db_session.query(Product).filter_by(moysklad_id="p").first().is_sale is True
 
 
 def test_upsert_logs_counts(db_session):

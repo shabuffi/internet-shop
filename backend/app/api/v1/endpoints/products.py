@@ -64,6 +64,17 @@ def list_categories(db: Session = Depends(get_db)):
     """
     cats = db.scalars(select(Category)).all()
 
+    # Число товаров «как на витрине» (активные, с остатком) по каждой категории — тем же
+    # правилом, что и список товаров (is_active + stock > 0). Пустые категории (например
+    # «Распродажа», из которой убрали весь товар) на витрине не показываем — иначе фильтр
+    # предлагает раздел, в котором заведомо ничего нет.
+    count_rows = db.execute(
+        select(Product.category_id, func.count())
+        .where(Product.is_active == True, Product.stock > 0, Product.category_id.isnot(None))
+        .group_by(Product.category_id)
+    ).all()
+    counts: dict[str, int] = {cid: n for cid, n in count_rows}
+
     def code_of(name: str) -> str | None:
         m = re.match(r"\s*([\d.]+)", name)
         return m.group(1).rstrip(".") if m and m.group(1).strip(".") else None
@@ -115,13 +126,21 @@ def list_categories(db: Session = Depends(get_db)):
     # дети идут сразу за родителем — дерево сохраняется, но упорядочено по алфавиту.
     out: list[CategoryOut] = []
 
-    def emit(pid: str | None) -> None:
-        for cid in sorted(children.get(pid, []), key=lambda x: info[x][2]):
-            pid2, depth, _k, c = info[cid]
-            out.append(CategoryOut(id=c.id, name=c.name, parent_id=pid2, depth=depth))
-            emit(cid)
+    def emit(cid: str) -> list[CategoryOut]:
+        # Собираем поддерево: сначала дети (в алфавитном порядке), затем решаем, показывать ли
+        # саму категорию. Категорию скрываем ТОЛЬКО если в ней нет товара И все её подкатегории
+        # тоже пусты — так пустой раздел-родитель с непустым ребёнком не исчезнет, а его ребёнок
+        # не осиротеет. Возвращаем строки поддерева (пусто — если весь узел скрыт).
+        pid2, depth, _k, c = info[cid]
+        child_rows: list[CategoryOut] = []
+        for ch in sorted(children.get(cid, []), key=lambda x: info[x][2]):
+            child_rows += emit(ch)
+        if counts.get(cid, 0) == 0 and not child_rows:
+            return []
+        return [CategoryOut(id=c.id, name=c.name, parent_id=pid2, depth=depth), *child_rows]
 
-    emit(None)
+    for cid in sorted(children.get(None, []), key=lambda x: info[x][2]):
+        out += emit(cid)
     return out
 
 
