@@ -22,6 +22,7 @@ function dismissedThisVisit(): boolean {
 
 export default function RegisterNotice() {
   const [show, setShow] = useState(false);
+  const [expanded, setExpanded] = useState(false);   // на мобиле баннер раскладной
 
   useEffect(() => {
     // На сервере/до монтирования не рендерим (sessionStorage — только в браузере).
@@ -40,7 +41,7 @@ export default function RegisterNotice() {
   if (!show) return null;
 
   return (
-    <aside className="regnotice" role="region" aria-label="Информация о регистрации">
+    <aside className={`regnotice${expanded ? " regnotice--open" : ""}`} role="region" aria-label="Информация о регистрации">
       <div className="container regnotice__inner">
         <span className="regnotice__icon" aria-hidden="true">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
@@ -48,13 +49,20 @@ export default function RegisterNotice() {
           </svg>
         </span>
 
-        <p className="regnotice__text">
-          Вы находитесь в оптовом интернет-магазине ТД «Инженер». Чтобы получить доступ к
-          оформлению заказов, пройдите{" "}
-          <Link href="/register" className="regnotice__link">регистрацию</Link>. После регистрации
-          для вашей организации будут доступны индивидуальные цены, персональные условия
-          сотрудничества и дополнительные возможности интернет-магазина.
-        </p>
+        <div className="regnotice__body">
+          <p className="regnotice__text">
+            Вы находитесь в оптовом интернет-магазине ТД «Инженер». Чтобы получить доступ к
+            оформлению заказов, пройдите{" "}
+            <Link href="/register" className="regnotice__link">регистрацию</Link>. После регистрации
+            для вашей организации будут доступны индивидуальные цены, персональные условия
+            сотрудничества и дополнительные возможности интернет-магазина.
+          </p>
+          {/* На мобиле баннер свёрнут (2 строки); кнопка разворачивает весь текст. На десктопе скрыта. */}
+          <button type="button" className="regnotice__more" onClick={() => setExpanded((v) => !v)} aria-expanded={expanded}>
+            {expanded ? "Свернуть" : "Показать полностью"}
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6" /></svg>
+          </button>
+        </div>
 
         <Link href="/register" className="btn btn--sm regnotice__cta">Зарегистрироваться</Link>
 
