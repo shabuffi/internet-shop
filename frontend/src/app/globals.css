@@ -81,6 +81,23 @@ button, input, textarea, select { font-family: inherit; }
 .container { width: 100%; max-width: var(--container); margin: 0 auto; padding: 0 var(--s-8); }
 .app-main { flex: 1 1 auto; }
 .band { background: var(--cloud); }
+
+/* Инфо-плашка «оформление — только зарегистрированным»: полоса между шапкой и контентом */
+.regnotice { background: var(--accent-soft); border-bottom: 1px solid color-mix(in srgb, var(--accent), #fff 80%); }
+.regnotice__inner { display: flex; align-items: flex-start; gap: var(--s-4); padding: var(--s-3) 0; }
+.regnotice__text { margin: 0; flex: 1 1 auto; font-size: var(--t-sm); line-height: 1.5; color: var(--ink); }
+.regnotice__link { color: var(--accent); font-weight: 600; text-decoration: underline; text-underline-offset: 2px; white-space: nowrap; }
+.regnotice__link:hover { color: var(--accent-deep); }
+.regnotice__close {
+  flex: none; display: inline-flex; align-items: center; justify-content: center;
+  width: 30px; height: 30px; border-radius: 999px; border: none; cursor: pointer;
+  background: transparent; color: var(--accent); transition: background .2s ease;
+}
+.regnotice__close:hover { background: color-mix(in srgb, var(--accent), #fff 78%); }
+@media (max-width: 768px) {
+  .regnotice__inner { padding: var(--s-3) 0; gap: var(--s-2); }
+  .regnotice__text { font-size: var(--t-xs); }
+}
 .band--hero {
   position: relative; overflow: hidden;
   /* Фон-иллюстрация склада на всех hero-разделах (светлый оверлей — заголовок читается).
