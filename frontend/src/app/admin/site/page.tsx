@@ -24,21 +24,27 @@ export default function AdminSitePage() {
 
   function markUnsaved() { setSaved(false); }
 
-  async function onUpload(file?: File) {
-    if (!file) return;
+  async function onUpload(files?: FileList | null) {
+    const list = files ? Array.from(files) : [];
+    if (list.length === 0) return;
     setUploading(true); setError("");
-    try {
-      const fd = new FormData();
-      fd.append("file", file);
-      const added = await adminUpload<Brand>("/brands/upload", fd);
-      setBrands((prev) => [...prev, added]);
-      markUnsaved();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Не удалось загрузить логотип");
-    } finally {
-      setUploading(false);
-      if (fileRef.current) fileRef.current.value = "";
+    // Эндпоинт принимает по одному файлу — грузим последовательно, сохраняя порядок выбора.
+    // Успешные добавляем к списку даже если часть не прошла; про сбойные сообщаем по именам.
+    const added: Brand[] = [];
+    const failed: string[] = [];
+    for (const file of list) {
+      try {
+        const fd = new FormData();
+        fd.append("file", file);
+        added.push(await adminUpload<Brand>("/brands/upload", fd));
+      } catch {
+        failed.push(file.name);
+      }
     }
+    if (added.length) { setBrands((prev) => [...prev, ...added]); markUnsaved(); }
+    if (failed.length) setError(`Не удалось загрузить: ${failed.join(", ")}`);
+    setUploading(false);
+    if (fileRef.current) fileRef.current.value = "";
   }
 
   function move(i: number, dir: -1 | 1) {
@@ -87,7 +93,7 @@ export default function AdminSitePage() {
       <div style={{ maxWidth: 720 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "18px 0 6px" }}>
           <h2 style={{ fontSize: 18, fontWeight: 600 }}>Бренды</h2>
-          <HelpHint text={"Логотипы брендов показываются слайдером над футером главной. Загружайте PNG (лучше с прозрачным фоном) или JPG; порядок задаётте стрелками."} />
+          <HelpHint text={"Логотипы брендов показываются слайдером над футером главной. Можно выбрать сразу несколько файлов (PNG лучше с прозрачным фоном, или JPG); порядок задаётся стрелками."} />
         </div>
 
         {/* Рекомендации по загрузке */}
@@ -109,10 +115,10 @@ export default function AdminSitePage() {
             <label style={{ display: "inline-flex", alignItems: "center", gap: 8, cursor: "pointer",
               padding: "9px 16px", borderRadius: 10, border: "1px dashed var(--accent, #003399)",
               color: "var(--accent, #003399)", fontWeight: 600, fontSize: 14, marginBottom: 16 }}>
-              {uploading ? "Загрузка…" : "＋ Загрузить логотип"}
-              <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml"
+              {uploading ? "Загрузка…" : "＋ Загрузить логотипы"}
+              <input ref={fileRef} type="file" multiple accept="image/png,image/jpeg,image/webp,image/svg+xml"
                 style={{ display: "none" }} disabled={uploading}
-                onChange={(e) => onUpload(e.target.files?.[0])} />
+                onChange={(e) => onUpload(e.target.files)} />
             </label>
 
             {/* Список логотипов */}

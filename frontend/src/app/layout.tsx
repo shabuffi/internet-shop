@@ -10,7 +10,7 @@ import HeaderSearch from "@/components/HeaderSearch";
 import ChatWidget from "@/components/ChatWidget";
 import VkChatWidget from "@/components/VkChatWidget";
 import CookieConsent from "@/components/CookieConsent";
-import RegisterNotice from "@/components/RegisterNotice";
+// import RegisterNotice from "@/components/RegisterNotice"; // плашка скрыта по просьбе заказчика (см. ниже)
 import { SITE_URL, SITE_NAME, SITE_DESCRIPTION } from "@/lib/site";
 import { getStoreInfo } from "@/lib/api";
 import { chatConfigFromStore } from "@/lib/chat";
@@ -108,8 +108,10 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             </div>
           </header>
 
-          {/* Инфо-плашка «оформление — только зарегистрированным» (гостю, между шапкой и контентом) */}
-          <RegisterNotice />
+          {/* Инфо-плашка «оформление — только зарегистрированным» СКРЫТА по просьбе заказчика
+              (11.07.2026): отмена оформления у заказчиков; компонент оставлен, но не монтируется.
+              Вернуть — раскомментировать импорт RegisterNotice и строку ниже. */}
+          {/* <RegisterNotice /> */}
 
           <main className="app-main">{children}</main>
 
