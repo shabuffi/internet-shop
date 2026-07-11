@@ -74,8 +74,11 @@ export default async function ProductPage({ params }: Props) {
     ...attributes,
     ...(product.article ? [{ name: "Артикул", value: product.article }] : []),
     ...(product.category?.name ? [{ name: "Категория", value: product.category.name }] : []),
-    ...(showQty ? [{ name: "Остаток на складе", value: stockLabel }] : []),
-    { name: "Наличие", value: inStock ? "В наличии" : "Нет в наличии" },
+    // Показываем ОДНО: точный остаток («Остаток на складе: N шт.») либо факт наличия
+    // («Наличие: В наличии») — чтобы не дублировать одно и то же двумя строками.
+    ...(showQty
+      ? [{ name: "Остаток на складе", value: stockLabel }]
+      : [{ name: "Наличие", value: inStock ? "В наличии" : "Нет в наличии" }]),
     ...(store?.delivery_info ? [{ name: "Доставка", value: store.delivery_info }] : []),
   ];
 
