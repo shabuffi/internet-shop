@@ -51,13 +51,16 @@ export default function RegisterNotice() {
 
         <div className="regnotice__body">
           <p className="regnotice__text">
+            {/* Первое предложение видно ВСЕГДА (в т.ч. в свёрнутом виде на мобиле) */}
             Вы находитесь в оптовом интернет-магазине ТД «Инженер». Чтобы получить доступ к
             оформлению заказов, пройдите{" "}
-            <Link href="/register" className="regnotice__link">регистрацию</Link>. После регистрации
-            для вашей организации будут доступны индивидуальные цены, персональные условия
-            сотрудничества и дополнительные возможности интернет-магазина.
+            <Link href="/register" className="regnotice__link">регистрацию</Link>.{" "}
+            {/* Остаток — на мобиле скрыт до «Показать полностью»; на десктопе виден всегда */}
+            <span className="regnotice__rest">После регистрации для вашей организации будут
+            доступны индивидуальные цены, персональные условия сотрудничества и дополнительные
+            возможности интернет-магазина.</span>
           </p>
-          {/* На мобиле баннер свёрнут (2 строки); кнопка разворачивает весь текст. На десктопе скрыта. */}
+          {/* На мобиле часть текста скрыта; кнопка разворачивает. На десктопе скрыта. */}
           <button type="button" className="regnotice__more" onClick={() => setExpanded((v) => !v)} aria-expanded={expanded}>
             {expanded ? "Свернуть" : "Показать полностью"}
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6" /></svg>
