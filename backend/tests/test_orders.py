@@ -35,8 +35,8 @@ def test_create_order_success(client, db_session, no_celery):
     assert data["status"] == "new"
     assert data["number"].startswith("ORD-")
     assert len(data["items"]) == 1
-    # сумма по цене ИЗ БД с витринной наценкой гостя +10% (3000 * 1.10 * 2), не из запроса
-    assert float(data["total_amount"]) == 6600.0
+    # сумма по цене ИЗ БД (гость видит базовую цену МойСклад без наценки: 3000 * 2), не из запроса
+    assert float(data["total_amount"]) == 6000.0
 
 
 def test_create_order_price_from_db_not_client(client, db_session, no_celery):
@@ -49,8 +49,8 @@ def test_create_order_price_from_db_not_client(client, db_session, no_celery):
         "items": [{"product_id": "p-1", "quantity": 1, "price": "1"}],  # цена-подделка
     })
     assert resp.status_code == 201
-    # цена клиента игнорируется: 6000 из БД + наценка гостя +10% = 6600
-    assert float(resp.json()["total_amount"]) == 6600.0
+    # цена клиента игнорируется: берётся 6000 из БД (гость — базовая цена без наценки)
+    assert float(resp.json()["total_amount"]) == 6000.0
 
 
 def test_create_order_missing_product(client, db_session, no_celery):
