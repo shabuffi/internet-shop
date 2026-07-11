@@ -102,9 +102,9 @@ button, input, textarea, select { font-family: inherit; }
 .regnotice__inner { display: flex; align-items: center; gap: var(--s-5); padding: var(--s-4) var(--s-8); }
 .regnotice__icon {
   flex: none; display: inline-flex; align-items: center; justify-content: center;
-  width: 40px; height: 40px; border-radius: 999px;
-  background: var(--accent-soft); color: var(--accent);
+  color: var(--accent);           /* без кружка-фона — просто крупная иконка */
 }
+.regnotice__icon svg { width: 30px; height: 30px; }
 .regnotice__body { flex: 1 1 auto; min-width: 0; }
 .regnotice__text { margin: 0; font-size: var(--t-sm); line-height: 1.5; color: var(--ink); }
 .regnotice__link { color: var(--accent); font-weight: 600; text-decoration: underline; text-underline-offset: 2px; }
@@ -121,7 +121,7 @@ button, input, textarea, select { font-family: inherit; }
   width: 40px; height: 40px; border-radius: 999px; border: none; cursor: pointer;
   background: transparent; color: var(--graphite); transition: background .2s ease, color .2s ease;
 }
-.regnotice__close:hover { background: var(--cloud); color: var(--ink); }
+.regnotice__close:hover { color: var(--ink); }   /* без фона — светлеет только сам крестик */
 @media (max-width: 768px) {
   /* Телефон: оверлей-карточка у краёв, под шапкой (60px). Раскладной: текст свёрнут в 2 строки,
      кнопка «Показать полностью» разворачивает весь текст. Кнопку регистрации прячем (ссылка в тексте). */
@@ -133,8 +133,8 @@ button, input, textarea, select { font-family: inherit; }
   /* .regnotice .regnotice__inner — двух-классовая специфичность: мобильный .container{padding:0 …}
      (шорткат, ниже по файлу) иначе обнуляет вертикальный padding */
   .regnotice .regnotice__inner { align-items: flex-start; gap: var(--s-3); padding: var(--s-6) var(--s-4); }
-  .regnotice__icon { width: 30px; height: 30px; margin-top: 1px; }
-  .regnotice__icon svg { width: 18px; height: 18px; }
+  .regnotice__icon { margin-top: 1px; }
+  .regnotice__icon svg { width: 26px; height: 26px; }
   .regnotice__body { padding-right: 30px; }   /* место под крестик в правом верхнем углу */
   .regnotice__text { font-size: var(--t-xs); }
   /* Свёрнуто: первое предложение видно всегда, остаток скрыт; «Показать полностью» разворачивает */
