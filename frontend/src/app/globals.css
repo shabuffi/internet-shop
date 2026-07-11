@@ -114,10 +114,15 @@ button, input, textarea, select { font-family: inherit; }
 }
 .regnotice__close:hover { background: rgba(255,255,255,.16); color: #fff; }
 @media (max-width: 768px) {
-  /* На телефоне: строка «иконка + текст», больше воздуха сверху/снизу. Кнопку прячем —
-     в тексте уже есть ссылка «регистрацию». Крестик в правом верхнем углу с большой зоной,
-     текст с запасом справа, чтобы под него не залезал. */
-  .regnotice { position: relative; }
+  /* На телефоне баннер — ПЛАВАЮЩИЙ ОВЕРЛЕЙ поверх контента (карточка со скруглением и тенью):
+     не двигает страницу и явно читается как всплывашка, которую можно закрыть крестиком.
+     Позиционируем под шапкой (60px) с зазором; при скролле уезжает под липкую шапку. */
+  .regnotice {
+    position: absolute; top: 66px; left: 10px; right: 10px; z-index: 30;
+    border-radius: 14px; overflow: hidden;
+    box-shadow: 0 16px 38px -10px rgba(0,0,0,.55);
+  }
+  /* строка «иконка + текст», воздух сверху/снизу; кнопку прячем (в тексте есть ссылка) */
   /* .regnotice .container — двух-классовая специфичность: мобильный .container{padding:0 …}
      (шорткат, ниже по файлу) иначе обнуляет вертикальный padding */
   .regnotice .regnotice__inner { flex-direction: row; align-items: flex-start; gap: var(--s-3); padding: var(--s-8) 0; }
