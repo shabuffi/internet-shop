@@ -118,7 +118,7 @@ button, input, textarea, select { font-family: inherit; }
      в тексте уже есть ссылка «регистрацию». Крестик в правом верхнем углу с большой зоной,
      текст с запасом справа, чтобы под него не залезал. */
   .regnotice { position: relative; }
-  .regnotice__inner { flex-direction: row; align-items: flex-start; gap: var(--s-3); padding: var(--s-5) 0; }
+  .regnotice__inner { flex-direction: row; align-items: flex-start; gap: var(--s-3); padding: var(--s-8) 0; }
   .regnotice__icon { display: inline-flex; width: 30px; height: 30px; margin-top: 1px; }
   .regnotice__icon svg { width: 18px; height: 18px; }
   .regnotice__text { font-size: var(--t-xs); padding-right: 36px; }
