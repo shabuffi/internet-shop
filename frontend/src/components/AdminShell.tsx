@@ -12,7 +12,7 @@ const NAV = [
   { href: "/admin/sync",     label: "Синхронизация", Icon: IconSync },
   { href: "/admin/products", label: "Товары",        Icon: IconBox },
   { href: "/admin/orders",   label: "Заказы",        Icon: IconOrders },
-  { href: "/admin/banners",  label: "Баннеры",       Icon: IconImage },
+  { href: "/admin/site",     label: "Настройка сайта", Icon: IconImage },
   { href: "/admin/users",    label: "Покупатели",    Icon: IconUsers },
   { href: "/admin/policy",   label: "Политика",      Icon: IconShield },
 ];

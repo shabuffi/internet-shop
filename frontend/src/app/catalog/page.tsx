@@ -1,12 +1,10 @@
 export const dynamic = 'force-dynamic';
 
 import Link from "next/link";
-import { getProducts, getCategories, getStoreInfo } from "@/lib/api";
+import { getProducts, getCategories } from "@/lib/api";
 import { CATEGORY_GROUPS, normCatName } from "@/lib/categoryGroups";
-import { parseBanners } from "@/lib/banners";
 import type { Category } from "@/types/product";
 import { formatPrice } from "@/lib/format";
-import Slider from "@/components/Slider";
 import AddToCartCard from "@/components/AddToCartCard";
 import ChestnyZnakBadge from "@/components/ChestnyZnakBadge";
 import FeaturedBadge from "@/components/FeaturedBadge";
@@ -89,11 +87,10 @@ export default async function CatalogPage({ searchParams }: Props) {
   const sort = params.sort === "price_asc" || params.sort === "price_desc" ? params.sort : "name";
   const withPhoto = params.photo === "1";
 
-  const [data, categories, store] = await Promise.all([
+  const [data, categories] = await Promise.all([
     // В списке («бланк заказа») показываем больше товаров на странице
     getProducts({ category_id: categoryId, search, page, sort, with_photo: withPhoto, page_size: listView ? 100 : undefined }),
     getCategories(),
-    getStoreInfo().catch(() => null),
   ]);
 
   const categoryLabel = resolveCategoryLabel(categoryId, categories);
@@ -106,10 +103,6 @@ export default async function CatalogPage({ searchParams }: Props) {
     searchedInCategory && data.items.length === 0
       ? (await getProducts({ search, page_size: 1 })).total
       : 0;
-  // Слайдер баннеров — на общем каталоге (без выбранной категории/поиска), только если явно включён.
-  const showBanners = !categoryId && !search && store?.banners_enabled === true;
-  const banners = showBanners ? parseBanners(store?.home_banners) : [];
-
   const toggle = (active: boolean): React.CSSProperties => ({
     display: "flex", alignItems: "center", justifyContent: "center", padding: "7px 12px", textDecoration: "none",
     background: active ? "var(--accent)" : "transparent", color: active ? "var(--on-accent)" : "var(--ink-secondary)",
@@ -165,14 +158,7 @@ export default async function CatalogPage({ searchParams }: Props) {
         </div>
       </div>
 
-      {/* Слайдер баннеров — под заголовком каталога, на белом фоне (без шва) */}
-      {banners.length > 0 && (
-        <div className="container" style={{ marginTop: "var(--s-8)" }}>
-          <Slider banners={banners} />
-        </div>
-      )}
-
-      <div className="container section section--listing" style={{ paddingTop: banners.length > 0 ? "var(--s-8)" : "var(--s-16)" }}>
+      <div className="container section section--listing" style={{ paddingTop: "var(--s-16)" }}>
         {/* Активный поисковый фильтр — виден всегда (в т.ч. внутри категории и на телефоне),
             иначе непонятно, почему в категориях пусто. Сбрасывает только поиск. */}
         {search && (

@@ -1186,6 +1186,28 @@ textarea.form-input { height: auto; min-height: 90px; padding: var(--s-3) var(--
 .marquee:hover .marquee__track { animation-play-state: paused; }
 @keyframes marquee-scroll { from { transform: translateX(0); } to { transform: translateX(-50%); } }
 
+/* Слайдер логотипов брендов над футером: авто-прокрутка по кругу (JS) + ручное листание.
+   Логотипы одной высоты, ширина по пропорциям, без плашки — прозрачный PNG на фоне секции. */
+.brands { padding: var(--s-12) 0 var(--s-16); background: var(--paper); border-top: 1px solid var(--hairline); }
+.brands .section-title { margin-bottom: var(--s-6); }
+.brands__viewport {
+  overflow-x: auto; overflow-y: hidden; cursor: grab;
+  scrollbar-width: none; -ms-overflow-style: none; -webkit-overflow-scrolling: touch;
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent);
+          mask-image: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent);
+}
+.brands__viewport::-webkit-scrollbar { display: none; }
+.brands__viewport:active { cursor: grabbing; }
+.brands__track { display: flex; align-items: center; gap: var(--s-12); width: max-content; padding: 0 var(--s-8); }
+.brands__item { flex: none; display: inline-flex; align-items: center; justify-content: center; height: 56px; }
+.brands__item img { height: 52px; width: auto; max-width: 200px; object-fit: contain; display: block; user-select: none; -webkit-user-drag: none; }
+@media (max-width: 768px) {
+  .brands { padding: var(--s-8) 0 var(--s-12); }
+  .brands__track { gap: var(--s-8); padding: 0 var(--s-4); }
+  .brands__item { height: 44px; }
+  .brands__item img { height: 40px; max-width: 150px; }
+}
+
 /* Универсальная карточка с подъёмом + иконка-плашка (Контакты, О компании) */
 .lift { transition: transform .2s ease, box-shadow .2s ease; }
 .lift:hover { transform: translateY(-4px); box-shadow: 0 16px 30px -14px rgba(0,0,0,.22); }

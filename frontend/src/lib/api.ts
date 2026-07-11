@@ -110,6 +110,8 @@ export interface StoreInfo {
   // Баннеры слайдера (в каталоге) — редактируется в dev-настройках
   banners_enabled?: boolean;
   home_banners?: string;
+  // Логотипы брендов для слайдера на главной (JSON-массив [{id, image}])
+  brands?: string;
 }
 
 export async function getStoreInfo(): Promise<StoreInfo> {

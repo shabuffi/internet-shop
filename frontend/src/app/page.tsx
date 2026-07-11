@@ -1,10 +1,12 @@
 export const dynamic = "force-dynamic";
 
 import Link from "next/link";
-import { getCategories, getProducts } from "@/lib/api";
+import { getCategories, getProducts, getStoreInfo } from "@/lib/api";
 import { CATEGORY_GROUPS, normCatName } from "@/lib/categoryGroups";
+import { parseBrands } from "@/lib/brands";
 import PromoCard from "@/components/PromoCard";
 import PromoCarousel from "@/components/PromoCarousel";
+import BrandsSlider from "@/components/BrandsSlider";
 import DeliveryMap from "@/components/DeliveryMap";
 import RegionsMarquee from "@/components/RegionsMarquee";
 import Reveal from "@/components/Reveal";
@@ -64,6 +66,9 @@ export default async function HomePage() {
   } catch {
     categories = [];
   }
+
+  // Логотипы брендов для слайдера над футером (из настроек сайта).
+  const brands = parseBrands((await getStoreInfo().catch(() => null))?.brands);
 
   // ВРЕМЕННО: «Новинки»/«Спецпредложения» наполняем товарами-заглушками (разная сортировка,
   // чтобы наборы отличались). Когда в МойСклад появятся доп. поля «Новинка»/«Спецпредложение» —
@@ -231,6 +236,9 @@ export default async function HomePage() {
           ))}
         </div>
       </div>
+
+      {/* Слайдер брендов — над футером (футер в layout.tsx) */}
+      <BrandsSlider brands={brands} />
 
     </div>
   );

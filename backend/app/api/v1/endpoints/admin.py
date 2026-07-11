@@ -2,8 +2,10 @@
 
 import bcrypt
 import hmac
+import json
 import jwt
 import os
+import uuid
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, UploadFile, File, Query
@@ -988,6 +990,8 @@ def store_info_public(db: Session = Depends(get_db)):
         # Баннеры слайдера (в каталоге): включён ли показ + JSON-массив (по умолчанию выкл.)
         "banners_enabled":    _get_setting(db, "banners_enabled", "0") == "1",
         "home_banners":       _get_setting(db, "home_banners"),
+        # Логотипы брендов для слайдера на главной (JSON-массив [{id, image}])
+        "brands":             _get_setting(db, "brands"),
     }
 
 
@@ -1096,6 +1100,55 @@ async def upload_banner_image(file: UploadFile = File(...), _=Depends(_get_curre
     except ValueError:
         raise HTTPException(status_code=400, detail="Можно загружать только изображения")
     return {"name": name, "url": f"/api/v1/admin/media/{name}"}
+
+
+# ─── Бренды (логотипы для слайдера на главной; управляет владелец) ───
+
+def _load_brands(db: Session) -> list[dict]:
+    """Список брендов из ShopSettings (`brands`) — массив {id, image} по порядку показа."""
+    raw = _get_setting(db, "brands")
+    try:
+        data = json.loads(raw) if raw else []
+    except (ValueError, TypeError):
+        return []
+    return [b for b in data if isinstance(b, dict) and b.get("image")] if isinstance(data, list) else []
+
+
+@router.get("/brands")
+def get_brands(db: Session = Depends(get_db), _=Depends(_get_current_admin)):
+    """Логотипы брендов (владелец) — упорядоченный список {id, image}."""
+    return {"brands": _load_brands(db)}
+
+
+@router.post("/brands/upload")
+async def upload_brand(file: UploadFile = File(...), _=Depends(_get_current_admin)):
+    """Загружает логотип бренда; возвращает {id, image}. Клиент добавляет его в список и сохраняет
+    через POST /brands. PNG с прозрачным фоном/JPG — на витрине показываются как есть (без плашки)."""
+    data = await file.read()
+    try:
+        name = media_storage.save_upload(file.filename or "brand.png", data)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Можно загружать только изображения")
+    return {"id": uuid.uuid4().hex, "image": name}
+
+
+@router.post("/brands")
+def save_brands(body: dict, db: Session = Depends(get_db), _=Depends(_get_current_admin)):
+    """Сохраняет упорядоченный список брендов. Файлы, пропавшие из списка (удалённые логотипы),
+    стираются с диска."""
+    incoming = body.get("brands") or []
+    clean = [
+        {"id": str(b.get("id") or uuid.uuid4().hex), "image": str(b["image"])}
+        for b in incoming if isinstance(b, dict) and b.get("image")
+    ]
+    old_files = {b["image"] for b in _load_brands(db)}
+    new_files = {b["image"] for b in clean}
+    for f in old_files - new_files:
+        if f.startswith("upload_"):
+            media_storage.delete_image(f)
+    _set_setting(db, "brands", json.dumps(clean, ensure_ascii=False))
+    db.commit()
+    return {"brands": clean}
 
 
 @router.get("/sync-logs")
