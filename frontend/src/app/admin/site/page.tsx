@@ -42,6 +42,9 @@ export default function AdminSitePage() {
   const [savingBrands, setSavingBrands] = useState(false);
   const [savedBrands, setSavedBrands] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  // Перетаскивание карточек бренда: индекс «взятой» карточки и индекс, над которым висим.
+  const [dragIndex, setDragIndex] = useState<number | null>(null);
+  const [overIndex, setOverIndex] = useState<number | null>(null);
 
   // ── Пароль админа ──
   const [pw, setPw] = useState({ current_password: "", new_password: "" });
@@ -116,12 +119,13 @@ export default function AdminSitePage() {
     if (fileRef.current) fileRef.current.value = "";
   }
 
-  function moveBrand(i: number, dir: -1 | 1) {
+  // Перемещает карточку с позиции from на позицию to (drag-and-drop) — любой порядок.
+  function reorderBrand(from: number, to: number) {
     setBrands((prev) => {
-      const j = i + dir;
-      if (j < 0 || j >= prev.length) return prev;
+      if (from === to || from < 0 || to < 0 || from >= prev.length || to >= prev.length) return prev;
       const next = [...prev];
-      [next[i], next[j]] = [next[j], next[i]];
+      const [moved] = next.splice(from, 1);
+      next.splice(to, 0, moved);
       return next;
     });
     setSavedBrands(false);
@@ -261,7 +265,7 @@ export default function AdminSitePage() {
       <div style={cardStyle}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
           <p style={{ fontWeight: 600, fontSize: 16, margin: 0 }}>Бренды</p>
-          <HelpHint text={"Логотипы брендов показываются слайдером над футером главной. Можно выбрать сразу несколько файлов (PNG лучше с прозрачным фоном, или JPG); порядок задаётся стрелками."} />
+          <HelpHint text={"Логотипы брендов показываются слайдером над футером главной. Можно выбрать сразу несколько файлов (PNG лучше с прозрачным фоном, или JPG); порядок задаётся перетаскиванием карточек."} />
         </div>
 
         <div style={{ background: "var(--surface, #f5f6f8)", borderRadius: 10, padding: "12px 14px",
@@ -292,24 +296,43 @@ export default function AdminSitePage() {
                 Логотипов пока нет — загрузите первый.
               </p>
             ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 20 }}>
-                {brands.map((b, i) => (
-                  <div key={b.id} style={{ display: "flex", alignItems: "center", gap: 12,
-                    padding: "8px 12px", borderRadius: 10, border: "1px solid var(--hairline-soft, #e5e7eb)",
-                    background: "var(--canvas, #fff)" }}>
-                    <span style={{ color: "var(--ink-secondary)", fontSize: 13, width: 20, textAlign: "center" }}>{i + 1}</span>
-                    <span style={{ height: 44, width: 120, display: "inline-flex", alignItems: "center", justifyContent: "center",
-                      borderRadius: 6, background: "repeating-conic-gradient(#eee 0% 25%, #fff 0% 50%) 50% / 12px 12px" }}>
-                      <img src={brandImageUrl(b.image)} alt="" style={{ maxHeight: 40, maxWidth: 112, objectFit: "contain", display: "block" }} />
-                    </span>
-                    <span style={{ marginLeft: "auto", display: "inline-flex", gap: 6 }}>
-                      <button type="button" style={iconBtn} onClick={() => moveBrand(i, -1)} disabled={i === 0} aria-label="Выше" title="Выше">↑</button>
-                      <button type="button" style={iconBtn} onClick={() => moveBrand(i, 1)} disabled={i === brands.length - 1} aria-label="Ниже" title="Ниже">↓</button>
-                      <button type="button" style={{ ...iconBtn, color: "var(--danger, #c0392b)" }} onClick={() => removeBrand(i)} aria-label="Удалить" title="Удалить">✕</button>
-                    </span>
-                  </div>
-                ))}
-              </div>
+              <>
+                <p style={{ fontSize: 13, color: "var(--ink-secondary)", marginBottom: 10 }}>
+                  Перетаскивайте карточки за ручку&nbsp;<b style={{ color: "var(--ink)" }}>⠿</b>&nbsp;слева, чтобы задать порядок.
+                </p>
+                <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 20 }}>
+                  {brands.map((b, i) => {
+                    const isOver = overIndex === i && dragIndex !== null && dragIndex !== i;
+                    return (
+                      <div key={b.id}
+                        draggable
+                        onDragStart={(e) => { setDragIndex(i); e.dataTransfer.effectAllowed = "move"; }}
+                        onDragEnter={() => setOverIndex(i)}
+                        onDragOver={(e) => e.preventDefault()}
+                        onDrop={(e) => { e.preventDefault(); if (dragIndex !== null) reorderBrand(dragIndex, i); setDragIndex(null); setOverIndex(null); }}
+                        onDragEnd={() => { setDragIndex(null); setOverIndex(null); }}
+                        style={{ display: "flex", alignItems: "center", gap: 12,
+                          padding: "8px 12px", borderRadius: 10,
+                          border: "1px solid " + (isOver ? "var(--accent, #003399)" : "var(--hairline-soft, #e5e7eb)"),
+                          boxShadow: isOver ? "0 0 0 1px var(--accent, #003399) inset" : "none",
+                          background: "var(--canvas, #fff)", opacity: dragIndex === i ? 0.4 : 1 }}>
+                        <span aria-label="Перетащить" title="Перетащите, чтобы изменить порядок"
+                          style={{ cursor: "grab", color: "var(--ink-tertiary)", fontSize: 20, lineHeight: 1, userSelect: "none", padding: "0 2px" }}>⠿</span>
+                        <span style={{ color: "var(--ink-secondary)", fontSize: 13, width: 20, textAlign: "center" }}>{i + 1}</span>
+                        {/* Превью без «шахматного» фона (он визуально уменьшал логотип) —
+                            на нейтральном светлом фоне, крупнее, чтобы оценить как на сайте. */}
+                        <span style={{ height: 60, width: 160, display: "inline-flex", alignItems: "center", justifyContent: "center",
+                          borderRadius: 8, background: "var(--surface, #f5f6f8)" }}>
+                          <img src={brandImageUrl(b.image)} alt="" draggable={false} style={{ maxHeight: 52, maxWidth: 150, objectFit: "contain", display: "block" }} />
+                        </span>
+                        <span style={{ marginLeft: "auto", display: "inline-flex", gap: 6 }}>
+                          <button type="button" style={{ ...iconBtn, color: "var(--danger, #c0392b)" }} onClick={() => removeBrand(i)} aria-label="Удалить" title="Удалить">✕</button>
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
             )}
 
             <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
