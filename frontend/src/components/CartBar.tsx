@@ -18,12 +18,20 @@ export default function CartBar() {
   const { items, totalItems, totalAmount } = useCart();
   const positions = items.length;
 
-  // Резервируем место под липкую панель в самом футере (он синий) — чтобы панель
-  // не перекрывала нижнюю строку футера и НЕ возникало белой полосы под ним.
+  // Резервируем место под липкую панель в самом футере (он синий) — чтобы панель не
+  // перекрывала нижнюю строку футера. Отступ = ФАКТИЧЕСКАЯ высота панели (на мобиле она выше:
+  // текст + кнопка в столбик ~98px, на десктопе ~52px) — иначе фикс.76px не хватало и панель
+  // налезала на футер. Пересчитываем и при ресайзе/повороте.
   useEffect(() => {
     const f = document.querySelector(".footer") as HTMLElement | null;
-    if (f) f.style.paddingBottom = totalItems > 0 ? "76px" : "";
-    return () => { if (f) f.style.paddingBottom = ""; };
+    if (!f) return;
+    const apply = () => {
+      const bar = document.querySelector(".cartbar") as HTMLElement | null;
+      f.style.paddingBottom = totalItems > 0 && bar ? `${bar.offsetHeight + 12}px` : "";
+    };
+    apply();
+    window.addEventListener("resize", apply);
+    return () => { window.removeEventListener("resize", apply); f.style.paddingBottom = ""; };
   }, [totalItems]);
 
   if (totalItems === 0) return null;

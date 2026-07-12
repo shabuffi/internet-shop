@@ -23,11 +23,16 @@ export function cleanCategoryName(name: string): string {
   return out || name;
 }
 
-/** Форматирует цену в рублях: 8900 → "8 900 ₽", 24.9 → "24,9 ₽". */
+/** Форматирует цену в рублях: 8900 → "8 900,00 ₽", 24.9 → "24,90 ₽".
+ *  ВАЖНО: формат ДЕТЕРМИНИРОВАННЫЙ (не `toLocaleString`) — иначе сервер (Node ICU) и браузер
+ *  могут дать разный разделитель тысяч (U+00A0 vs U+202F) → рассинхрон гидратации Next → случайный
+ *  «Application error» на страницах с ценами. Здесь разделитель фиксирован (обычный пробел), запятая — дробная. */
 export function formatPrice(value: string | number): string {
   const n = typeof value === "string" ? Number(value) : value;
-  if (Number.isNaN(n)) return "—";
-  return n.toLocaleString("ru-RU", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " ₽";
+  if (!Number.isFinite(n)) return "—";
+  const [int, frac] = Math.abs(n).toFixed(2).split(".");
+  const grouped = int.replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+  return `${n < 0 ? "−" : ""}${grouped},${frac} ₽`;
 }
 
 /** Дата-время по Москве. Бэкенд отдаёт наивный UTC (без зоны) — добавляем «Z»,

@@ -131,13 +131,13 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                   <Link href="/cart">Корзина</Link>
                   <Link href="/how-to-order">Оформление заказа</Link>
                   <Link href="/payment">Оплата</Link>
-                  <Link href="/offer">Политика обработки персональных данных</Link>
                 </div>
 
                 <div className="footer__col">
                   <h4>Компания</h4>
                   <Link href="/about">О компании</Link>
                   <Link href="/contacts">Контакты</Link>
+                  <Link href="/offer">Политика обработки персональных данных</Link>
                 </div>
 
                 {hasContacts && (
