@@ -123,8 +123,8 @@ export default function CheckoutPage() {
                     <FieldError>{fields.customer_phone}</FieldError>
                   </div>
                   <div className="field">
-                    <label>Email</label>
-                    <input className={"input" + invalidClass("customer_email")} name="customer_email" value={form.customer_email} onChange={handleChange} type="email" placeholder="mail@example.ru" />
+                    <label>Email <span className="req">*</span></label>
+                    <input className={"input" + invalidClass("customer_email")} name="customer_email" value={form.customer_email} onChange={handleChange} required type="email" placeholder="mail@example.ru" />
                     <FieldError>{fields.customer_email}</FieldError>
                   </div>
                 </div>

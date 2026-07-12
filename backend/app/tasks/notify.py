@@ -314,6 +314,38 @@ def notify_order_confirmation(order_id: str):
         db.close()
 
 
+@celery_app.task(name="app.tasks.notify.notify_order_status")
+def notify_order_status(order_id: str, status: str):
+    """Письмо ПОКУПАТЕЛЮ при изменении статуса заказа в МойСклад.
+
+    Ставится из обмена (``_apply_order_statuses``), когда у заказа сменился ``moysklad_status``.
+    Нет email у заказа — тихо выходим. Ошибки отправки не пробрасываем.
+    """
+    from app.db.session import SessionLocal
+    from app.db.models.order import Order
+    import app.db.models.user  # noqa: F401 — регистрируем маппер User (у Order есть связь)
+    from app.integrations.email import send_email
+
+    db = SessionLocal()
+    try:
+        order = db.get(Order, order_id)
+        if not order or not order.customer_email:
+            return {"sent": False}
+        shop_name = _shop_name(db)
+        lines = [
+            f"Здравствуйте, {order.customer_name}!", "",
+            f"Статус вашего заказа № {order.number} в «{shop_name}» обновлён:", "",
+            f"    {status}", "",
+            "Спасибо, что выбрали нас!",
+        ]
+        text = "\n".join(lines)
+        ok = send_email(order.customer_email, f"Заказ № {order.number}: {status} — {shop_name}", text, from_name=shop_name)
+        print(f"notify_order_status: {order.number} → «{status}» → покупателю {'отправлено' if ok else 'НЕ отправлено'}", flush=True)
+        return {"sent": bool(ok)}
+    finally:
+        db.close()
+
+
 @celery_app.task(name="app.tasks.notify.send_password_reset")
 def send_password_reset(user_id: str, token: str):
     """Письмо ПОКУПАТЕЛЮ со ссылкой восстановления пароля (действует 1 час).

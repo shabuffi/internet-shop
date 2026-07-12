@@ -208,6 +208,7 @@ def _apply_order_statuses(db: Session, body: bytes) -> int:
     """
     from app.integrations.moysklad.commerceml_order_status import parse_order_statuses
     n = 0
+    status_changes: list[tuple[str, str]] = []   # (order_id, новый статус) — письма после коммита
     for r in parse_order_statuses(body):
         order = db.scalar(select(Order).where(Order.number == r["number"]))
         if not order:
@@ -216,6 +217,8 @@ def _apply_order_statuses(db: Session, body: bytes) -> int:
         if r["status"] and order.moysklad_status != r["status"]:
             order.moysklad_status = r["status"]
             changed = True
+            # письмо покупателю о новом статусе (шлём ниже, после успешного commit)
+            status_changes.append((order.id, r["status"]))
         if r["ms_number"] and order.moysklad_number != r["ms_number"]:
             order.moysklad_number = r["ms_number"]
             changed = True
@@ -259,6 +262,15 @@ def _apply_order_statuses(db: Session, body: bytes) -> int:
         if changed:
             n += 1
     db.commit()
+
+    # После успешного commit — письма покупателям о смене статуса (фоном, как уведомления заказа).
+    if status_changes:
+        from app.tasks.notify import notify_order_status
+        for oid, st in status_changes:
+            try:
+                notify_order_status.delay(oid, st)
+            except Exception:
+                pass
     return n
 
 

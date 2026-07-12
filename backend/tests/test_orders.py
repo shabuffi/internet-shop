@@ -27,6 +27,7 @@ def test_create_order_success(client, db_session, no_celery):
     resp = client.post("/api/v1/orders", json={
         "customer_name": "Иван",
         "customer_phone": "+7 900 123-45-67",
+        "customer_email": "buyer@example.ru",
         "delivery_method": "pickup",
         "items": [{"product_id": "p-1", "quantity": 2}],
     })
@@ -45,6 +46,7 @@ def test_create_order_price_from_db_not_client(client, db_session, no_celery):
     resp = client.post("/api/v1/orders", json={
         "customer_name": "Иван",
         "customer_phone": "+79001234567",
+        "customer_email": "buyer@example.ru",
         "delivery_method": "pickup",
         "items": [{"product_id": "p-1", "quantity": 1, "price": "1"}],  # цена-подделка
     })
@@ -113,8 +115,8 @@ def test_create_order_blank_name_reports_field(client, db_session, no_celery):
     assert "customer_name" in _err_fields(resp)
 
 
-def test_create_order_empty_email_is_allowed(client, db_session, no_celery):
-    """E-mail необязателен: пустая строка — не ошибка, заказ создаётся."""
+def test_create_order_empty_email_rejected(client, db_session, no_celery):
+    """E-mail обязателен: пустая строка → 422 по полю customer_email."""
     _make_product(db_session, id="p-1", price=Decimal("3000.00"))   # выше минимальной суммы
     resp = client.post("/api/v1/orders", json={
         "customer_name": "Иван",
@@ -123,7 +125,8 @@ def test_create_order_empty_email_is_allowed(client, db_session, no_celery):
         "delivery_method": "pickup",
         "items": [{"product_id": "p-1", "quantity": 2}],
     })
-    assert resp.status_code == 201
+    assert resp.status_code == 422
+    assert "customer_email" in _err_fields(resp)
 
 
 # ─── остаток не считается ────────────────────────────────────────────────────
@@ -133,6 +136,7 @@ def test_create_order_does_not_change_stock(client, db_session, no_celery):
     _make_product(db_session, id="p-1", stock=5, price=Decimal("2600.00"))
     resp = client.post("/api/v1/orders", json={
         "customer_name": "Иван", "customer_phone": "+79001234567",
+        "customer_email": "buyer@example.ru",
         "delivery_method": "pickup",
         "items": [{"product_id": "p-1", "quantity": 2}],
     })
@@ -146,6 +150,7 @@ def test_create_order_succeeds_with_zero_stock(client, db_session, no_celery):
     _make_product(db_session, id="p-1", stock=0, price=Decimal("2000.00"))
     resp = client.post("/api/v1/orders", json={
         "customer_name": "Иван", "customer_phone": "+79001234567",
+        "customer_email": "buyer@example.ru",
         "delivery_method": "pickup",
         "items": [{"product_id": "p-1", "quantity": 3}],
     })
@@ -157,6 +162,7 @@ def test_create_order_below_minimum_rejected(client, db_session, no_celery):
     _make_product(db_session, id="p-1", price=Decimal("100.00"))
     resp = client.post("/api/v1/orders", json={
         "customer_name": "Иван", "customer_phone": "+79001234567",
+        "customer_email": "buyer@example.ru",
         "delivery_method": "pickup",
         "items": [{"product_id": "p-1", "quantity": 1}],  # 100 ₽ < 5000 ₽
     })
@@ -181,6 +187,7 @@ def test_create_order_queues_notification(client, db_session, monkeypatch):
     _make_product(db_session, id="p-1", stock=5, price=Decimal("5000.00"))
     resp = client.post("/api/v1/orders", json={
         "customer_name": "Иван", "customer_phone": "+79001234567",
+        "customer_email": "buyer@example.ru",
         "delivery_method": "pickup",
         "items": [{"product_id": "p-1", "quantity": 1}],
     })

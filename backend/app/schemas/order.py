@@ -15,7 +15,7 @@ class OrderItemIn(BaseModel):
 class OrderIn(BaseModel):
     customer_name: str
     customer_phone: str
-    customer_email: str | None = None
+    customer_email: str          # обязателен — на него уходит подтверждение и статусы заказа
     customer_type: str | None = None          # individual|ip|ooo (для гостя; из кабинета берём из профиля)
     customer_inn: str | None = None
     delivery_address: str | None = None
@@ -41,10 +41,11 @@ class OrderIn(BaseModel):
 
     @field_validator("customer_email")
     @classmethod
-    def validate_email(cls, v: str | None) -> str | None:
-        # E-mail необязателен, но если указан — должен быть корректным.
-        if v is None or not v.strip():
-            return None
+    def validate_email(cls, v: str) -> str:
+        # E-mail обязателен: на него уходит подтверждение заказа и уведомления о смене статуса.
+        v = (v or "").strip()
+        if not v:
+            raise ValueError("Укажите e-mail — на него придёт подтверждение заказа")
         return validate_email_format(v)
 
     @field_validator("items")

@@ -117,6 +117,30 @@ def test_apply_updates_items_and_total(db_session):
     assert items[1].product_id == "prod-1"               # привязка по moysklad_id p1
 
 
+def test_apply_queues_status_email_on_change(db_session, monkeypatch):
+    """При смене moysklad_status ставится письмо покупателю (notify_order_status.delay)."""
+    from decimal import Decimal
+    import app.db.models.user  # noqa: F401
+    from app.db.models.order import Order
+    from app.api.v1.endpoints.exchange import _apply_order_statuses
+    import app.tasks.notify as notify_mod
+
+    queued = []
+    monkeypatch.setattr(notify_mod.notify_order_status, "delay", lambda oid, st: queued.append((oid, st)))
+
+    db_session.add(Order(id="o-st", number="ORD-0013", customer_name="И", customer_phone="+79990000000",
+                         customer_email="buyer@example.ru", moysklad_status="Новый", status="new"))
+    db_session.commit()
+
+    _apply_order_statuses(db_session, ORDERS_XML)
+    assert queued == [("o-st", "Отгружен")]
+
+    # Повторный обмен с тем же статусом — письмо НЕ шлём (изменения нет)
+    queued.clear()
+    _apply_order_statuses(db_session, ORDERS_XML)
+    assert queued == []
+
+
 def test_apply_no_item_churn_when_unchanged(db_session):
     """Если состав в orders.xml совпадает с текущим — позиции не пересоздаются зря."""
     from decimal import Decimal
