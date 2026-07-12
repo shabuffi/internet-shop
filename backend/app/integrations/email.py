@@ -6,7 +6,7 @@
 
 import smtplib
 from email.mime.text import MIMEText
-from email.utils import formataddr
+from email.utils import formataddr, formatdate, make_msgid
 
 from app.core.config import settings
 
@@ -71,6 +71,10 @@ def send_email_detail(to: str, subject: str, body: str, from_name: str = "Маг
         msg["Subject"] = subject
         msg["From"] = formataddr((from_name, from_addr))
         msg["To"] = to
+        # Date и Message-ID обязательны по RFC 5322: без них многие провайдеры (mail.ru,
+        # gmail, yandex) режут письмо в спам/отклоняют. Message-ID — в домене отправителя.
+        msg["Date"] = formatdate(localtime=True)
+        msg["Message-ID"] = make_msgid(domain=from_addr.rsplit("@", 1)[-1])
         port = int(cfg["port"] or 587)
         with smtplib.SMTP(cfg["host"], port, timeout=15) as server:
             server.starttls()
