@@ -336,8 +336,13 @@ def notify_order_status(order_id: str, status: str):
             f"Здравствуйте, {order.customer_name}!", "",
             f"Статус вашего заказа № {order.number} в «{shop_name}» обновлён:", "",
             f"    {status}", "",
-            "Спасибо, что выбрали нас!",
+            # Состав кладём актуальный: в МойСклад вместе со статусом могли поменять/дозаказать
+            # позиции — покупатель сразу видит обновлённый заказ и итог, без второго письма.
+            "Актуальный состав заказа:",
         ]
+        for it in order.items:
+            lines.append(f"• {it.product_name} — {it.quantity} × {it.price:.2f} ₽ = {it.price * it.quantity:.2f} ₽")
+        lines += ["", f"Итого: {order.total_amount:.2f} ₽", "", "Спасибо, что выбрали нас!"]
         text = "\n".join(lines)
         ok = send_email(order.customer_email, f"Заказ № {order.number}: {status} — {shop_name}", text, from_name=shop_name)
         print(f"notify_order_status: {order.number} → «{status}» → покупателю {'отправлено' if ok else 'НЕ отправлено'}", flush=True)

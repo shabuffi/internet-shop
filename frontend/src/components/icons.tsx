@@ -158,6 +158,17 @@ export function IconDoc(p: SVGProps<SVGSVGElement>) {
   );
 }
 
+// Стопка страниц (две наложенные) — раздел «Страницы» (инфо-страницы сайта).
+// Визуально отличается от IconOrders/IconDoc (одиночный документ с линиями).
+export function IconPages(p: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base} {...p}>
+      <rect x="8" y="3" width="12" height="14" rx="2" />
+      <path d="M16 21H6a2 2 0 0 1-2-2V7" />
+    </svg>
+  );
+}
+
 // Галочка в кружке — статус «Активен».
 export function IconCheckCircle(p: SVGProps<SVGSVGElement>) {
   return (
