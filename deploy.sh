@@ -49,6 +49,13 @@ fi
 echo "Running migrations..."
 $COMPOSE exec -T backend alembic upgrade head
 
+# Celery worker/beat держат список задач в ПАМЯТИ с момента старта. Если контейнер не
+# пересоздать на свежем образе, задачи, добавленные в код позже (напр. письмо-подтверждение
+# покупателю notify_order_confirmation), остаются «незарегистрированными» — воркер молча
+# отклоняет их, и письма/уведомления теряются. Форсируем пересоздание на новом образе.
+echo "Recreating worker & beat (fresh task registry)..."
+$COMPOSE up -d --force-recreate --no-deps worker beat
+
 # Перезапускаем nginx, чтобы он перечитал новые IP пересозданных backend/frontend
 # (иначе после деплоя ловим 502 Bad Gateway — nginx помнит старые адреса контейнеров)
 echo "Restarting nginx..."
