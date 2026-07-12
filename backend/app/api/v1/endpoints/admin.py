@@ -600,6 +600,25 @@ def save_policy(body: dict, db: Session = Depends(get_db), _=Depends(_get_curren
     return {"message": "Политика сохранена"}
 
 
+# ─── Инфо-страницы «Оформление заказа» / «Оплата» (редактор) ──────────
+
+@router.get("/info-pages")
+def get_info_pages_admin(db: Session = Depends(get_db), _=Depends(_get_current_admin)):
+    """Тексты редактируемых инфо-страниц (order/payment) для редактора админки."""
+    from app.services.legal_content import get_info_pages
+    return get_info_pages(db)
+
+
+@router.post("/info-pages")
+def save_info_pages(body: dict, db: Session = Depends(get_db), _=Depends(_get_current_admin)):
+    """Сохраняет тела инфо-страниц. body: {order_info_body?, payment_body?}."""
+    for key in ("order_info_body", "payment_body"):
+        if key in body:
+            _set_setting(db, key, str(body[key]))
+    db.commit()
+    return {"message": "Сохранено"}
+
+
 @router.post("/test-notification")
 def test_notification(channel: str | None = None, db: Session = Depends(get_db), _=Depends(_get_current_admin)):
     """Шлёт пробное уведомление в канал(ы) — Telegram / ВК / Email.

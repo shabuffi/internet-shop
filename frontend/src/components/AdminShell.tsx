@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { adminFetch, adminLogout } from "@/lib/adminApi";
-import { IconOverview, IconSettings, IconSync, IconBox, IconOrders, IconUsers, IconShield, IconCloud, IconBell } from "@/components/icons";
+import { IconOverview, IconSettings, IconSync, IconBox, IconOrders, IconUsers, IconShield, IconCloud, IconBell, IconDoc } from "@/components/icons";
 
 const NAV = [
   { href: "/admin",          label: "Обзор",         Icon: IconOverview },
@@ -14,6 +14,7 @@ const NAV = [
   { href: "/admin/orders",   label: "Заказы",        Icon: IconOrders },
   { href: "/admin/site",     label: "Настройка сайта", Icon: IconSettings },
   { href: "/admin/notifications", label: "Уведомления", Icon: IconBell },
+  { href: "/admin/pages",    label: "Страницы",      Icon: IconDoc },
   { href: "/admin/users",    label: "Покупатели",    Icon: IconUsers },
   { href: "/admin/policy",   label: "Политика",      Icon: IconShield },
 ];

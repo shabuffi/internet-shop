@@ -129,6 +129,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                   <h4>Магазин</h4>
                   <Link href="/catalog">Каталог</Link>
                   <Link href="/cart">Корзина</Link>
+                  <Link href="/how-to-order">Оформление заказа</Link>
+                  <Link href="/payment">Оплата</Link>
                   <Link href="/offer">Политика обработки персональных данных</Link>
                 </div>
 
