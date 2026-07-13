@@ -208,17 +208,20 @@ def _apply_order_statuses(db: Session, body: bytes) -> int:
     """
     from app.integrations.moysklad.commerceml_order_status import parse_order_statuses
     n = 0
-    status_changes: list[tuple[str, str]] = []   # (order_id, новый статус) — письма после коммита
+    # (order_id, новый статус | None) — письма покупателю после коммита.
+    # status=None → изменился только состав/сумма (без смены статуса).
+    customer_mails: list[tuple[str, str | None]] = []
     for r in parse_order_statuses(body):
         order = db.scalar(select(Order).where(Order.number == r["number"]))
         if not order:
             continue
         changed = False
+        status_changed = False
+        content_changed = False
         if r["status"] and order.moysklad_status != r["status"]:
             order.moysklad_status = r["status"]
             changed = True
-            # письмо покупателю о новом статусе (шлём ниже, после успешного commit)
-            status_changes.append((order.id, r["status"]))
+            status_changed = True
         if r["ms_number"] and order.moysklad_number != r["ms_number"]:
             order.moysklad_number = r["ms_number"]
             changed = True
@@ -250,6 +253,7 @@ def _apply_order_statuses(db: Session, body: bytes) -> int:
                     quantity=d["quantity"],
                 ))
             changed = True
+            content_changed = True
 
         # Сумма заказа: итог документа; если его нет — считаем по позициям.
         total = _to_decimal(r.get("total"))
@@ -258,15 +262,25 @@ def _apply_order_statuses(db: Session, body: bytes) -> int:
         if total is not None and order.total_amount != total:
             order.total_amount = total
             changed = True
+            content_changed = True
+
+        # Письмо покупателю (одинаково для заказов из кабинета и гостевых — адресат в
+        # order.customer_email). При смене статуса шлём статус-письмо (в нём уже виден
+        # обновлённый состав). Если статус НЕ менялся, но изменился состав/сумма — шлём
+        # письмо об изменении заказа (иначе гость без кабинета не узнал бы о правках).
+        if status_changed:
+            customer_mails.append((order.id, r["status"]))
+        elif content_changed:
+            customer_mails.append((order.id, None))
 
         if changed:
             n += 1
     db.commit()
 
-    # После успешного commit — письма покупателям о смене статуса (фоном, как уведомления заказа).
-    if status_changes:
+    # После успешного commit — письма покупателям (фоном, как остальные уведомления заказа).
+    if customer_mails:
         from app.tasks.notify import notify_order_status
-        for oid, st in status_changes:
+        for oid, st in customer_mails:
             try:
                 notify_order_status.delay(oid, st)
             except Exception:

@@ -315,11 +315,17 @@ def notify_order_confirmation(order_id: str):
 
 
 @celery_app.task(name="app.tasks.notify.notify_order_status")
-def notify_order_status(order_id: str, status: str):
-    """Письмо ПОКУПАТЕЛЮ при изменении статуса заказа в МойСклад.
+def notify_order_status(order_id: str, status: str | None = None):
+    """Письмо ПОКУПАТЕЛЮ при изменении заказа в МойСклад.
 
-    Ставится из обмена (``_apply_order_statuses``), когда у заказа сменился ``moysklad_status``.
-    Нет email у заказа — тихо выходим. Ошибки отправки не пробрасываем.
+    Ставится из обмена (``_apply_order_statuses``). Работает одинаково для заказов из
+    кабинета и гостевых — адресат берётся из ``order.customer_email`` (снимок e-mail
+    заказчика на момент оформления). Нет email у заказа — тихо выходим.
+
+    Args:
+        status: новый ``moysklad_status``, если сменился статус; ``None`` — если статус
+            не менялся, а поменялся только состав/сумма заказа (тогда шлём письмо об
+            изменении заказа). Ошибки отправки не пробрасываем.
     """
     from app.db.session import SessionLocal
     from app.db.models.order import Order
@@ -329,26 +335,46 @@ def notify_order_status(order_id: str, status: str):
     db = SessionLocal()
     try:
         order = db.get(Order, order_id)
-        if not order or not order.customer_email:
+        if not order:
+            return {"sent": False}
+        # Адресат один и тот же для заказов из кабинета и гостевых — снимок e-mail заказчика.
+        # Фолбэк на e-mail привязанного аккаунта на случай, если снимок пуст (старые гостевые
+        # заказы, когда e-mail был необязателен). Нет адреса — логируем, чтобы «письмо не
+        # пришло» было видно в логах воркера, а не терялось молча.
+        recipient = order.customer_email or (order.user.email if order.user else None)
+        if not recipient:
+            print(f"notify_order_status: {order.number} → нет e-mail у заказа, письмо не отправлено", flush=True)
             return {"sent": False}
         shop_name = _shop_name(db)
-        lines = [
-            f"Здравствуйте, {order.customer_name}!", "",
-            # Пишем строго факт — НОВЫЙ СТАТУС (письмо шлётся только при реальной смене статуса).
-            # Слова «обновлён/актуальный» НЕ используем: заказ мог не меняться, только статус —
-            # чтобы не вводить покупателя в заблуждение, будто состав/сумму изменили.
-            f"Заказ № {order.number} в «{shop_name}» — новый статус:", "",
-            f"    {status}", "",
-            # Состав показываем нейтрально, для справки (в МойСклад его могли и поменять вместе
-            # со статусом — тогда здесь уже обновлённые позиции; если нет — просто текущий состав).
-            "Состав заказа:",
-        ]
+        if status:
+            # Смена статуса. Пишем строго факт — НОВЫЙ СТАТУС. Слова «обновлён/актуальный»
+            # НЕ используем: заказ мог не меняться, только статус — чтобы не вводить
+            # покупателя в заблуждение, будто состав/сумму изменили.
+            head = [
+                f"Заказ № {order.number} в «{shop_name}» — новый статус:", "",
+                f"    {status}", "",
+                # Состав показываем нейтрально, для справки (в МойСклад его могли поменять
+                # вместе со статусом — тогда здесь уже обновлённые позиции; иначе текущий).
+                "Состав заказа:",
+            ]
+            subject = f"Заказ № {order.number}: {status} — {shop_name}"
+            log_what = f"«{status}»"
+        else:
+            # Статус не менялся — изменили состав/сумму заказа. Здесь «актуальный состав»
+            # уместно: он действительно поменялся.
+            head = [
+                f"Ваш заказ № {order.number} в «{shop_name}» изменён.", "",
+                "Актуальный состав заказа:",
+            ]
+            subject = f"Заказ № {order.number} изменён — {shop_name}"
+            log_what = "изменение состава"
+        lines = [f"Здравствуйте, {order.customer_name}!", "", *head]
         for it in order.items:
             lines.append(f"• {it.product_name} — {it.quantity} × {it.price:.2f} ₽ = {it.price * it.quantity:.2f} ₽")
         lines += ["", f"Итого: {order.total_amount:.2f} ₽", "", "Спасибо, что выбрали нас!"]
         text = "\n".join(lines)
-        ok = send_email(order.customer_email, f"Заказ № {order.number}: {status} — {shop_name}", text, from_name=shop_name)
-        print(f"notify_order_status: {order.number} → «{status}» → покупателю {'отправлено' if ok else 'НЕ отправлено'}", flush=True)
+        ok = send_email(recipient, subject, text, from_name=shop_name)
+        print(f"notify_order_status: {order.number} → {log_what} → покупателю {'отправлено' if ok else 'НЕ отправлено'}", flush=True)
         return {"sent": bool(ok)}
     finally:
         db.close()
