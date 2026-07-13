@@ -19,6 +19,7 @@ export default function AdminProductsPage() {
   const [filters, setFilters] = useState({ photo: "", desc: "", avail: "" }); // фильтры каталога
   const [ver, setVer] = useState(0);                       // для сброса кэша миниатюр
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [confirmDel, setConfirmDel] = useState<{ id: string; filename: string } | null>(null);
   const isMobile = useIsMobile();
 
   const pages = Math.max(1, Math.ceil(total / pageSize));
@@ -81,7 +82,6 @@ export default function AdminProductsPage() {
   }
 
   async function deleteImage(id: string, filename: string) {
-    if (!confirm("Удалить это фото товара? Оно исчезнет с сайта.")) return;
     setBusyId(id);
     try {
       const r = await adminFetch<{ images: string[] }>(`/products/${id}/images?filename=${encodeURIComponent(filename)}`, { method: "DELETE" });
@@ -97,7 +97,7 @@ export default function AdminProductsPage() {
         <span key={img} style={{ position: "relative", lineHeight: 0 }}>
           <img src={`/api/v1/products/${p.id}/image?n=${i}&v=${ver}`} alt="" width={40} height={40}
             style={{ objectFit: "cover", borderRadius: 6, border: "1px solid var(--hairline-soft)" }} />
-          <button onClick={() => deleteImage(p.id, img)} title="Удалить фото"
+          <button onClick={() => setConfirmDel({ id: p.id, filename: img })} title="Удалить фото"
             style={{ position: "absolute", top: -7, right: -7, width: 18, height: 18, borderRadius: 999,
               border: "none", background: "var(--ink)", color: "#fff", fontSize: 12, lineHeight: "16px", cursor: "pointer", padding: 0 }}>×</button>
         </span>
@@ -248,6 +248,28 @@ export default function AdminProductsPage() {
           </span>
           <button className="btn btn--outline btn--sm" disabled={page >= pages}
             onClick={() => setPage(p => Math.min(pages, p + 1))}>Вперёд ›</button>
+        </div>
+      )}
+      {confirmDel && (
+        <div onClick={() => setConfirmDel(null)}
+          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", display: "flex",
+            alignItems: "center", justifyContent: "center", zIndex: 1000, padding: 16 }}>
+          <div onClick={e => e.stopPropagation()} role="dialog" aria-modal="true"
+            style={{ background: "var(--paper, #fff)", borderRadius: 14, padding: "22px 22px 18px",
+              maxWidth: 380, width: "100%", boxShadow: "0 12px 40px rgba(0,0,0,0.25)" }}>
+            <p style={{ fontWeight: 700, fontSize: 17, margin: "0 0 8px" }}>Удалить фото?</p>
+            <p style={{ fontSize: 14, color: "var(--ink-secondary)", margin: "0 0 18px", lineHeight: 1.5 }}>
+              Фото товара исчезнет с сайта. Если оно есть в МойСклад, вернётся при следующей выгрузке этого товара.
+            </p>
+            <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+              <button onClick={() => setConfirmDel(null)}
+                style={{ height: 38, padding: "0 16px", borderRadius: 9, border: "1px solid var(--hairline-soft)",
+                  background: "#fff", color: "var(--ink)", cursor: "pointer", fontSize: 14 }}>Отмена</button>
+              <button onClick={() => { if (!confirmDel) return; const d = confirmDel; setConfirmDel(null); deleteImage(d.id, d.filename); }}
+                style={{ height: 38, padding: "0 16px", borderRadius: 9, border: "none",
+                  background: "#d33", color: "#fff", cursor: "pointer", fontSize: 14, fontWeight: 600 }}>Удалить</button>
+            </div>
+          </div>
         </div>
       )}
     </AdminShell>
