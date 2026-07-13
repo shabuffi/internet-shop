@@ -73,7 +73,7 @@ jobs:
           # Категория нужна, чтобы e2e-тест фильтра по категории имел что выбрать
           # (CategorySelect показывает только НЕпустые категории).
           if not db.get(Category, "ci-cat-1"):
-              db.add(Category(id="ci-cat-1", name="Тестовая категория"))
+              db.add(Category(id="ci-cat-1", moysklad_id="ms-ci-cat-1", name="Тестовая категория"))
               db.commit()
           rows = [
               ("ci-1", "ms-ci-1", "Тестовый товар один", "CI-001", Decimal("100"), 5),
