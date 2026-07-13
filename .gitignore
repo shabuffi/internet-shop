@@ -50,3 +50,7 @@ design-ref/
 test-results/
 аксессуары.png
 иконки-на-главную/
+
+# Служебные файлы Codex/агентов (локально, не в гит)
+.codex/
+AGENTS.md
