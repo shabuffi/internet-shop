@@ -67,9 +67,14 @@ jobs:
         run: |
           docker compose exec -T backend python3 - <<'PY'
           from app.db.session import SessionLocal
-          from app.db.models.product import Product
+          from app.db.models.product import Product, Category
           from decimal import Decimal
           db = SessionLocal()
+          # Категория нужна, чтобы e2e-тест фильтра по категории имел что выбрать
+          # (CategorySelect показывает только НЕпустые категории).
+          if not db.get(Category, "ci-cat-1"):
+              db.add(Category(id="ci-cat-1", name="Тестовая категория"))
+              db.commit()
           rows = [
               ("ci-1", "ms-ci-1", "Тестовый товар один", "CI-001", Decimal("100"), 5),
               ("ci-2", "ms-ci-2", "Тестовый товар два",  "CI-002", Decimal("200"), 3),
@@ -77,7 +82,7 @@ jobs:
           for pid, ms, name, art, price, stock in rows:
               if not db.get(Product, pid):
                   db.add(Product(id=pid, moysklad_id=ms, name=name, article=art,
-                                 price=price, stock=stock, is_active=True))
+                                 price=price, stock=stock, is_active=True, category_id="ci-cat-1"))
           db.commit(); db.close()
           print("seeded")
           PY

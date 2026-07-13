@@ -16,7 +16,7 @@ async function fillCommon(page: Page, email: string, password = "Passw0rd!23") {
   // может занять секунды) — иначе fill полей иногда упирается в таймаут.
   await expect(page.getByRole("button", { name: "Зарегистрироваться" })).toBeVisible();
   await page.getByPlaceholder("you@example.ru").fill(email);
-  await page.getByPlaceholder("+7 999 000-00-00").fill("+7 900 123-45-67");
+  await page.getByPlaceholder("+7 999 123 45 67").fill("+7 900 123-45-67");
   await page.locator('input[type="password"]').fill(password);
   await page.locator('input[type="checkbox"]').check();
 }
@@ -79,7 +79,7 @@ test.describe("Регистрация покупателя", () => {
     const email = uniqueEmail();
     await page.goto("/register");
     await page.getByPlaceholder("you@example.ru").fill(email);
-    await page.getByPlaceholder("+7 999 000-00-00").fill("+7 900 123-45-67");
+    await page.getByPlaceholder("+7 999 123 45 67").fill("+7 900 123-45-67");
     await page.getByPlaceholder("Иванов Иван Иванович").fill("Без Согласия");
     await page.locator('input[type="password"]').fill("Passw0rd!23");
     // НЕ ставим галочку согласия

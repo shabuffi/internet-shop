@@ -20,15 +20,16 @@ test.describe("Каталог", () => {
 
   test("выбор категории ведёт на отфильтрованную выдачу с хлебными крошками", async ({ page }) => {
     await page.goto("/catalog");
-    const select = page.getByLabel("Категория");
-    await expect(select).toBeVisible();
-    // выбираем первую реальную категорию (после «Все категории»)
-    const value = await select.locator("option").nth(1).getAttribute("value");
-    if (value) {
-      await select.selectOption(value);
-      await expect(page).toHaveURL(/category_id=/);
-      // видно, в какой категории находимся: крошки «Каталог → …»
-      await expect(page.getByLabel("Вы находитесь в разделе")).toBeVisible();
-    }
+    // CategorySelect — кастомный дропдаун: триггер-кнопка открывает список,
+    // категории рендерятся как <button role="option"> («Все категории» — без роли).
+    const trigger = page.getByLabel("Категория");
+    await expect(trigger).toBeVisible();
+    await trigger.click();
+    const firstCategory = page.getByRole("option").first();
+    await expect(firstCategory).toBeVisible();
+    await firstCategory.click();
+    await expect(page).toHaveURL(/category_id=/);
+    // видно, в какой категории находимся: крошки «Каталог → …»
+    await expect(page.getByLabel("Вы находитесь в разделе")).toBeVisible();
   });
 });
