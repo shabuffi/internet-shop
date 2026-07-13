@@ -294,25 +294,27 @@ def upsert_catalog(db: Session, catalog: ParsedCatalog, source: str = "commercem
                 # <Картинка> фото затиралось в ноль → 350 осиротевших файлов (инцидент 29.06.2026).
                 # Теперь: тег заполнен → ставим; тег пустой (has_image_field, images=[]) → удаление,
                 # чистим; тега не было → НЕ трогаем (обычный import.xml чужие фото не сбрасывает).
-                if not product.images_manual:
-                    if parsed_product.has_image_field or parsed_product.images:
-                        imgs = [image_name(x) for x in parsed_product.images]
-                        if product.images != imgs:
-                            if imgs:
-                                # добавление/замена фото — применяем сразу, потери нет
-                                product.images = imgs
-                                product.image_url = imgs[0]
-                                images_touched = True
-                                changed = True
-                            elif product.images:
-                                # обмен просит СТЕРЕТЬ фото (пустой тег) — под предохранитель (ниже)
-                                pending_image_clears.append(product)
-                    elif changes_only and product.images:
-                        # Дельта-выгрузка карточки товара, но тега <Картинка> БОЛЬШЕ нет → фото
-                        # удалили в МойСклад. Откладываем под предохранитель: единичные удаления
-                        # применятся, массовое стирание (сбой выгрузки) — нет. Полный каталог
-                        # (changes_only=False) сюда не попадает — там фото не выгружаются вовсе.
-                        pending_image_clears.append(product)
+                # МойСклад — ИСТОЧНИК ИСТИНЫ для ДОБАВЛЕНИЯ/ЗАМЕНЫ: непустой тег <Картинка>
+                # применяем ВСЕГДА — даже если фото товара раньше меняли вручную. В этом случае
+                # снимаем флаг images_manual и возвращаем товар под управление обмена, чтобы
+                # «добавил/сменил фото в МойСклад → сменилось на сайте» работало и после ручных
+                # правок (иначе один ручной штрих блокировал бы обновления навсегда).
+                # УДАЛЕНИЕ (пустой тег has_image_field+images=[], либо дельта карточки без тега) —
+                # под предохранитель (MAX_IMAGE_CLEARS) и ТОЛЬКО у не-ручных товаров. Полный каталог
+                # (changes_only=False без тега) фото не трогает — там картинок не бывает вовсе.
+                imgs = [image_name(x) for x in parsed_product.images]
+                if imgs:
+                    if product.images != imgs:
+                        # добавление/замена фото — применяем сразу, потери нет
+                        product.images = imgs
+                        product.image_url = imgs[0]
+                        product.images_manual = False   # МойСклад снова управляет фото этого товара
+                        images_touched = True
+                        changed = True
+                elif not product.images_manual and product.images and (parsed_product.has_image_field or changes_only):
+                    # пустой тег <Картинка></Картинка> ИЛИ дельта карточки без тега = удаление в
+                    # МойСклад → под предохранитель (единичные применятся, массовое стирание — нет).
+                    pending_image_clears.append(product)
                 # Отметку последнего обмена ставим всегда (товар «виден» в выгрузке),
                 # а в счётчик «Обновлено» попадают только реально изменившиеся.
                 product.synced_at = _utcnow()

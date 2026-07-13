@@ -155,21 +155,41 @@ def test_upsert_preserves_article_on_image_round(db_session):
     assert p.image_url == "pic.png"
 
 
-def test_upsert_does_not_overwrite_manual_images(db_session):
-    """Если картинки заданы вручную (images_manual), обмен их не перезаписывает."""
-    upsert_catalog(db_session, _catalog(products=[ParsedProduct(moysklad_id="p1", name="X", images=["a.png"])]))
+def test_upsert_moysklad_photo_overrides_manual_and_unlocks(db_session):
+    """Добавление/замена фото в МойСклад ПРИМЕНЯЕТСЯ даже если товар был на ручном управлении
+    (images_manual) — и снимает флаг (товар снова под обменом). Так ручное удаление фото не
+    блокирует будущие обновления из МойСклад."""
+    upsert_catalog(db_session, _catalog(products=[ParsedProduct(moysklad_id="p1", name="X", images=["a.png"], has_image_field=True)]))
     p = db_session.query(Product).filter_by(moysklad_id="p1").first()
     p.images_manual = True
     p.images = ["manual.png"]
     p.image_url = "manual.png"
     db_session.commit()
 
-    # обмен снова присылает картинки — НЕ должен перезаписать ручные
-    upsert_catalog(db_session, _catalog(products=[ParsedProduct(moysklad_id="p1", name="X2", images=["b.png"])]))
+    # МойСклад присылает НОВОЕ фото — должно примениться поверх ручного и снять флаг
+    upsert_catalog(db_session, _catalog(products=[ParsedProduct(moysklad_id="p1", name="X2", images=["b.png"], has_image_field=True)]))
     p = db_session.query(Product).filter_by(moysklad_id="p1").first()
     assert p.name == "X2"                 # имя обновилось
+    assert p.images == ["b.png"]          # фото из МойСклад применилось поверх ручного
+    assert p.image_url == "b.png"
+    assert p.images_manual is False        # товар вернулся под управление обмена
+
+
+def test_upsert_manual_images_not_cleared_by_deletion_signal(db_session):
+    """Ручные картинки НЕ стираются сигналом удаления из обмена (пустой тег / дельта без тега):
+    добавление МойСклад их перезаписывает, а удаление — не трогает."""
+    upsert_catalog(db_session, _catalog(products=[ParsedProduct(moysklad_id="p1", name="X", images=["a.png"], has_image_field=True)]))
+    p = db_session.query(Product).filter_by(moysklad_id="p1").first()
+    p.images_manual = True
+    p.images = ["manual.png"]
+    p.image_url = "manual.png"
+    db_session.commit()
+
+    # обмен присылает ПУСТОЙ тег (сигнал удаления) — ручные не трогаем
+    upsert_catalog(db_session, _catalog(products=[ParsedProduct(moysklad_id="p1", name="X", has_image_field=True)]))
+    p = db_session.query(Product).filter_by(moysklad_id="p1").first()
     assert p.images == ["manual.png"]     # ручные картинки сохранены
-    assert p.image_url == "manual.png"
+    assert p.images_manual is True
 
 
 def test_upsert_photo_round_does_not_clear_others(db_session):
