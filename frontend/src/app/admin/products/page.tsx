@@ -81,6 +81,7 @@ export default function AdminProductsPage() {
   }
 
   async function deleteImage(id: string, filename: string) {
+    if (!confirm("Удалить это фото товара? Оно исчезнет с сайта.")) return;
     setBusyId(id);
     try {
       const r = await adminFetch<{ images: string[] }>(`/products/${id}/images?filename=${encodeURIComponent(filename)}`, { method: "DELETE" });
