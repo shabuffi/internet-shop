@@ -490,6 +490,13 @@ button, input, textarea, select { font-family: inherit; }
 @media (max-width: 768px) {
   .section-title--line { gap: var(--s-3); }
   .section-title--line::before { flex-basis: 22px; }
+  /* Единый стиль на телефоне: линия только слева, справа убираем у всех. */
+  .section-title--line::after { display: none; }
+  /* Мельче заголовок, чтобы по возможности не переносился на 2 строки. */
+  .section-title { font-size: 22px; }
+  .section-title--xl { font-size: 24px; }
+  /* Разрешаем перенос, если всё-таки не влезло — без горизонтального выхода за экран. */
+  .info-subhead > span { white-space: normal; }
 }
 .section-copy {
   color: var(--charcoal); font-size: var(--t-body-lg); line-height: 1.65;
