@@ -8,7 +8,6 @@ td-engineer.ru (проверено 13.07.2026):
 """
 import uuid
 import pytest
-from app.db.session import SessionLocal
 from app.db.models.product import Product
 from app.integrations.moysklad.commerceml_parser import parse_import_xml
 from app.services.import_service import upsert_catalog, MAX_IMAGE_CLEARS
@@ -33,13 +32,12 @@ def _tovar(msid: str, name: str, kartinka: str | None = None) -> str:
 
 
 @pytest.fixture
-def db():
-    s = SessionLocal()
-    try:
-        yield s
-    finally:
-        s.rollback()
-        s.close()
+def db(db_session):
+    """Тестовая БД — SQLite in-memory из conftest (``db_session``), а НЕ реальный
+    ``SessionLocal``/postgres. Локально тест проходил только потому, что хост ``db``
+    резолвился через docker-сеть; в CI (нативный pytest, без стека) хоста ``db`` нет →
+    ``could not translate host name "db"``. Делегируем на общую тестовую сессию."""
+    return db_session
 
 
 def _seed(db, msid: str, images: list[str]) -> Product:
