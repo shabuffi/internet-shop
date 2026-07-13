@@ -80,7 +80,7 @@ export default function BrandsSlider({ brands }: { brands: Brand[] }) {
 
   return (
     <section className="brands" aria-label="Бренды">
-      <div className="container"><h2 className="section-title section-title--caps">Бренды</h2></div>
+      <div className="container"><h2 className="section-title section-title--caps section-title--line">Бренды</h2></div>
       <div
         className="brands__viewport"
         ref={vpRef}

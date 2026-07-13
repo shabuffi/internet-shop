@@ -159,8 +159,8 @@ export default async function HomePage() {
       {/* Убойные цены (по полю «Убойные цены» из МойСклад) — первой секцией */}
       {hot.length > 0 && (
         <div id="hot" className="container section">
-          <div className="section-head">
-            <h2 className="section-title section-title--caps section-title--xl">Убойные цены</h2>
+          <div className="section-head section-head--line">
+            <h2 className="section-title section-title--caps section-title--xl section-title--line">Убойные цены</h2>
             <Link href="/hot" className="see-all">Посмотреть все <ArrowIcon size={16} /></Link>
           </div>
           <PromoCarousel>
@@ -172,8 +172,8 @@ export default async function HomePage() {
       {/* Новинки (по полю «Новинка» из МойСклад; нет флага — секции нет) */}
       {novinki.length > 0 && (
         <div id="novinki" className="container section">
-          <div className="section-head">
-            <h2 className="section-title section-title--caps section-title--xl">Новинки</h2>
+          <div className="section-head section-head--line">
+            <h2 className="section-title section-title--caps section-title--xl section-title--line">Новинки</h2>
             <Link href="/novinki" className="see-all">Посмотреть все <ArrowIcon size={16} /></Link>
           </div>
           <PromoCarousel>
@@ -184,24 +184,22 @@ export default async function HomePage() {
 
       {/* Спецпредложения (по полю «Распродажа/Спецпредложение» из МойСклад; нет флага — секции нет) */}
       {special.length > 0 && (
-        <div className="band">
-          <div id="special" className="container section">
-            <div className="section-head">
-              <h2 className="section-title section-title--caps section-title--xl">Спецпредложения</h2>
-              <Link href="/special" className="see-all">Посмотреть все <ArrowIcon size={16} /></Link>
-            </div>
-            <PromoCarousel>
-              {special.map(p => <PromoCard key={p.id} p={p} kind="sale" compact />)}
-            </PromoCarousel>
+        <div id="special" className="container section">
+          <div className="section-head section-head--line">
+            <h2 className="section-title section-title--caps section-title--xl section-title--line">Спецпредложения</h2>
+            <Link href="/special" className="see-all">Посмотреть все <ArrowIcon size={16} /></Link>
           </div>
+          <PromoCarousel>
+            {special.map(p => <PromoCard key={p.id} p={p} kind="sale" compact />)}
+          </PromoCarousel>
         </div>
       )}
 
       {/* Категории */}
       <div className="container section section--cats">
-        <div className="section-head">
+        <div className="section-head section-head--line">
           <div>
-            <h2 className="section-title section-title--caps">Популярные разделы</h2>
+            <h2 className="section-title section-title--caps section-title--line">Популярные разделы</h2>
             <p className="lead">Полный ассортимент для дома, дачи и магазина — выберите раздел и оформите заказ онлайн.</p>
           </div>
           <Link href="/catalog" className="see-all">

@@ -130,7 +130,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                   <Link href="/catalog">Каталог</Link>
                   <Link href="/cart">Корзина</Link>
                   <Link href="/how-to-order">Оформление заказа</Link>
-                  <Link href="/payment">Оплата</Link>
+                  <Link href="/how-to-order#payment">Оплата</Link>
                 </div>
 
                 <div className="footer__col">

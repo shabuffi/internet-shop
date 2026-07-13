@@ -472,6 +472,21 @@ button, input, textarea, select { font-family: inherit; }
   gap: var(--s-6); margin-bottom: var(--s-6);
 }
 .section-head .section-title { margin-bottom: 0; }
+
+/* Заголовок-разделитель с синей линией (главная): «— ЗАГОЛОВОК ————————».
+   Голова становится колонкой: строка 1 — заголовок с линией во всю ширину; строка 2 —
+   «Посмотреть все» справа под линией. Линия синяя (var(--accent)). */
+.section-head--line { flex-direction: column; align-items: stretch; gap: var(--s-3); }
+.section-head--line .see-all { align-self: flex-end; }
+.section-title--line { display: flex; align-items: center; gap: var(--s-4); }
+.section-title--line::before,
+.section-title--line::after { content: ""; height: 2px; background: var(--accent); border-radius: 2px; }
+.section-title--line::before { flex: 0 0 44px; }   /* короткий сегмент слева */
+.section-title--line::after  { flex: 1 1 auto; }   /* длинная линия справа */
+@media (max-width: 768px) {
+  .section-title--line { gap: var(--s-3); }
+  .section-title--line::before { flex-basis: 22px; }
+}
 .section-copy {
   color: var(--charcoal); font-size: var(--t-body-lg); line-height: 1.65;
   max-width: 58ch; margin: 0 0 var(--s-6);

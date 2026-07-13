@@ -67,8 +67,9 @@ export default async function ProductPage({ params }: Props) {
   // у ВСЕХ товаров (если не задано — «—»), поэтому исключаем его из общего списка реквизитов.
   const attributes = (product.attributes?.filter((item) => item.name && item.value) ?? [])
     .filter((x) => !/минимальн.*(единиц.*отгрузк|количеств)/iu.test(x.name))
-    // Флаги «Новинка»/«Распродажа» — служебные (для сортировки/лент), в характеристиках не показываем
-    .filter((x) => !/новин|распродаж|спецпредлож|акци/iu.test(x.name));
+    // Флаги «Новинка»/«Распродажа»/«Убойные цены» — служебные (для сортировки/лент),
+    // в характеристиках товара их не показываем (шаблоны как в backend import_service).
+    .filter((x) => !/новин|распродаж|спецпредлож|акци|скидк|убойн/iu.test(x.name));
   const specs: { name: string; value: string }[] = [
     { name: MIN_ORDER_QTY_LABEL, value: minOrderQtyText(product.attributes) },
     ...attributes,

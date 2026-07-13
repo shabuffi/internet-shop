@@ -2,7 +2,7 @@
 // markdown-lite: блоки разделены пустой строкой; «## …» — подзаголовок, остальное — абзац
 // (переносы строк внутри абзаца сохраняются). Один компонент для витрины и превью в админке.
 
-function renderBlocks(text: string) {
+export function renderBlocks(text: string) {
   return text
     .split(/\n{2,}/)
     .map((block) => block.trim())
@@ -23,7 +23,21 @@ function renderBlocks(text: string) {
     });
 }
 
-export default function InfoPageView({ title, body }: { title: string; body: string }) {
+export default function InfoPageView({ title, body, hero = false }: { title: string; body: string; hero?: boolean }) {
+  // hero=true — публичная страница: баннер с фоновой картинкой (как «О компании»/«Контакты»
+  // и др. пункты меню) + тело. hero=false — инлайн (заголовок+текст), для превью в админке.
+  if (hero) {
+    return (
+      <div className="page">
+        <div className="band band--hero">
+          <div className="container catalog__hero"><h1>{title}</h1></div>
+        </div>
+        <div className="container section prose" style={{ maxWidth: 760, lineHeight: 1.6 }}>
+          {renderBlocks(body)}
+        </div>
+      </div>
+    );
+  }
   return (
     <>
       <h1 style={{ fontFamily: "var(--font-display)", fontSize: "var(--t-h1)", margin: "0 0 var(--s-4)" }}>
