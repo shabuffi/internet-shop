@@ -1,0 +1,52 @@
+# Dependabot — автоматически следит за обновлениями зависимостей и открывает PR,
+# когда выходит новая версия (в т.ч. с исправлением уязвимости). Заведён после
+# инцидента 13.07.2026 (RCE через устаревший Next.js 15.3.3) — чтобы про фиксы
+# безопасности узнавать сразу, а не постфактум от хостера.
+#
+# ⚠️ Отдельно включи в настройках репозитория на GitHub:
+#   Settings → Code security → «Dependabot alerts» и «Dependabot security updates».
+#   Этот файл делает плановые обновления; алерты о CVE включаются там (одна галочка)
+#   и заставляют Dependabot открывать PR на уязвимости немедленно, вне расписания.
+version: 2
+updates:
+  # ── Frontend (Next.js / npm) — тут была дыра, следим внимательно ──
+  - package-ecosystem: "npm"
+    directory: "/frontend"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    labels: ["dependencies", "frontend"]
+    groups:
+      # Мелкие апдейты — одним PR, чтобы не шумело; мажорные — отдельными PR
+      npm-minor-patch:
+        update-types: ["minor", "patch"]
+
+  # ── Backend (FastAPI / pip) ──
+  - package-ecosystem: "pip"
+    directory: "/backend"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    labels: ["dependencies", "backend"]
+    groups:
+      pip-minor-patch:
+        update-types: ["minor", "patch"]
+
+  # ── Базовые образы Docker (node:20-alpine, python:3.12-slim и т.п.) ──
+  - package-ecosystem: "docker"
+    directory: "/frontend"
+    schedule:
+      interval: "weekly"
+    labels: ["dependencies", "docker"]
+  - package-ecosystem: "docker"
+    directory: "/backend"
+    schedule:
+      interval: "weekly"
+    labels: ["dependencies", "docker"]
+
+  # ── GitHub Actions (ci.yml) ──
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    labels: ["dependencies", "ci"]
