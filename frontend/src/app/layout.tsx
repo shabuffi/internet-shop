@@ -100,7 +100,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               <MainNav />
 
               <div className="header__actions">
-                <HeaderSearch className="hide-mobile" />
+                <HeaderSearch className="hide-mobile" unified={store?.unified_search !== false} />
                 <AccountNav />
                 <CartIcon />
                 <MobileMenu />

@@ -13,12 +13,14 @@ interface ShopSettings {
   warehouse_coords: string; delivery_info: string;
   show_stock_qty: boolean;
   category_sort: string;
+  unified_search: boolean;
 }
 
 const EMPTY: ShopSettings = {
   shop_name: "", contact_phone: "", contact_email: "", contact_hours: "",
   company_legal_name: "", company_inn: "", company_ogrn: "", warehouse_address: "",
   warehouse_coords: "", delivery_info: "", show_stock_qty: true, category_sort: "moysklad",
+  unified_search: true,
 };
 
 const cardStyle: React.CSSProperties = {
@@ -61,6 +63,7 @@ export default function AdminSitePage() {
         warehouse_address: d.warehouse_address || "", warehouse_coords: d.warehouse_coords || "",
         delivery_info: d.delivery_info || "", show_stock_qty: d.show_stock_qty !== false,
         category_sort: d.category_sort === "alpha" ? "alpha" : "moysklad",
+        unified_search: d.unified_search !== false,
       }))
       .catch(() => {});
     adminFetch<{ brands: Brand[] }>("/brands")
@@ -289,6 +292,34 @@ export default function AdminSitePage() {
           </span>
         </label>
         {saveRow("category_sort")}
+      </form>
+
+      {/* Поиск товаров: единый (только на «Каталоге») или своя строка на каждой странице */}
+      <form style={cardStyle} onSubmit={e => saveSection(e, "unified_search", ["unified_search"])}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+          <p style={{ fontWeight: 600, fontSize: 16, margin: 0 }}>Поиск товаров</p>
+          <HelpHint text={"Где показывать поисковую строку. Переключение мгновенное — повторная синхронизация товаров не нужна."} />
+        </div>
+        <p style={{ fontSize: 13, color: "var(--ink-secondary)", marginBottom: 12 }}>
+          Как покупатель ищет товары на страницах «Новинки», «Спецпредложения» и «Убойные цены».
+        </p>
+        <label style={{ display: "flex", gap: 10, alignItems: "flex-start", padding: "10px 12px", borderRadius: 10,
+          border: "1px solid " + (form.unified_search ? "var(--accent, #003399)" : "var(--hairline-soft)"), marginBottom: 8, cursor: "pointer" }}>
+          <input type="radio" name="search_mode" checked={form.unified_search} onChange={() => setForm(p => ({ ...p, unified_search: true }))} style={{ marginTop: 3 }} />
+          <span>
+            <b>Единый поиск</b> — рекомендуется
+            <span style={{ display: "block", fontSize: 12, color: "var(--ink-secondary)" }}>Поиск живёт на «Каталоге» и в шапке; на «Новинках»/«Спец»/«Убойных ценах» отдельной строки нет — ищем по всему каталогу.</span>
+          </span>
+        </label>
+        <label style={{ display: "flex", gap: 10, alignItems: "flex-start", padding: "10px 12px", borderRadius: 10,
+          border: "1px solid " + (!form.unified_search ? "var(--accent, #003399)" : "var(--hairline-soft)"), marginBottom: 4, cursor: "pointer" }}>
+          <input type="radio" name="search_mode" checked={!form.unified_search} onChange={() => setForm(p => ({ ...p, unified_search: false }))} style={{ marginTop: 3 }} />
+          <span>
+            <b>Отдельный поиск на каждой странице</b> — текущее поведение
+            <span style={{ display: "block", fontSize: 12, color: "var(--ink-secondary)" }}>У «Новинок», «Спецпредложений» и «Убойных цен» своя строка — поиск идёт внутри раздела.</span>
+          </span>
+        </label>
+        {saveRow("unified_search")}
       </form>
 
       {/* Бренды */}

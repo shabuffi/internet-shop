@@ -33,8 +33,11 @@ export default async function PromoListing({
   const pageSize = listView ? 100 : 48;
   const data = await getProducts({ page_size: pageSize, with_photo: withPhoto || undefined, sort, featured, search });
   const items = data.items;
+  const store = await getStoreInfo().catch(() => null);
   // Показ остатка (для списочного вида) — «N шт.» или только «В наличии»: настройка сайта.
-  const showQty = (await getStoreInfo().catch(() => null))?.show_stock_qty !== false;
+  const showQty = store?.show_stock_qty !== false;
+  // Единый поиск: своя поисковая строка раздела скрыта — поиск живёт на «Каталоге» (в шапке).
+  const unifiedSearch = store?.unified_search !== false;
 
   // Ссылка для тулбара: желаемое состояние (список? / только с фото?), сортировку и поиск сохраняем.
   const mk = (o: { list?: boolean; photo?: boolean }) => {
@@ -67,10 +70,13 @@ export default async function PromoListing({
   return (
     <div className="page">
       {/* Поиск на телефоне — НАД заголовком раздела (как у DNS); в шапке он скрыт.
-          action = basePath: ищем ВНУТРИ раздела, а не по всему каталогу. */}
-      <div className="container search-mobile-top">
-        <HeaderSearch className="search-mobile" action={basePath} />
-      </div>
+          action = basePath: ищем ВНУТРИ раздела, а не по всему каталогу.
+          Единый поиск: своя строка раздела скрыта — поиск только на «Каталоге». */}
+      {!unifiedSearch && (
+        <div className="container search-mobile-top">
+          <HeaderSearch className="search-mobile" action={basePath} />
+        </div>
+      )}
       <div className="band band--hero hero--off-mobile">
         <div className="container catalog__hero">
           <h1>{title}</h1>

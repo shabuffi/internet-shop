@@ -94,8 +94,9 @@ function StickySearch({ className, action, placeholder }: { className: string; a
 /** Поиск в шапке и в разделах. Область поиска берём из текущего пути (новинки/спец → внутри
  *  раздела, иначе весь каталог); `action` можно задать явно. `useSearchParams` требует
  *  Suspense — фолбэк рабочая форма с пустым полем. */
-export default function HeaderSearch({ className = "", action }: { className?: string; action?: string }) {
-  const scope = scopeFor(usePathname());
+export default function HeaderSearch({ className = "", action, unified }: { className?: string; action?: string; unified?: boolean }) {
+  // Единый поиск: на «Новинках»/«Спец»/«Убойных» шапка ищет по всему каталогу, а не внутри раздела.
+  const scope = unified ? { action: "/catalog", placeholder: DEFAULT_PLACEHOLDER } : scopeFor(usePathname());
   const target = action ?? scope.action;
   const placeholder = scope.placeholder;
   return (

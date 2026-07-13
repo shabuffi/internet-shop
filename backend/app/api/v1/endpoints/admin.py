@@ -526,6 +526,8 @@ def get_settings(db: Session = Depends(get_db), _=Depends(_get_current_admin)):
         "show_stock_qty":     _get_setting(db, "show_stock_qty", "1") != "0",
         # Сортировка категорий каталога: «moysklad» (порядок МойСклад) или «alpha» (алфавит)
         "category_sort":      _get_setting(db, "category_sort", "moysklad"),
+        # Единый поиск: «1» — поиск только на «Каталоге» (по умолчанию), «0» — своя строка на каждой странице
+        "unified_search":     _get_setting(db, "unified_search", "1") != "0",
     }
 
 
@@ -558,6 +560,8 @@ def save_settings(body: dict, db: Session = Depends(get_db), _=Depends(_get_curr
         "show_stock_qty",
         # сортировка категорий каталога («moysklad» / «alpha»)
         "category_sort",
+        # единый поиск («1» — только на «Каталоге», «0» — своя строка на каждой странице)
+        "unified_search",
     }
     # Настройки сайта (чат/соцсети/SEO/тема) перенесены на dev-страницу — см. save_dev_settings.
     for key, value in body.items():
@@ -1021,6 +1025,8 @@ def store_info_public(db: Session = Depends(get_db)):
         "brands":             _get_setting(db, "brands"),
         # Показывать точный остаток «N шт.» (1, по умолчанию) или только «В наличии» (0)
         "show_stock_qty":     _get_setting(db, "show_stock_qty", "1") != "0",
+        # Единый поиск: «1» — поиск только на «Каталоге» (по умолчанию), «0» — своя строка на каждой странице
+        "unified_search":     _get_setting(db, "unified_search", "1") != "0",
     }
 
 

@@ -114,6 +114,8 @@ export interface StoreInfo {
   brands?: string;
   // Показ остатка: true — «N шт.», false — только «В наличии» (по умолчанию true)
   show_stock_qty?: boolean;
+  // Единый поиск: true — поиск только на «Каталоге» (по умолчанию), false — своя строка на каждой странице
+  unified_search?: boolean;
 }
 
 export async function getStoreInfo(): Promise<StoreInfo> {
