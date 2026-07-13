@@ -12,12 +12,13 @@ interface ShopSettings {
   company_legal_name: string; company_inn: string; company_ogrn: string; warehouse_address: string;
   warehouse_coords: string; delivery_info: string;
   show_stock_qty: boolean;
+  category_sort: string;
 }
 
 const EMPTY: ShopSettings = {
   shop_name: "", contact_phone: "", contact_email: "", contact_hours: "",
   company_legal_name: "", company_inn: "", company_ogrn: "", warehouse_address: "",
-  warehouse_coords: "", delivery_info: "", show_stock_qty: true,
+  warehouse_coords: "", delivery_info: "", show_stock_qty: true, category_sort: "moysklad",
 };
 
 const cardStyle: React.CSSProperties = {
@@ -59,6 +60,7 @@ export default function AdminSitePage() {
         company_inn: d.company_inn || "", company_ogrn: d.company_ogrn || "",
         warehouse_address: d.warehouse_address || "", warehouse_coords: d.warehouse_coords || "",
         delivery_info: d.delivery_info || "", show_stock_qty: d.show_stock_qty !== false,
+        category_sort: d.category_sort === "alpha" ? "alpha" : "moysklad",
       }))
       .catch(() => {});
     adminFetch<{ brands: Brand[] }>("/brands")
@@ -259,6 +261,34 @@ export default function AdminSitePage() {
           </span>
         </label>
         {saveRow("stock")}
+      </form>
+
+      {/* Сортировка категорий каталога */}
+      <form style={cardStyle} onSubmit={e => saveSection(e, "category_sort", ["category_sort"])}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+          <p style={{ fontWeight: 600, fontSize: 16, margin: 0 }}>Порядок категорий</p>
+          <HelpHint text={"Как расположены разделы каталога в меню и фильтре. Переключение мгновенное — повторная синхронизация товаров не нужна."} />
+        </div>
+        <p style={{ fontSize: 13, color: "var(--ink-secondary)", marginBottom: 12 }}>
+          В каком порядке покупатель видит разделы каталога.
+        </p>
+        <label style={{ display: "flex", gap: 10, alignItems: "flex-start", padding: "10px 12px", borderRadius: 10,
+          border: "1px solid " + (form.category_sort !== "alpha" ? "var(--accent, #003399)" : "var(--hairline-soft)"), marginBottom: 8, cursor: "pointer" }}>
+          <input type="radio" name="category_sort" checked={form.category_sort !== "alpha"} onChange={() => setForm(p => ({ ...p, category_sort: "moysklad" }))} style={{ marginTop: 3 }} />
+          <span>
+            <b>По порядку МойСклад</b> — рекомендуется
+            <span style={{ display: "block", fontSize: 12, color: "var(--ink-secondary)" }}>Разделы идут так же, как в МойСклад, — логические группы товаров сохраняются.</span>
+          </span>
+        </label>
+        <label style={{ display: "flex", gap: 10, alignItems: "flex-start", padding: "10px 12px", borderRadius: 10,
+          border: "1px solid " + (form.category_sort === "alpha" ? "var(--accent, #003399)" : "var(--hairline-soft)"), marginBottom: 4, cursor: "pointer" }}>
+          <input type="radio" name="category_sort" checked={form.category_sort === "alpha"} onChange={() => setForm(p => ({ ...p, category_sort: "alpha" }))} style={{ marginTop: 3 }} />
+          <span>
+            <b>По алфавиту</b>
+            <span style={{ display: "block", fontSize: 12, color: "var(--ink-secondary)" }}>Разделы упорядочены по названию.</span>
+          </span>
+        </label>
+        {saveRow("category_sort")}
       </form>
 
       {/* Бренды */}

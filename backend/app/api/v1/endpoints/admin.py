@@ -524,6 +524,8 @@ def get_settings(db: Session = Depends(get_db), _=Depends(_get_current_admin)):
         "email_ready":        bool(smtp["host"] and smtp["user"] and smtp["password"]),
         # Показ остатка на витрине: «N шт.» (по умолчанию) или только «В наличии»
         "show_stock_qty":     _get_setting(db, "show_stock_qty", "1") != "0",
+        # Сортировка категорий каталога: «moysklad» (порядок МойСклад) или «alpha» (алфавит)
+        "category_sort":      _get_setting(db, "category_sort", "moysklad"),
     }
 
 
@@ -554,6 +556,8 @@ def save_settings(body: dict, db: Session = Depends(get_db), _=Depends(_get_curr
         "guest_moysklad_ext_code",
         # показ остатка на витрине («1» — «N шт.», «0» — «В наличии»)
         "show_stock_qty",
+        # сортировка категорий каталога («moysklad» / «alpha»)
+        "category_sort",
     }
     # Настройки сайта (чат/соцсети/SEO/тема) перенесены на dev-страницу — см. save_dev_settings.
     for key, value in body.items():

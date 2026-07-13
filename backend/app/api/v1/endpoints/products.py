@@ -7,6 +7,7 @@ from sqlalchemy import select, func, or_, and_, case
 
 from app.db.session import get_db
 from app.db.models.product import Product, Category
+from app.db.models.admin import ShopSettings
 from app.schemas.product import ProductOut, ProductListOut, CategoryOut
 from app.services.media_storage import read_image
 from app.services.pricing import adjusted_price
@@ -108,18 +109,36 @@ def list_categories(db: Session = Depends(get_db)):
         cleaned = re.sub(r"^\d[\d.]*\.[\d.]*\s+", "", name).strip() or name
         return cleaned.casefold().replace("ё", "е")
 
+    def ms_key(name: str) -> tuple:
+        # Ключ «как в МойСклад»: числовой код-префикс имени (001, 001.02) кодирует порядок,
+        # заданный в МойСклад, — сортируем по сегментам как по числам. Категории без кода — в
+        # конец, между собой по алфавиту (стабильно). Сравниваются только ключи одного уровня.
+        code = code_of(name)
+        if code:
+            try:
+                return (0, tuple(int(s) for s in code.split(".") if s))
+            except ValueError:
+                pass
+        return (1, sort_key(name))
+
+    # Режим сортировки категорий из настроек магазина: «moysklad» (порядок МойСклад,
+    # рекомендуемый) или «alpha» (по алфавиту). Влияет только на порядок вывода.
+    mode_row = db.get(ShopSettings, "category_sort")
+    mode = mode_row.value if mode_row else "moysklad"
+    key_idx = 2 if mode == "alpha" else 4  # info[..][2] — алфавит, [4] — порядок МойСклад
+
     # parent_id / depth для каждой категории (иерархия — из кода; без кода — корень)
-    info: dict[str, tuple[str | None, int, str, Category]] = {}
+    info: dict[str, tuple[str | None, int, str, Category, tuple]] = {}
     for c in cats:
         code = code_of(c.name)
         if code:
             pc = parent_code(code)
-            info[c.id] = (by_code[pc].id if pc else None, depth_of(code), sort_key(c.name), c)
+            info[c.id] = (by_code[pc].id if pc else None, depth_of(code), sort_key(c.name), c, ms_key(c.name))
         else:
-            info[c.id] = (None, 0, sort_key(c.name), c)
+            info[c.id] = (None, 0, sort_key(c.name), c, ms_key(c.name))
 
     children: dict[str | None, list[str]] = {}
-    for cid, (pid, _d, _k, _c) in info.items():
+    for cid, (pid, _d, _k, _c, _m) in info.items():
         children.setdefault(pid, []).append(cid)
 
     # Обход в глубину: на каждом уровне сортируем детей по алфавиту (Python sort стабилен),
@@ -131,15 +150,15 @@ def list_categories(db: Session = Depends(get_db)):
         # саму категорию. Категорию скрываем ТОЛЬКО если в ней нет товара И все её подкатегории
         # тоже пусты — так пустой раздел-родитель с непустым ребёнком не исчезнет, а его ребёнок
         # не осиротеет. Возвращаем строки поддерева (пусто — если весь узел скрыт).
-        pid2, depth, _k, c = info[cid]
+        pid2, depth, _k, c, _m = info[cid]
         child_rows: list[CategoryOut] = []
-        for ch in sorted(children.get(cid, []), key=lambda x: info[x][2]):
+        for ch in sorted(children.get(cid, []), key=lambda x: info[x][key_idx]):
             child_rows += emit(ch)
         if counts.get(cid, 0) == 0 and not child_rows:
             return []
         return [CategoryOut(id=c.id, name=c.name, parent_id=pid2, depth=depth), *child_rows]
 
-    for cid in sorted(children.get(None, []), key=lambda x: info[x][2]):
+    for cid in sorted(children.get(None, []), key=lambda x: info[x][key_idx]):
         out += emit(cid)
     return out
 
