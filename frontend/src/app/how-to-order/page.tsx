@@ -19,12 +19,7 @@ async function getPages(): Promise<{ order: InfoPage; payment: InfoPage } | null
   }
 }
 
-const subheadStyle: React.CSSProperties = {
-  fontFamily: "var(--font-display)", fontSize: "var(--t-h2)", fontWeight: 700,
-  color: "var(--accent)", margin: "0 0 var(--s-4)",
-};
-
-// Объединённая страница «Оформление и оплата»: два раздела (Оформление заказа + Оплата)
+//Объединённая страница «Оформление и оплата»: два раздела (Оформление заказа + Оплата)
 // с якорями #order/#payment (на «Оплату» ведёт ссылка из футера). Тексты — из /admin/pages.
 export default async function OrderAndPaymentPage() {
   const data = await getPages();
@@ -38,15 +33,15 @@ export default async function OrderAndPaymentPage() {
   return (
     <div className="page">
       <div className="band band--hero">
-        <div className="container catalog__hero"><h1>Оформление и оплата</h1></div>
+        <div className="container catalog__hero"><h1>Оформление и оплата заказа</h1></div>
       </div>
       <div className="container section prose" style={{ maxWidth: 760, lineHeight: 1.6 }}>
         <section id="order" style={{ scrollMarginTop: "90px" }}>
-          <h2 style={subheadStyle}>{data.order.title}</h2>
+          <h2 className="section-title section-title--caps section-title--line info-subhead"><span>{data.order.title}</span></h2>
           {renderBlocks(data.order.body)}
         </section>
         <section id="payment" style={{ scrollMarginTop: "90px", marginTop: "var(--s-10)" }}>
-          <h2 style={subheadStyle}>{data.payment.title}</h2>
+          <h2 className="section-title section-title--caps section-title--line info-subhead"><span>{data.payment.title}</span></h2>
           {renderBlocks(data.payment.body)}
         </section>
       </div>

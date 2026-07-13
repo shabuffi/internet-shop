@@ -57,7 +57,7 @@ export default function AdminPagesPage() {
     <div style={cardStyle}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
         <p style={{ fontWeight: 600, fontSize: 16, margin: 0 }}>{data[slug].title}</p>
-        <HelpHint text={"Пустая строка — новый абзац. Строка, начинающаяся с «## », — подзаголовок. Переносы строк внутри абзаца сохраняются (удобно для подписи/контактов)."} />
+        <HelpHint text={"Поддерживается Markdown. Пустая строка — новый абзац. «## » — подзаголовок, **жирный**, *курсив*, списки (- пункт или 1. пункт), [текст](ссылка), «> » — цитата, «---» — разделитель. Переносы строк внутри абзаца сохраняются."} />
         <a href={href} target="_blank" rel="noopener noreferrer"
           style={{ marginLeft: "auto", fontSize: 13, color: "var(--accent, #003399)" }}>Открыть на сайте ↗</a>
       </div>

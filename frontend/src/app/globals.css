@@ -165,6 +165,10 @@ button, input, textarea, select { font-family: inherit; }
 /* Одинаковая высота hero на всех разделах (картинка всегда одного размера), контент по центру */
 .band--hero .catalog__hero { position: relative; z-index: 1; min-height: 200px; display: flex; flex-direction: column; justify-content: center; }
 .band--hero .eyebrow { color: var(--accent); }
+/* Подзаголовки страницы «Оформление и оплата»: декор-линии как на главной.
+   Текст в span с nowrap — линии не разрывают перенос слов на мобильных. */
+.info-subhead { color: var(--accent); }
+.info-subhead > span { white-space: nowrap; }
 @media (max-width: 768px) {
   /* На телефоне фон-иллюстрацию не показываем (по просьбе) — обычный светлый hero */
   .band--hero { background: linear-gradient(118deg, var(--accent-soft) 0%, color-mix(in srgb, var(--accent-soft), #fff 55%) 45%, #fff 100%); }
