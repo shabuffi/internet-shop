@@ -493,8 +493,8 @@ button, input, textarea, select { font-family: inherit; }
   /* Единый стиль на телефоне: линия только слева, справа убираем у всех. */
   .section-title--line::after { display: none; }
   /* Мельче заголовок, чтобы по возможности не переносился на 2 строки. */
-  .section-title { font-size: 22px; }
-  .section-title--xl { font-size: 24px; }
+  .section-title { font-size: 19px; }
+  .section-title--xl { font-size: 20px; }
   /* Разрешаем перенос, если всё-таки не влезло — без горизонтального выхода за экран. */
   .info-subhead > span { white-space: normal; }
 }
@@ -1093,7 +1093,7 @@ textarea.form-input { height: auto; min-height: 90px; padding: var(--s-3) var(--
 }
 @media (max-width: 768px) {
   .container { padding: 0 var(--s-4); }
-  .section { padding-top: var(--s-12); padding-bottom: var(--s-12); }
+  .section { padding-top: var(--s-8); padding-bottom: var(--s-8); }
   .hide-mobile { display: none !important; }
   .only-mobile { display: inline-flex !important; }
   /* Бланк заказа: на телефоне таблицу прячем, показываем компактные строки */
