@@ -204,6 +204,14 @@ def upsert_catalog(db: Session, catalog: ParsedCatalog, source: str = "commercem
         pending_image_clears: list[Product] = []
         images_touched = False
 
+        # Удаление фото ловим ТОЛЬКО в дельта-выгрузке (<Каталог СодержитТолькоИзменения="true">).
+        # На этом аккаунте МойСклад так устроен (проверено на проде): ПОЛНЫЙ каталог (false) несёт
+        # весь ассортимент, но БЕЗ единой <Картинка> — там отсутствие тега НЕ значит удаление, фото
+        # не трогаем. А дельта (true) — изменённые товары ПОЛНОЙ карточкой (с <Картинка>, если фото
+        # есть); тут «был тег → пропал» = фото удалили в МойСклад (пустой тег МойСклад не шлёт).
+        # Всё стирание всё равно проходит через предохранитель MAX_IMAGE_CLEARS ниже.
+        changes_only = catalog.changes_only
+
         for parsed_product in catalog.products:
             product = existing_products.get(parsed_product.moysklad_id)
 
@@ -286,18 +294,25 @@ def upsert_catalog(db: Session, catalog: ParsedCatalog, source: str = "commercem
                 # <Картинка> фото затиралось в ноль → 350 осиротевших файлов (инцидент 29.06.2026).
                 # Теперь: тег заполнен → ставим; тег пустой (has_image_field, images=[]) → удаление,
                 # чистим; тега не было → НЕ трогаем (обычный import.xml чужие фото не сбрасывает).
-                if (parsed_product.has_image_field or parsed_product.images) and not product.images_manual:
-                    imgs = [image_name(x) for x in parsed_product.images]
-                    if product.images != imgs:
-                        if imgs:
-                            # добавление/замена фото — применяем сразу, потери нет
-                            product.images = imgs
-                            product.image_url = imgs[0]
-                            images_touched = True
-                            changed = True
-                        elif product.images:
-                            # обмен просит СТЕРЕТЬ фото — откладываем под предохранитель (ниже)
-                            pending_image_clears.append(product)
+                if not product.images_manual:
+                    if parsed_product.has_image_field or parsed_product.images:
+                        imgs = [image_name(x) for x in parsed_product.images]
+                        if product.images != imgs:
+                            if imgs:
+                                # добавление/замена фото — применяем сразу, потери нет
+                                product.images = imgs
+                                product.image_url = imgs[0]
+                                images_touched = True
+                                changed = True
+                            elif product.images:
+                                # обмен просит СТЕРЕТЬ фото (пустой тег) — под предохранитель (ниже)
+                                pending_image_clears.append(product)
+                    elif changes_only and product.images:
+                        # Дельта-выгрузка карточки товара, но тега <Картинка> БОЛЬШЕ нет → фото
+                        # удалили в МойСклад. Откладываем под предохранитель: единичные удаления
+                        # применятся, массовое стирание (сбой выгрузки) — нет. Полный каталог
+                        # (changes_only=False) сюда не попадает — там фото не выгружаются вовсе.
+                        pending_image_clears.append(product)
                 # Отметку последнего обмена ставим всегда (товар «виден» в выгрузке),
                 # а в счётчик «Обновлено» попадают только реально изменившиеся.
                 product.synced_at = _utcnow()
