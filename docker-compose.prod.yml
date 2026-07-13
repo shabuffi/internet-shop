@@ -71,7 +71,9 @@ services:
     env_file: .env.prod
     depends_on:
       - worker
-    command: celery -A app.tasks.celery_app beat --loglevel=info
+    # --schedule в /tmp: под non-root (uid 1000) beat не может писать файл
+    # расписания в /app (root:root). /tmp писуем всем.
+    command: celery -A app.tasks.celery_app beat --loglevel=info --schedule=/tmp/celerybeat-schedule
 
   frontend:
     build:
