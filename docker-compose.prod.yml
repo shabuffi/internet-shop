@@ -79,11 +79,14 @@ services:
       dockerfile: Dockerfile.prod
     restart: always
     mem_limit: 1024m          # Next.js SSR может зависать на маленьком лимите под ботами/каталогом
-    env_file: .env.prod
+    # НЕ передаём фронту весь .env.prod (пароль БД, токены ТГ/ВК, exchange_*): при RCE в
+    # next-server они читаются из окружения. Фронту нужен только публичный SITE_URL (SEO/OG),
+    # к бэкенду он ходит по имени сервиса backend:8000 / через nginx. Инцидент 13.07.2026.
     environment:
       HOSTNAME: "0.0.0.0"
       PORT: "3000"
       NODE_OPTIONS: "--max-old-space-size=768"
+      SITE_URL: ${SITE_URL}
     depends_on:
       backend:
         condition: service_healthy
