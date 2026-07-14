@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useCart } from "@/context/CartContext";
 import { formatPrice, minOrderQty } from "@/lib/format";
-import { IconImage } from "@/components/icons";
+import NoPhoto from "@/components/NoPhoto";
 import ChestnyZnakBadge from "@/components/ChestnyZnakBadge";
 import type { Product } from "@/types/product";
 
@@ -29,7 +29,7 @@ function ProductThumb({ product }: { product: Product }) {
         background: "var(--cloud)", border: "1px solid var(--hairline-soft)", position: "relative" }}>
       {hasImg
         ? <img src={`/api/v1/products/${product.id}/image`} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
-        : <span style={{ display: "flex", width: "100%", height: "100%", alignItems: "center", justifyContent: "center", color: "var(--graphite)", opacity: .5 }}><IconImage width="1.2em" height="1.2em" /></span>}
+        : <NoPhoto />}
       {box && (
         // Всплывашка ровно по размеру картинки: без подложки и полей — только само фото.
         <span style={{ position: "fixed", left: box.left, top: box.top, zIndex: 60, pointerEvents: "none",

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { formatPrice } from "@/lib/format";
-import { IconImage, IconFlame } from "@/components/icons";
+import { IconFlame } from "@/components/icons";
+import NoPhoto from "@/components/NoPhoto";
 import AddToCartCard from "@/components/AddToCartCard";
 import ChestnyZnakBadge from "@/components/ChestnyZnakBadge";
 import ProductName from "@/components/ProductName";
@@ -19,7 +20,7 @@ export default function PromoCard({ p, kind, compact = false }: { p: Product; ki
     <div className="photo photo--square">
       {p.image_url
         ? <img src={`/api/v1/products/${p.id}/image`} alt={p.name} />
-        : <span className="photo__ph"><IconImage /></span>}
+        : <NoPhoto />}
     </div>
   );
   const price = <span className="price">{Number(p.price) > 0 ? formatPrice(p.price) : "—"}</span>;

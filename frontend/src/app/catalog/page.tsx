@@ -14,7 +14,8 @@ import CatalogList from "@/components/CatalogList";
 import CartBar from "@/components/CartBar";
 import CategorySelect from "@/components/CategorySelect";
 import SortSelect from "@/components/SortSelect";
-import { IconImage, IconSearch } from "@/components/icons";
+import { IconSearch } from "@/components/icons";
+import NoPhoto from "@/components/NoPhoto";
 
 interface Props {
   searchParams: Promise<{ category_id?: string; search?: string; page?: string; view?: string; sort?: string; photo?: string }>;
@@ -241,7 +242,7 @@ export default async function CatalogPage({ searchParams }: Props) {
                       <div className="photo photo--square">
                         {p.image_url
                           ? <img src={`/api/v1/products/${p.id}/image`} alt={p.name} />
-                          : <span className="photo__ph"><IconImage /></span>}
+                          : <NoPhoto />}
                       </div>
                     </Link>
                     <div className="pcard__body">

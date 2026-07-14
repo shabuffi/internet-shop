@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { IconImage } from "@/components/icons";
+import NoPhoto from "@/components/NoPhoto";
 
 // Галерея фото товара на карточке: большое фото + миниатюры (если фото несколько).
 export default function ProductGallery({ productId, images, name }: {
@@ -14,7 +14,7 @@ export default function ProductGallery({ productId, images, name }: {
   if (!images || images.length === 0) {
     return (
       <div className="photo">
-        <span className="photo__ph" style={{ fontSize: 64 }}><IconImage /></span>
+        <NoPhoto />
       </div>
     );
   }

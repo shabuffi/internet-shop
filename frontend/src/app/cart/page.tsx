@@ -4,7 +4,8 @@ import Link from "next/link";
 import { useCart } from "@/context/CartContext";
 import { formatPrice } from "@/lib/format";
 import { MIN_ORDER_AMOUNT } from "@/lib/site";
-import { IconImage, IconCart } from "@/components/icons";
+import { IconCart } from "@/components/icons";
+import NoPhoto from "@/components/NoPhoto";
 import ChestnyZnakBadge from "@/components/ChestnyZnakBadge";
 import QtyField from "@/components/QtyField";
 
@@ -43,7 +44,7 @@ export default function CartPage() {
             <div className="lineitem" key={item.id}>
               <Link href={`/products/${item.id}`} className="lineitem__media">
                 <div className="photo" style={{ position: "relative" }}>
-                  <span className="photo__ph" style={{ position: "absolute", inset: 0, fontSize: 22 }}><IconImage /></span>
+                  <NoPhoto style={{ position: "absolute", inset: 0 }} />
                   <img src={`/api/v1/products/${item.id}/image`} alt={item.name}
                     style={{ position: "relative", zIndex: 1 }}
                     onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />

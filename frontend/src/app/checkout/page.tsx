@@ -6,7 +6,8 @@ import Link from "next/link";
 import { useCart } from "@/context/CartContext";
 import { formatPrice } from "@/lib/format";
 import { MIN_ORDER_AMOUNT } from "@/lib/site";
-import { IconImage, IconCart } from "@/components/icons";
+import { IconCart } from "@/components/icons";
+import NoPhoto from "@/components/NoPhoto";
 import ChestnyZnakBadge from "@/components/ChestnyZnakBadge";
 import { FieldError, useFormErrors } from "@/components/FormErrors";
 import { getMe, type UserProfile } from "@/lib/authApi";
@@ -175,7 +176,7 @@ export default function CheckoutPage() {
             {items.map((it) => (
               <div className="osummary__item" key={it.id}>
                 <div className="photo" style={{ position: "relative" }}>
-                  <span className="photo__ph" style={{ position: "absolute", inset: 0, fontSize: 20 }}><IconImage /></span>
+                  <NoPhoto style={{ position: "absolute", inset: 0 }} />
                   <img src={`/api/v1/products/${it.id}/image`} alt={it.name} style={{ position: "relative", zIndex: 1 }}
                     onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
                 </div>
