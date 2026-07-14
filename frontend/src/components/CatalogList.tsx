@@ -26,7 +26,7 @@ function ProductThumb({ product }: { product: Product }) {
   return (
     <Link href={`/products/${product.id}`} onMouseEnter={onEnter} onMouseLeave={() => setBox(null)}
       style={{ display: "block", width: 44, height: 44, borderRadius: 8, overflow: "hidden",
-        background: "var(--cloud)", border: "1px solid var(--hairline-soft)", position: "relative" }}>
+        background: "var(--paper)", border: "1px solid var(--hairline-soft)", position: "relative" }}>
       {hasImg
         ? <img src={`/api/v1/products/${product.id}/image`} alt="" style={{ width: "100%", height: "100%", objectFit: "contain", display: "block" }} />
         : <NoPhoto />}

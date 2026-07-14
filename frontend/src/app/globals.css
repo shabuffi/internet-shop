@@ -618,12 +618,13 @@ button, input, textarea, select { font-family: inherit; }
 /* ---------- фото ---------- */
 .photo {
   position: relative; width: 100%; border-radius: var(--r-xl); overflow: hidden;
-  background: var(--cloud); display: flex; align-items: center; justify-content: center;
+  background: var(--paper); display: flex; align-items: center; justify-content: center;
 }
 /* contain, а не cover: фото товара показываем целиком, без обрезки (как на Ozon/WB).
    Пропорции сохраняются; если фото не квадратное — по краям поля цвета контейнера.
-   background закрашивает эти поля (важно в корзине/чекауте, где под фото лежит NoPhoto). */
-.photo img { width: 100%; height: 100%; object-fit: contain; object-position: center; background: var(--cloud); display: block; }
+   Фон белый (--paper, как у карточки), а не серый; background закрашивает поля
+   (важно в корзине/чекауте, где под фото лежит NoPhoto). */
+.photo img { width: 100%; height: 100%; object-fit: contain; object-position: center; background: var(--paper); display: block; }
 .photo__ph {
   position: relative; font-size: 40px; opacity: .5; color: var(--graphite);
   display: flex; align-items: center; justify-content: center;
@@ -638,10 +639,10 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .
 .gallery-thumbs { display: flex; gap: var(--s-2); margin-top: var(--s-3); flex-wrap: wrap; }
 .gallery-thumb {
   width: 64px; height: 64px; padding: 0; border-radius: var(--radius-md); overflow: hidden;
-  border: 1px solid var(--hairline-soft); background: var(--cloud); cursor: pointer;
+  border: 1px solid var(--hairline-soft); background: var(--paper); cursor: pointer;
   transition: border-color .15s; flex: none;
 }
-.gallery-thumb img { width: 100%; height: 100%; object-fit: contain; object-position: center; background: var(--cloud); display: block; }
+.gallery-thumb img { width: 100%; height: 100%; object-fit: contain; object-position: center; background: var(--paper); display: block; }
 .gallery-thumb--active { border-color: var(--graphite); }
 .photo--square { aspect-ratio: 1 / 1; }
 
