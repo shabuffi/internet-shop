@@ -28,7 +28,7 @@ function ProductThumb({ product }: { product: Product }) {
       style={{ display: "block", width: 44, height: 44, borderRadius: 8, overflow: "hidden",
         background: "var(--cloud)", border: "1px solid var(--hairline-soft)", position: "relative" }}>
       {hasImg
-        ? <img src={`/api/v1/products/${product.id}/image`} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+        ? <img src={`/api/v1/products/${product.id}/image`} alt="" style={{ width: "100%", height: "100%", objectFit: "contain", display: "block" }} />
         : <NoPhoto />}
       {box && (
         // Всплывашка ровно по размеру картинки: без подложки и полей — только само фото.
