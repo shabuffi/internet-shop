@@ -184,6 +184,12 @@ button, input, textarea, select { font-family: inherit; }
 }
 /* только вертикальные отступы — горизонтальные оставляем за .container */
 .section { padding-top: var(--s-16); padding-bottom: var(--s-16); }
+/* Секции-ленты товаров на главной («Убойные цены», «Новинки», «Спецпредложения»).
+   Отступ до следующего заголовка должен считаться от нижней границы карточек, а падинги
+   соседних секций не схлопываются: 64 (низ ленты) + 64 (верх следующей) = 128px пустоты.
+   Собираем расстояние явно: 8px у .promo-grid (гуттер скролла) + 8 + 24 = ~40px. */
+.section--promo { padding-bottom: var(--s-2); }
+.section--promo + .section { padding-top: var(--s-6); }
 .row { display: flex; align-items: center; gap: var(--s-3); }
 
 /* ---------- главная ---------- */
@@ -1119,6 +1125,7 @@ textarea.form-input { height: auto; min-height: 90px; padding: var(--s-3) var(--
 @media (max-width: 768px) {
   .container { padding: 0 var(--s-4); }
   .section { padding-top: var(--s-6); padding-bottom: var(--s-6); }
+  .section--promo { padding-bottom: var(--s-2); }   /* см. базовое правило: 8+8+24 ≈ 40px */
   /* Заголовки секций мельче на телефоне (правила идут ПОСЛЕ базовых .section-title,
      иначе медиа-запрос проигрывает по порядку — специфичность одинаковая). */
   /* Размер шрифта адаптивный: clamp масштабирует его по ширине экрана, чтобы длинные

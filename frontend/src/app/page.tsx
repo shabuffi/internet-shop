@@ -158,7 +158,7 @@ export default async function HomePage() {
 
       {/* Убойные цены (по полю «Убойные цены» из МойСклад) — первой секцией */}
       {hot.length > 0 && (
-        <div id="hot" className="container section">
+        <div id="hot" className="container section section--promo">
           <div className="section-head section-head--line">
             <h2 className="section-title section-title--caps section-title--xl section-title--line">Убойные цены</h2>
             <Link href="/hot" className="see-all">Посмотреть все <ArrowIcon size={16} /></Link>
@@ -171,7 +171,7 @@ export default async function HomePage() {
 
       {/* Новинки (по полю «Новинка» из МойСклад; нет флага — секции нет) */}
       {novinki.length > 0 && (
-        <div id="novinki" className="container section">
+        <div id="novinki" className="container section section--promo">
           <div className="section-head section-head--line">
             <h2 className="section-title section-title--caps section-title--xl section-title--line">Новинки</h2>
             <Link href="/novinki" className="see-all">Посмотреть все <ArrowIcon size={16} /></Link>
@@ -184,7 +184,7 @@ export default async function HomePage() {
 
       {/* Спецпредложения (по полю «Распродажа/Спецпредложение» из МойСклад; нет флага — секции нет) */}
       {special.length > 0 && (
-        <div id="special" className="container section">
+        <div id="special" className="container section section--promo">
           <div className="section-head section-head--line">
             <h2 className="section-title section-title--caps section-title--xl section-title--line">Спецпредложения</h2>
             <Link href="/special" className="see-all">Посмотреть все <ArrowIcon size={16} /></Link>
