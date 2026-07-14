@@ -1093,9 +1093,17 @@ textarea.form-input { height: auto; min-height: 90px; padding: var(--s-3) var(--
   .section { padding-top: var(--s-6); padding-bottom: var(--s-6); }
   /* Заголовки секций мельче на телефоне (правила идут ПОСЛЕ базовых .section-title,
      иначе медиа-запрос проигрывает по порядку — специфичность одинаковая). */
-  .section-title { font-size: 19px; }
-  .section-title--xl { font-size: 20px; }
+  /* Размер шрифта адаптивный: clamp масштабирует его по ширине экрана, чтобы длинные
+     заголовки («Спецпредложения», «Убойные цены») влезали в одну строку и на узких
+     телефонах (320px), и оставались крупными на широких (~430px). Планшет/десктоп не трогаем. */
+  .section-title { font-size: clamp(15px, 4.4vw, 19px); }
+  .section-title--xl { font-size: clamp(16px, 4.8vw, 20px); }
   .section-head--line { gap: var(--s-2); }
+  /* Текст заголовка — в одну строку. Причина: заголовок это flex-контейнер (декор-линия ::before),
+     а текст лежит голым текст-узлом; WebKit/Safari переносит такой анонимный flex-элемент по пробелу
+     («Убойные»/«цены») независимо от размера шрифта. nowrap держит его строкой. Подзаголовки
+     инфо-страниц (.info-subhead > span) остаются с переносом — у них своё правило white-space:normal. */
+  .section-title--line { white-space: nowrap; }
   .hide-mobile { display: none !important; }
   .only-mobile { display: inline-flex !important; }
   /* Бланк заказа: на телефоне таблицу прячем, показываем компактные строки */
