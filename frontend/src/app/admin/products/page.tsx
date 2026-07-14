@@ -1,8 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import AdminShell from "@/components/AdminShell";
 import HelpHint from "@/components/HelpHint";
+import OrphanImagesDrawer from "@/components/OrphanImagesDrawer";
+import { IconCloud, IconImage, IconPlus } from "@/components/icons";
 import { adminFetch, adminUpload } from "@/lib/adminApi";
 import { formatMsk } from "@/lib/format";
 import { useIsMobile } from "@/lib/useIsMobile";
@@ -20,6 +22,16 @@ export default function AdminProductsPage() {
   const [ver, setVer] = useState(0);                       // для сброса кэша миниатюр
   const [busyId, setBusyId] = useState<string | null>(null);
   const [confirmDel, setConfirmDel] = useState<{ id: string; filename: string } | null>(null);
+  // Библиотека бесхозных изображений (правая панель)
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [drawerTarget, setDrawerTarget] = useState<{ id: string; name: string } | null>(null);
+  const [attached, setAttached] = useState<string[]>([]);   // файлы, привязанные в этой сессии — прячем в панели
+  const [dropId, setDropId] = useState<string | null>(null); // товар под курсором при drag&drop
+  // Меню у «+»: загрузить с компьютера / выбрать из библиотеки
+  const [photoMenu, setPhotoMenu] = useState<{ product: AdminProduct; x: number; y: number } | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploadFor, setUploadFor] = useState<string | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
   const isMobile = useIsMobile();
 
   const pages = Math.max(1, Math.ceil(total / pageSize));
@@ -35,6 +47,14 @@ export default function AdminProductsPage() {
       .catch(() => {});
   }
   useEffect(() => { load(page, query, filters); }, [page, query, filters]);
+
+  // Меню «+» закрывается по Esc
+  useEffect(() => {
+    if (!photoMenu) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setPhotoMenu(null); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [photoMenu]);
 
   // Смена фильтра — на первую страницу.
   function setFilter(key: "photo" | "desc" | "avail", value: string) {
@@ -52,6 +72,28 @@ export default function AdminProductsPage() {
     backgroundRepeat: "no-repeat", backgroundPosition: "right 10px center",
   };
   const hasFilters = filters.photo || filters.desc || filters.avail;
+
+  // Кнопка «+ фото» и меню под ней (стили рядом с разметкой — страница уже так написана)
+  const photoMenuCss = `
+    .photo-add { position: relative; width: 40px; height: 40px; padding: 0; border-radius: 8px;
+      border: 1px dashed var(--hairline-soft); background: transparent; color: var(--ink-tertiary);
+      display: flex; align-items: center; justify-content: center;
+      transition: border-color .12s, background .12s, color .12s; }
+    .photo-add:hover, .photo-add[data-open] { border-style: solid; border-color: var(--accent, var(--ink));
+      background: var(--cloud); color: var(--accent, var(--ink)); }
+    .photo-add:active { transform: translateY(1px); }
+    .photo-add:focus-visible { outline: 2px solid var(--accent, var(--ink)); outline-offset: 2px; }
+    .photo-add__plus { position: absolute; right: 3px; bottom: 3px; }
+    .photo-menu { animation: photo-menu-in .12s ease-out; }
+    @keyframes photo-menu-in { from { opacity: 0; transform: translateY(-4px) } to { opacity: 1; transform: none } }
+    .photo-menu__item { display: flex; align-items: center; gap: 10px; width: 100%; height: 42px;
+      padding: 0 14px; font-size: 14px; text-align: left; border: none; background: transparent;
+      color: var(--ink); cursor: pointer; transition: background .1s; }
+    .photo-menu__item:hover { background: var(--cloud); }
+    .photo-menu__item:active { background: var(--hairline-soft); }
+    .photo-menu__item:focus-visible { outline: none; background: var(--cloud); box-shadow: inset 2px 0 0 var(--accent, var(--ink)); }
+    .photo-menu__item svg { flex: none; color: var(--ink-secondary); }
+  `;
 
   // Поиск: сбрасываем на первую страницу и фиксируем запрос
   function submitSearch(e: React.FormEvent) {
@@ -90,9 +132,45 @@ export default function AdminProductsPage() {
     } catch { /* ignore */ } finally { setBusyId(null); }
   }
 
+  // Привязка бесхозной картинки к товару (файл уже лежит в хранилище — новых не создаём)
+  async function attachImage(id: string, filename: string) {
+    setBusyId(id);
+    try {
+      const r = await adminFetch<{ images: string[] }>(`/products/${id}/images/attach`, {
+        method: "POST", body: JSON.stringify({ filename }),
+      });
+      setProducts(ps => ps.map(p => p.id === id ? { ...p, images: r.images } : p)); // обновляем только строку
+      setAttached(a => [...a, filename]);                                           // и убираем из панели
+      setVer(v => v + 1);
+      setToast("Изображение привязано");
+      setTimeout(() => setToast(null), 2500);
+    } catch {
+      setToast("Не удалось привязать изображение");
+      setTimeout(() => setToast(null), 2500);
+    } finally { setBusyId(null); }
+  }
+
+  function openLibrary(p: AdminProduct) {
+    setDrawerTarget({ id: p.id, name: p.name });
+    setDrawerOpen(true);
+  }
+
   // Общие элементы (таблица + мобильные карточки)
   const photoStrip = (p: AdminProduct) => (
-    <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+    <div
+      onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = "copy"; setDropId(p.id); }}
+      onDragLeave={() => setDropId(d => (d === p.id ? null : d))}
+      onDrop={e => {
+        e.preventDefault();
+        setDropId(null);
+        const filename = e.dataTransfer.getData("text/plain");
+        if (filename) attachImage(p.id, filename);
+      }}
+      style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap",
+        padding: 4, margin: -4, borderRadius: 8, transition: "background .12s, box-shadow .12s",
+        background: dropId === p.id ? "var(--cloud)" : "transparent",
+        boxShadow: dropId === p.id ? "inset 0 0 0 2px var(--ink)" : "none" }}
+    >
       {p.images.map((img, i) => (
         <span key={img} style={{ position: "relative", lineHeight: 0 }}>
           <img src={`/api/v1/products/${p.id}/image?n=${i}&v=${ver}`} alt="" width={40} height={40}
@@ -102,13 +180,21 @@ export default function AdminProductsPage() {
               border: "none", background: "var(--ink)", color: "#fff", fontSize: 12, lineHeight: "16px", cursor: "pointer", padding: 0 }}>×</button>
         </span>
       ))}
-      <label title="Загрузить фото"
-        style={{ width: 40, height: 40, borderRadius: 6, border: "1px dashed var(--graphite)",
-          display: "flex", alignItems: "center", justifyContent: "center", cursor: busyId === p.id ? "wait" : "pointer",
-          color: "var(--graphite)", fontSize: 20, opacity: busyId === p.id ? 0.5 : 1 }}>
-        ＋
-        <input type="file" accept="image/*" hidden onChange={e => { uploadImage(p.id, e.target.files?.[0]); e.target.value = ""; }} />
-      </label>
+      <button
+        className="photo-add"
+        aria-haspopup="menu"
+        aria-expanded={photoMenu?.product.id === p.id}
+        data-open={photoMenu?.product.id === p.id ? "1" : undefined}
+        onClick={e => {
+          const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
+          setPhotoMenu(m => m?.product.id === p.id ? null : { product: p, x: r.left, y: r.bottom + 6 });
+        }}
+        title="Добавить фото"
+        aria-label="Добавить фото"
+        style={{ cursor: busyId === p.id ? "wait" : "pointer", opacity: busyId === p.id ? 0.5 : 1 }}>
+        <IconImage width={17} height={17} />
+        <IconPlus width={11} height={11} className="photo-add__plus" />
+      </button>
     </div>
   );
   const availBtn = (p: AdminProduct) => {
@@ -134,6 +220,7 @@ export default function AdminProductsPage() {
 
   return (
     <AdminShell>
+      <style>{photoMenuCss}</style>
       <div style={{ display: "flex", alignItems: "baseline", gap: 12, marginBottom: 20, flexWrap: "wrap" }}>
         <h1 style={{ fontSize: 24, fontWeight: 700, letterSpacing: -0.3 }}>Товары</h1>
         <HelpHint text="Каталог загружается из МойСклад. Здесь можно фильтровать товары, скрыть/показать их на сайте и задать фото." />
@@ -250,6 +337,54 @@ export default function AdminProductsPage() {
             onClick={() => setPage(p => Math.min(pages, p + 1))}>Вперёд ›</button>
         </div>
       )}
+      {/* Один общий file-input: «Загрузить с компьютера» из меню «+» */}
+      <input ref={fileInputRef} type="file" accept="image/*" hidden
+        onChange={e => { if (uploadFor) uploadImage(uploadFor, e.target.files?.[0]); e.target.value = ""; }} />
+
+      {photoMenu && (
+        <>
+          <div onClick={() => setPhotoMenu(null)} style={{ position: "fixed", inset: 0, zIndex: 950 }} />
+          <div role="menu" aria-label="Добавить фото" className="photo-menu"
+            style={{ position: "fixed", zIndex: 951,
+              // Мобильный — лист снизу на всю ширину; десктоп — под кнопкой, с флипом вверх у нижнего края
+              top: isMobile ? undefined
+                : photoMenu.y + 100 > window.innerHeight ? photoMenu.y - 112 : photoMenu.y,
+              left: isMobile ? 12 : Math.min(photoMenu.x, window.innerWidth - 244),
+              right: isMobile ? 12 : undefined, bottom: isMobile ? 12 : undefined,
+              width: isMobile ? undefined : 232,
+              background: "var(--paper, #fff)", border: "1px solid var(--hairline-soft)", borderRadius: 12,
+              boxShadow: "0 6px 24px rgba(0,0,0,0.12), 0 1px 3px rgba(0,0,0,0.06)",
+              padding: 4, overflow: "hidden" }}>
+            <button role="menuitem" className="photo-menu__item" style={{ borderRadius: 8 }} autoFocus
+              onClick={() => { setUploadFor(photoMenu.product.id); setPhotoMenu(null); fileInputRef.current?.click(); }}>
+              <IconCloud width={16} height={16} />
+              Загрузить с компьютера
+            </button>
+            <button role="menuitem" className="photo-menu__item" style={{ borderRadius: 8 }}
+              onClick={() => { const p = photoMenu.product; setPhotoMenu(null); openLibrary(p); }}>
+              <IconImage width={16} height={16} />
+              Выбрать из библиотеки
+            </button>
+          </div>
+        </>
+      )}
+
+      <OrphanImagesDrawer
+        open={drawerOpen}
+        onClose={() => { setDrawerOpen(false); setDrawerTarget(null); }}
+        target={drawerTarget}
+        hidden={attached}
+        onAttach={attachImage}
+      />
+
+      {toast && (
+        <div style={{ position: "fixed", right: drawerOpen && !isMobile ? 376 : 16, bottom: 16, zIndex: 1100,
+          background: "var(--ink)", color: "#fff", padding: "10px 16px", borderRadius: 10,
+          fontSize: 13, fontWeight: 600, boxShadow: "0 8px 24px rgba(0,0,0,0.25)" }}>
+          {toast}
+        </div>
+      )}
+
       {confirmDel && (
         <div onClick={() => setConfirmDel(null)}
           style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", display: "flex",

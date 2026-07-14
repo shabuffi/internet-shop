@@ -994,6 +994,135 @@ def delete_product_image(
     return {"images": product.images}
 
 
+# ─── Бесхозные изображения (локальная медиа-библиотека) ────────────
+
+
+def _used_image_names(db: Session) -> tuple[set[str], str]:
+    """Имена картинок, уже занятые товарами, и «сырой» текст настроек магазина.
+
+    Настройки (логотип, баннеры, бренды) хранят имена файлов внутри строк/JSON,
+    поэтому проверяем вхождением подстроки, а не точным совпадением.
+    """
+    used: set[str] = set()
+    for images, image_url in db.execute(select(Product.images, Product.image_url)):
+        used.update(images or [])
+        if image_url:
+            used.add(image_url)
+    blob = "\n".join(v or "" for (v,) in db.execute(select(ShopSettings.value)))
+    return used, blob
+
+
+@router.get("/media/orphans")
+def list_orphan_images(
+    q: str | None = None,
+    sort: str = "date",       # date | name | size
+    order: str = "desc",      # desc | asc
+    page: int = 1,
+    page_size: int = 20,
+    db: Session = Depends(get_db),
+    _=Depends(_get_current_admin),
+):
+    """Картинки в медиа-хранилище, не привязанные ни к одному товару и не занятые настройками.
+
+    Args:
+        q: Поиск по имени файла.
+        sort: Сортировка — ``date`` (по дате файла), ``name``, ``size``.
+        order: Направление — ``desc`` (по умолчанию) или ``asc``.
+        page: Номер страницы (с 1).
+        page_size: Размер страницы.
+
+    Returns:
+        ``{"items": [{filename, size, mtime}], "total": N, "page": N, "page_size": N}``.
+    """
+    used, settings_blob = _used_image_names(db)
+    try:
+        names = os.listdir(settings.MEDIA_DIR)
+    except OSError:
+        names = []
+
+    items: list[dict] = []
+    for name in names:
+        if not media_storage.is_image_filename(name) or name in used or name in settings_blob:
+            continue
+        try:
+            st = os.stat(os.path.join(settings.MEDIA_DIR, name))
+        except OSError:
+            continue
+        items.append({
+            "filename": name,
+            "size": st.st_size,
+            "mtime": datetime.fromtimestamp(st.st_mtime, timezone.utc).isoformat(),
+        })
+
+    if q and q.strip():
+        needle = q.strip().lower()
+        items = [i for i in items if needle in i["filename"].lower()]
+
+    key = {"name": "filename", "size": "size"}.get(sort, "mtime")
+    items.sort(key=lambda i: i[key], reverse=(order != "asc"))
+
+    total = len(items)
+    start = max(0, (page - 1) * page_size)
+    return {
+        "items": items[start:start + page_size],
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+    }
+
+
+@router.get("/media/file/{filename}")
+def get_media_file(
+    filename: str,
+    _=Depends(_get_current_admin),
+):
+    """Отдаёт файл картинки из медиа-хранилища по имени (превью в библиотеке админки)."""
+    found = media_storage.read_image(filename)
+    if not found:
+        raise HTTPException(status_code=404, detail="Файл не найден")
+    data, content_type = found
+    return Response(content=data, media_type=content_type)
+
+
+class AttachImage(BaseModel):
+    filename: str
+
+
+@router.post("/products/{product_id}/images/attach")
+def attach_existing_image(
+    product_id: str,
+    body: AttachImage,
+    db: Session = Depends(get_db),
+    _=Depends(_get_current_admin),
+):
+    """Привязывает уже лежащий в хранилище файл (бесхозную картинку) к товару.
+
+    Новых файлов не создаёт — переиспользует существующий. Ставит ``images_manual``,
+    чтобы обмен МойСклад не перезаписал картинки этого товара.
+
+    Returns:
+        ``{"images": [...]}`` — обновлённый список картинок товара.
+
+    Raises:
+        HTTPException: 404 — товар или файл не найден.
+    """
+    product = db.get(Product, product_id)
+    if not product:
+        raise HTTPException(status_code=404, detail="Товар не найден")
+    name = os.path.basename(body.filename.replace("\\", "/"))
+    if not media_storage.is_image_filename(name) or not media_storage.read_image(name):
+        raise HTTPException(status_code=404, detail="Файл не найден")
+
+    images = _current_images(product)
+    if name not in images:
+        images.append(name)
+    product.images = images
+    product.image_url = images[0]
+    product.images_manual = True
+    db.commit()
+    return {"images": product.images}
+
+
 @router.get("/store-info")
 def store_info_public(db: Session = Depends(get_db)):
     """Публичный эндпойнт — настройки сайта для фронтенда (шапка/футер/чат/SEO/тема)."""
