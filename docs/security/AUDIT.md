@@ -4,7 +4,7 @@
 
 **Легенда статуса:** 🔴 open · 🟡 in progress · ✅ fixed (в коде, ждёт деплоя) · 🚀 deployed · ⚪ won't-fix/accepted
 
-Последнее обновление: **2026-07-14**
+Последнее обновление: **2026-07-14** — Stages 1–3 **задеплоены на прод** (commit `9947863`, alembic head `d6e7f8a9b0c1`).
 
 ## Область
 
@@ -17,15 +17,15 @@
 | ID | Проблема | Уровень | Файл/место | Статус |
 |----|----------|---------|------------|--------|
 | C-1 | Секреты `MOYSKLAD_LOGIN/PASSWORD` открытым текстом (личный пароль); код их не читает, в git не коммитились | 🟠 High | `.env` | 🔴 open (нужна ротация + ручное удаление) |
-| H-1 | Fail-open обмена CommerceML: при пустых кредах пускал всех; `mode=query` отдаёт ПДн, `mode=import` перезаписывает каталог | 🟠 High | `api/v1/endpoints/exchange.py` | ✅ fixed (Stage 1) |
-| H-2 | Swagger/OpenAPI/Redoc открыты на проде | 🟡 Medium | `main.py`, `nginx.prod.conf` | ✅ fixed (Stage 1) |
-| H-3 | Нет security-заголовков на проде (HSTS/X-Frame-Options/nosniff/Referrer-Policy) | 🟡 Medium | `nginx/nginx.prod.conf` | ✅ fixed (Stage 1) |
+| H-1 | Fail-open обмена CommerceML: при пустых кредах пускал всех; `mode=query` отдаёт ПДн, `mode=import` перезаписывает каталог | 🟠 High | `api/v1/endpoints/exchange.py` | 🚀 deployed 2026-07-14 (9947863) |
+| H-2 | Swagger/OpenAPI/Redoc открыты на проде | 🟡 Medium | `main.py`, `nginx.prod.conf` | 🚀 deployed 2026-07-14 (9947863) |
+| H-3 | Нет security-заголовков на проде (HSTS/X-Frame-Options/nosniff/Referrer-Policy) | 🟡 Medium | `nginx/nginx.prod.conf` | 🚀 deployed 2026-07-14 (9947863) |
 | M-1 | `docker.sock` смонтирован в контейнер `autoheal` (`:latest`) — root на хосте при компрометации | 🟡 Medium | `docker-compose.prod.yml` | 🔴 open (отложено) |
-| M-2 | Нет rate-limit на `/orders`, `/leads` | 🟡 Medium | `api/v1/endpoints/orders.py`, `leads.py` | ✅ fixed (Stage 1) |
+| M-2 | Нет rate-limit на `/orders`, `/leads` | 🟡 Medium | `api/v1/endpoints/orders.py`, `leads.py` | 🚀 deployed 2026-07-14 (9947863) |
 | M-4 | `COOKIE_SECURE` дефолт `False`; отсутствует в `.env.prod.example` | 🟡 Medium | `core/config.py`, `.env.prod.example` | ✅ verified on prod 2026-07-14 (`.env.prod`: `COOKIE_SECURE=true`, `DEBUG=false`, `ALLOWED_ORIGINS`=боевые HTTPS, `SECRET_KEY` задан) — на бою не проблема |
-| M-5 | `/admin/setup` создавал первого админа без аутентификации | 🟢 Low | `api/v1/endpoints/admin.py` | ✅ fixed (Stage 1, доработан) |
-| B-1 | Race condition в номере заказа (`COUNT(*)+1`, `number` unique → 500 при гонке) | 🟢 Low | `api/v1/endpoints/orders.py` | ✅ fixed (Stage 3) |
-| B-2 | `users.phone` не уникален на уровне БД (TOCTOU при регистрации) | 🟢 Low | `db/models/user.py` | ✅ fixed (Stage 3) |
+| M-5 | `/admin/setup` создавал первого админа без аутентификации | 🟢 Low | `api/v1/endpoints/admin.py` | 🚀 deployed 2026-07-14 (9947863, доработан) |
+| B-1 | Race condition в номере заказа (`COUNT(*)+1`, `number` unique → 500 при гонке) | 🟢 Low | `api/v1/endpoints/orders.py` | 🚀 deployed 2026-07-14 (9947863) |
+| B-2 | `users.phone` не уникален на уровне БД (TOCTOU при регистрации) | 🟢 Low | `db/models/user.py` | 🚀 deployed 2026-07-14 (9947863) |
 
 ## Проверено — уязвимости НЕТ (ложные для проекта)
 
