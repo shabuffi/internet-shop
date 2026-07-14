@@ -311,13 +311,23 @@ def get_product_image(request: Request, product_id: str, n: int = 0, db: Session
     Raises:
         HTTPException: 404, если товар/картинка не найдены или файла нет в хранилище.
     """
-    product = db.scalar(
-        select(Product).where(Product.id == product_id, Product.is_active == True)
-    )
-    if not product:
+    # Берём только имена файлов (не ORM-сущность): дальше БД не нужна. Сессию закрываем
+    # сразу — иначе соединение остаётся занятым (idle in transaction) всё время чтения
+    # файла с диска. Браузер тянет картинки каталога десятками параллельно (HTTP/2), и
+    # такие «простаивающие занятыми» соединения исчерпывают пул: SSR-запросы витрины
+    # встают в очередь на pool.acquire() и падают по таймауту. db.close() идемпотентен —
+    # повторный close() из get_db() безвреден.
+    row = db.execute(
+        select(Product.images, Product.image_url).where(
+            Product.id == product_id, Product.is_active == True
+        )
+    ).first()
+    db.close()
+
+    if row is None:
         raise HTTPException(status_code=404, detail="Изображение не найдено")
 
-    images = product.images or ([product.image_url] if product.image_url else [])
+    images = row.images or ([row.image_url] if row.image_url else [])
     if not images or n < 0 or n >= len(images):
         raise HTTPException(status_code=404, detail="Изображение не найдено")
 
