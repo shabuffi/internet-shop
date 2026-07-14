@@ -245,6 +245,24 @@ export function IconPencil(p: SVGProps<SVGSVGElement>) {
 }
 
 // Заливной огонёк — бейдж «Убойные цены». Классический «языковый» силуэт как у эмодзи
+// Иконки степпера количества: «−» и «+» (вместо текстовых символов — ровная геометрия на любом шрифте).
+export function IconMinus(p: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base} strokeWidth={2.6} aria-hidden="true" {...p}>
+      <line x1="5" y1="12" x2="19" y2="12" />
+    </svg>
+  );
+}
+
+export function IconPlus(p: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base} strokeWidth={2.6} aria-hidden="true" {...p}>
+      <line x1="12" y1="5" x2="12" y2="19" />
+      <line x1="5" y1="12" x2="19" y2="12" />
+    </svg>
+  );
+}
+
 // (Material «whatshot»): внешнее пламя + внутренний язычок вырезом (fill-rule evenodd).
 export function IconFlame(p: SVGProps<SVGSVGElement>) {
   return (

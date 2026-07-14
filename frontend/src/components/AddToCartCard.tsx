@@ -2,6 +2,7 @@
 
 import { useCart } from "@/context/CartContext";
 import QtyField from "@/components/QtyField";
+import { IconMinus, IconPlus } from "@/components/icons";
 import { minOrderQty } from "@/lib/format";
 import type { Product } from "@/types/product";
 
@@ -31,9 +32,9 @@ export default function AddToCartCard({ product }: { product: Product }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 4, alignItems: "stretch" }}>
       <div className="qty qty--sm" style={{ width: "100%", justifyContent: "space-between" }}>
-        <button type="button" onClick={() => commit(qty - step)} disabled={qty <= 0} aria-label="Меньше">−</button>
+        <button type="button" onClick={() => commit(qty - step)} disabled={qty <= 0} aria-label="Меньше"><IconMinus /></button>
         <QtyField value={qty} min={0} onCommit={commit} />
-        <button type="button" onClick={() => commit(qty === 0 ? step : qty + step)} aria-label="Больше">+</button>
+        <button type="button" onClick={() => commit(qty === 0 ? step : qty + step)} aria-label="Больше"><IconPlus /></button>
       </div>
       {/* Слот подписи резервируем всегда (даже пустой) — чтобы цена/количество в соседних
           карточках были на одном уровне. */}

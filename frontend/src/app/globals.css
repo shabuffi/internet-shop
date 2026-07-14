@@ -963,14 +963,38 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .
 .pdp__specs .srow span:first-child { color: var(--graphite); flex: none; max-width: 55%; }
 .pdp__specs .srow span:last-child { text-align: right; }
 
-.qty { display: inline-flex; align-items: center; border: 2px solid var(--steel); border-radius: var(--r-md); height: 52px; }
-.qty button { width: 46px; height: 100%; border: none; background: transparent; cursor: pointer; color: var(--accent); font-weight: 700; display: flex; align-items: center; justify-content: center; font-size: 18px; }
-.qty button:hover { background: var(--accent-soft); }
-.qty button:disabled { color: var(--steel); cursor: not-allowed; }
-.qty span { min-width: 36px; text-align: center; font-weight: 600; font-variant-numeric: tabular-nums; }
+/* ---------- степпер количества (pill + круглые кнопки) ---------- */
+.qty {
+  display: inline-flex; align-items: center; gap: 6px;
+  height: 52px; padding: 0 7px;
+  background: var(--paper); border: 1px solid #E5E7EB; border-radius: var(--r-pill);
+  /* очень лёгкая тень — только чтобы отделиться от карточки (у карточки своя тень) */
+  box-shadow: 0 2px 8px rgba(0, 0, 0, .04);
+}
+.qty button {
+  flex: none; width: 40px; height: 40px; border-radius: 50%;
+  border: none;                    /* без обводки — только заливка в тон */
+  cursor: pointer; line-height: 1;
+  display: flex; align-items: center; justify-content: center;
+  transition: background-color .15s ease;
+}
+/* значки «−»/«+» — SVG (IconMinus/IconPlus), цвет наследуют от кнопки через currentColor */
+.qty button svg { width: 18px; height: 18px; }
+.qty--sm button svg { width: 15px; height: 15px; }
+/* «+» — светло-синий фон, синий значок (последняя кнопка) */
+.qty button:last-of-type { background: color-mix(in srgb, var(--accent), #fff 88%); color: var(--accent); }
+.qty button:last-of-type:hover:not(:disabled) { background: color-mix(in srgb, var(--accent), #fff 82%); }
+.qty button:last-of-type:active:not(:disabled) { background: color-mix(in srgb, var(--accent), #fff 74%); }
+/* «−» активная (кол-во > 0) — светло-красный фон, красный значок (первая кнопка) */
+.qty button:first-of-type { background: color-mix(in srgb, var(--accent-2), #fff 88%); color: var(--accent-2); }
+.qty button:first-of-type:hover:not(:disabled) { background: color-mix(in srgb, var(--accent-2), #fff 82%); }
+.qty button:first-of-type:active:not(:disabled) { background: color-mix(in srgb, var(--accent-2), #fff 74%); }
+/* недоступно (в т.ч. «−» при кол-ве = 0) — очень светлый серый фон, серый значок */
+.qty button:disabled { background: #F1F2F4; color: #B4B8BF; cursor: not-allowed; }
+.qty span { min-width: 36px; text-align: center; font-weight: 700; font-size: 19px; font-variant-numeric: tabular-nums; }
 /* ввод количества с клавиатуры: выглядит как прежний span, но редактируется */
-.qty input { width: 48px; height: 100%; border: none; background: transparent; text-align: center; font-weight: 600; font-variant-numeric: tabular-nums; font-size: inherit; color: var(--ink); padding: 0; }
-.qty input:focus { outline: none; background: var(--cloud); }
+.qty input { width: 48px; height: 100%; border: none; background: transparent; text-align: center; font-weight: 700; font-size: 19px; font-variant-numeric: tabular-nums; color: var(--ink); padding: 0; }
+.qty input:focus { outline: none; }
 .qty--sm input { width: 40px; }
 
 /* ---------- корзина ---------- */
@@ -983,8 +1007,8 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .
 .lineitem__name { font-weight: 600; font-size: var(--t-body); }
 .lineitem__sku { color: var(--graphite); font-size: var(--t-xs); margin-top: 2px; }
 .lineitem__controls { display: flex; align-items: center; gap: var(--s-4); margin-top: var(--s-3); }
-.qty--sm { height: 38px; }
-.qty--sm button { width: 36px; font-size: 16px; }
+.qty--sm { height: 42px; padding: 0 5px; gap: 4px; }
+.qty--sm button { width: 32px; height: 32px; font-size: 17px; }
 .lineitem__right { text-align: right; display: flex; flex-direction: column; align-items: flex-end; gap: var(--s-3); }
 .lineitem__price { font-weight: 700; font-variant-numeric: tabular-nums; font-size: var(--t-body); }
 .linkbtn { background: none; border: none; color: var(--graphite); font-size: var(--t-sm); cursor: pointer; padding: 0; display: inline-flex; align-items: center; gap: 5px; }
@@ -1175,8 +1199,8 @@ textarea.form-input { height: auto; min-height: 90px; padding: var(--s-3) var(--
   .promo-grid .pcard__sku { font-size: 11px; }
   .promo-grid .price { font-size: 16px; white-space: nowrap; }
   .promo-grid .pcard__foot { margin-top: var(--s-2); padding-top: var(--s-2); gap: var(--s-2); }
-  .promo-grid .qty--sm { height: 34px; }
-  .promo-grid .qty--sm button { width: 32px; font-size: 15px; }
+  .promo-grid .qty--sm { height: 40px; }
+  .promo-grid .qty--sm button { width: 30px; height: 30px; font-size: 16px; }
   /* Регионы-бегущая строка: на узком экране шире затухание по краям, чтобы плитки
      не выглядели резко обрубленными */
   .marquee { padding: var(--s-4) 0;

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useCart } from "@/context/CartContext";
 import QtyField from "@/components/QtyField";
+import { IconMinus, IconPlus } from "@/components/icons";
 import { minOrderQty } from "@/lib/format";
 import type { Product } from "@/types/product";
 
@@ -31,9 +32,9 @@ export default function AddToCartButton({ product }: { product: Product }) {
     <div>
       <div className="pdp__buy">
         <div className="qty">
-          <button onClick={() => setQty((q) => Math.max(step, q - step))} disabled={qty <= step || outOfStock} aria-label="Меньше">−</button>
+          <button onClick={() => setQty((q) => Math.max(step, q - step))} disabled={qty <= step || outOfStock} aria-label="Меньше"><IconMinus /></button>
           <QtyField value={qty} min={step} onCommit={setQtyRounded} disabled={outOfStock} />
-          <button onClick={() => setQty((q) => q + step)} disabled={outOfStock} aria-label="Больше">+</button>
+          <button onClick={() => setQty((q) => q + step)} disabled={outOfStock} aria-label="Больше"><IconPlus /></button>
         </div>
         <button className="btn btn--primary btn--lg" style={{ flex: 1 }} disabled={outOfStock} onClick={handleAdd}>
           {outOfStock ? "Нет в наличии" : added ? "✓ Добавлено" : inCart > 0 ? "Добавить ещё" : "В корзину"}

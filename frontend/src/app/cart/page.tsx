@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useCart } from "@/context/CartContext";
 import { formatPrice } from "@/lib/format";
 import { MIN_ORDER_AMOUNT } from "@/lib/site";
-import { IconCart } from "@/components/icons";
+import { IconCart, IconMinus, IconPlus } from "@/components/icons";
 import NoPhoto from "@/components/NoPhoto";
 import ChestnyZnakBadge from "@/components/ChestnyZnakBadge";
 import QtyField from "@/components/QtyField";
@@ -59,9 +59,9 @@ export default function CartPage() {
                 {item.article && <div className="lineitem__sku">Арт. {item.article}</div>}
                 <div className="lineitem__controls">
                   <div className="qty qty--sm">
-                    <button onClick={() => updateQuantity(item.id, item.quantity - 1)} disabled={item.quantity <= 1} aria-label="Меньше">−</button>
+                    <button onClick={() => updateQuantity(item.id, item.quantity - 1)} disabled={item.quantity <= 1} aria-label="Меньше"><IconMinus /></button>
                     <QtyField value={item.quantity} onCommit={(n) => updateQuantity(item.id, n)} />
-                    <button onClick={() => updateQuantity(item.id, item.quantity + 1)} aria-label="Больше">+</button>
+                    <button onClick={() => updateQuantity(item.id, item.quantity + 1)} aria-label="Больше"><IconPlus /></button>
                   </div>
                   <button className="linkbtn" onClick={() => removeItem(item.id)}>Удалить</button>
                 </div>
