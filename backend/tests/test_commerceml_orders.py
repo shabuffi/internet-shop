@@ -3,11 +3,21 @@
 from datetime import datetime
 from decimal import Decimal
 
+import pytest
 from lxml import etree
 
+from app.api.v1.endpoints import exchange
 from app.db.models.order import Order, OrderItem
 from app.db.models.product import Product
 from app.integrations.moysklad.commerceml_orders import build_orders_xml
+
+
+@pytest.fixture(autouse=True)
+def _authorize_exchange(monkeypatch):
+    """Обмен теперь fail-closed (Stage 1): без кред доступ закрыт. Эти тесты проверяют
+    механику query/success, а не авторизацию (она покрыта test_exchange_auth.py), поэтому
+    авторизацию здесь считаем пройденной."""
+    monkeypatch.setattr(exchange, "_is_authorized", lambda *a, **k: True)
 
 
 def _order(**kw):

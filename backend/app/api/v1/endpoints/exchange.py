@@ -362,7 +362,7 @@ def _is_authorized(request: Request, db: Session) -> bool:
     """
     exp_login, exp_pass = _get_exchange_credentials(db)
     if not exp_login or not exp_pass:
-        return True  # мягкий режим: креды не заданы — пускаем (как раньше)
+        return False  # fail-closed: креды обмена не заданы — никого не пускаем
     if _basic_auth_ok(request, exp_login, exp_pass):
         return True
     cookie = request.cookies.get("session")
@@ -415,8 +415,9 @@ async def exchange_get(
             token = secrets.token_hex(16)
             redis_client.set(_SESSION_KEY, token, ex=_TTL)
             return f"success\nsession\n{token}"
-        # Мягкий режим: пара не задана в админке — старое поведение
-        return "success\nsession\ncommerceml-session"
+        # fail-closed: пара обмена не задана в админке — обмен недоступен (не пускаем всех).
+        logger.warning("checkauth: креды обмена не заданы — доступ закрыт")
+        return "failure\nОбмен не настроен: задайте логин и пароль обмена в админке"
 
     # Все остальные шаги требуют валидной авторизации
     if not _is_authorized(request, db):

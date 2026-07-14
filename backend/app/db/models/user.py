@@ -21,7 +21,9 @@ class User(Base):
 
     id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     email: Mapped[str] = mapped_column(String, unique=True, index=True, nullable=False)
-    phone: Mapped[str] = mapped_column(String, nullable=False)
+    # Один номер = один аккаунт: уникальность на уровне БД (не только проверкой в коде,
+    # которая подвержена гонке при одновременной регистрации).
+    phone: Mapped[str] = mapped_column(String, unique=True, index=True, nullable=False)
     # Тип заказчика: individual (физлицо) | ip (ИП) | ooo (ООО)
     customer_type: Mapped[str] = mapped_column(String, nullable=False)
     # Наименование заказчика: ФИО для физлица, название организации для ИП/ООО

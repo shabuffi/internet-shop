@@ -7,6 +7,13 @@ import pytest
 from app.db.models.product import Product
 
 
+@pytest.fixture(autouse=True)
+def _no_rate_limit(monkeypatch):
+    """Отключаем rate-limit в HTTP-тестах (иначе TestClient упрётся в лимит по IP)."""
+    from app.api.v1.endpoints import orders as orders_mod
+    monkeypatch.setattr(orders_mod, "rate_limit", lambda *a, **k: None)
+
+
 @pytest.fixture
 def no_celery(monkeypatch):
     """Глушим фоновую задачу уведомления, чтобы тест не лез в брокер Celery."""

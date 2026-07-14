@@ -132,3 +132,4 @@ Browser ──form──▶ POST /api/v1/orders ──▶ orders table (+ спи
 - **Migrations**: always import new model modules in `migrations/env.py` before running autogenerate.
 - **ALLOWED_ORIGINS** in `.env` must be a JSON array string: `ALLOWED_ORIGINS=["http://localhost:3000"]`
 - **Local tunnel**: during development, `ngrok http 8000` exposes the CommerceML endpoint to МойСклад. The ngrok URL is pasted into МойСклад → Онлайн-торговля → Адрес магазина.
+- **Security docs**: после каждого завершённого этапа работ по безопасности автоматически обновлять `docs/security/AUDIT.md`, `FIXES.md`, `TODO.md`, `CHANGELOG.md` и `DECISIONS.md` — **до** показа результатов пользователю. Обновлять инкрементально (не переписывать целиком), с датой; закрытые проблемы отмечать, оставшиеся сохранять. `DECISIONS.md` — только мотивация выбора (не дублировать остальные документы).

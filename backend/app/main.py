@@ -21,12 +21,19 @@ if not _app_logger.handlers:
 _app_logger.setLevel(logging.INFO)
 _app_logger.propagate = False
 
+# Интерактивная документация (Swagger/Redoc/OpenAPI) — только в DEBUG. На проде
+# отключена, чтобы не раскрывать карту API (в т.ч. /admin/*, /1c/exchange, /dev/*).
+_docs_url = "/docs" if settings.DEBUG else None
+_redoc_url = "/redoc" if settings.DEBUG else None
+_openapi_url = "/openapi.json" if settings.DEBUG else None
+
 app = FastAPI(
     title="Internet Shop API",
     description="Backend для интернет-магазина с интеграцией МойСклад",
     version="0.1.0",
-    docs_url="/docs",
-    redoc_url="/redoc",
+    docs_url=_docs_url,
+    redoc_url=_redoc_url,
+    openapi_url=_openapi_url,
 )
 
 app.add_middleware(

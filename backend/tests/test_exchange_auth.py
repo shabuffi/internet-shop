@@ -53,9 +53,13 @@ def test_basic_auth_malformed_header():
 
 # ─── _is_authorized (БД + Redis) ─────────────────────────────────────────────
 
-def test_is_authorized_soft_mode_when_no_creds(db_session):
-    """Креды обмена не заданы → мягкий режим → пускаем всех."""
-    assert exchange._is_authorized(FakeRequest(), db_session) is True
+def test_is_authorized_fail_closed_when_no_creds(db_session):
+    """Креды обмена не заданы → fail-closed → доступ закрыт (никого не пускаем).
+
+    Раньше это был «мягкий режим» (пускали всех) — небезопасный дефолт, устранён в Stage 1
+    (см. docs/security/DECISIONS.md).
+    """
+    assert exchange._is_authorized(FakeRequest(), db_session) is False
 
 
 def test_is_authorized_valid_basic(db_session):

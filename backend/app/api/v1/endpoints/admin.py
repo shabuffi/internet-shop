@@ -191,8 +191,23 @@ def change_password(
 
 
 @router.post("/setup", include_in_schema=False)
-def setup_admin(body: dict, db: Session = Depends(get_db)):
-    """Создаёт первого admin-пользователя. Отключить после первого использования."""
+def setup_admin(body: dict, request: Request, db: Session = Depends(get_db)):
+    """Создаёт первого admin-пользователя (первичная установка).
+
+    Доступ только при выполнении ВСЕХ условий:
+    - задан ``SETUP_TOKEN`` в конфигурации (пустой → эндпоинт закрыт наглухо);
+    - в запросе передан верный одноразовый setup-токен (тело ``setup_token`` или заголовок
+      ``X-Setup-Token``), сверяется constant-time;
+    - в системе ещё нет ни одного администратора.
+
+    Как только админ создан — эндпоинт недоступен (даже с верным токеном). После установки
+    значение ``SETUP_TOKEN`` следует убрать из окружения.
+    """
+    if not settings.SETUP_TOKEN:
+        raise HTTPException(status_code=403, detail="Инициализация закрыта")
+    provided = str(body.get("setup_token") or request.headers.get("X-Setup-Token", ""))
+    if not hmac.compare_digest(provided, settings.SETUP_TOKEN):
+        raise HTTPException(status_code=401, detail="Неверный или отсутствующий setup-токен")
     if db.scalar(select(AdminUser)):
         raise HTTPException(status_code=400, detail="Администратор уже существует")
 

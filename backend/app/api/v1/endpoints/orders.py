@@ -1,10 +1,11 @@
 from decimal import Decimal
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
-from sqlalchemy import select, func
+from sqlalchemy import select, text
 
 from app.core.config import settings
+from app.core.rate_limit import rate_limit, client_ip
 from app.db.session import get_db
 from app.db.models.order import Order, OrderItem
 from app.db.models.product import Product
@@ -17,20 +18,33 @@ router = APIRouter(prefix="/orders", tags=["Orders"])
 
 
 def _next_order_number(db: Session) -> str:
-    """Возвращает следующий человекочитаемый номер заказа.
+    """Возвращает следующий человекочитаемый номер заказа вида ``ORD-0001``.
+
+    Использует атомарный Postgres-sequence ``order_number_seq`` (``nextval``) — безопасно
+    при нескольких воркерах и параллельных запросах, без блокировок приложения. Возможны
+    пропуски в нумерации при откате транзакции (номерам нужна только уникальность).
+
+    На не-Postgres (SQLite в тестах) sequence недоступен — используется фолбэк ``MAX+1``.
+    Прод всегда на Postgres, поэтому боевой путь — race-free; фолбэк нужен только тестам.
 
     Args:
         db: Сессия БД.
 
     Returns:
-        Номер вида ``ORD-0001`` (по количеству заказов в БД + 1).
+        Номер вида ``ORD-0001``.
     """
-    count = db.scalar(select(func.count()).select_from(Order)) or 0
-    return f"ORD-{count + 1:04d}"
+    if db.get_bind().dialect.name == "postgresql":
+        n = db.execute(text("SELECT nextval('order_number_seq')")).scalar()
+    else:
+        maxnum = db.execute(
+            text("SELECT COALESCE(MAX(CAST(SUBSTR(number, 5) AS INTEGER)), 0) FROM orders")
+        ).scalar() or 0
+        n = int(maxnum) + 1
+    return f"ORD-{n:04d}"
 
 
 @router.post("", response_model=OrderOut, status_code=201)
-def create_order(payload: OrderIn, db: Session = Depends(get_db),
+def create_order(payload: OrderIn, request: Request, db: Session = Depends(get_db),
                  user: User | None = Depends(get_optional_user)):
     """Создаёт заказ из корзины и ставит фоновую отправку в МойСклад.
 
@@ -48,6 +62,9 @@ def create_order(payload: OrderIn, db: Session = Depends(get_db),
     Raises:
         HTTPException: 422, если хотя бы один ``product_id`` не найден в БД.
     """
+    # Защита от спама заказами: не более 10 оформлений за 10 минут с одного IP.
+    rate_limit(f"rl:order:{client_ip(request)}", limit=10, window_sec=600)
+
     # Загружаем товары одним запросом
     product_ids = [i.product_id for i in payload.items]
     products = {

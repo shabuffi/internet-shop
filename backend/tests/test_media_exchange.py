@@ -2,8 +2,19 @@
 
 from decimal import Decimal
 
+import pytest
+
 import app.services.media_storage as media
+from app.api.v1.endpoints import exchange
 from app.db.models.product import Product
+
+
+@pytest.fixture(autouse=True)
+def _authorize_exchange(monkeypatch):
+    """Обмен теперь fail-closed (Stage 1): без кред доступ закрыт. Эти тесты проверяют
+    механику приёма файлов, а не авторизацию (она покрыта test_exchange_auth.py), поэтому
+    авторизацию здесь считаем пройденной."""
+    monkeypatch.setattr(exchange, "_is_authorized", lambda *a, **k: True)
 
 
 # ─── медиа-хранилище ─────────────────────────────────────────────────────────
