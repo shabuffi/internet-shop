@@ -9,14 +9,15 @@ import uuid
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, UploadFile, File, Query
+from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
-from sqlalchemy import or_, select
+from sqlalchemy import func, or_, select
 
 from app.core.config import settings
 from app.db.session import get_db
 from app.db.models.admin import AdminUser, ShopSettings
-from app.db.models.product import Product, Category, SyncLog
+from app.db.models.product import Product, Category, SyncLog, SyncChange
 from app.db.models.order import Order, OrderItem
 from app.db.models.user import User as Customer
 from app.schemas.auth import UserOut
@@ -1204,9 +1205,102 @@ def sync_logs(db: Session = Depends(get_db), _=Depends(_get_current_admin)):
             "error_message": l.error_message,
             "started_at": l.started_at.isoformat(),
             "finished_at": l.finished_at.isoformat() if l.finished_at else None,
+            "changes_only": l.changes_only,
+            "products_in_xml": l.products_in_xml,
+            "has_xml": bool(l.xml_file),
         }
         for l in logs
     ]
+
+
+def _sync_log_or_404(db: Session, sync_id: int) -> SyncLog:
+    log = db.get(SyncLog, sync_id)
+    if not log:
+        raise HTTPException(status_code=404, detail="Синхронизация не найдена")
+    return log
+
+
+@router.get("/sync-logs/{sync_id}")
+def sync_log_detail(sync_id: int, db: Session = Depends(get_db), _=Depends(_get_current_admin)):
+    """Сводка одного обмена: журнал + сколько товаров создано/изменено/без изменений."""
+    log = _sync_log_or_404(db, sync_id)
+    counts = dict(
+        db.query(SyncChange.action, func.count(SyncChange.id))
+        .filter(SyncChange.sync_log_id == sync_id)
+        .group_by(SyncChange.action)
+        .all()
+    )
+    return {
+        "id": log.id, "source": log.source, "status": log.status,
+        "products_created": log.products_created, "products_updated": log.products_updated,
+        "error_message": log.error_message,
+        "started_at": log.started_at.isoformat(),
+        "finished_at": log.finished_at.isoformat() if log.finished_at else None,
+        "changes_only": log.changes_only,
+        "products_in_xml": log.products_in_xml,
+        "has_xml": bool(log.xml_file),
+        "counts": {
+            "created": counts.get("created", 0),
+            "updated": counts.get("updated", 0),
+            "skipped": counts.get("skipped", 0),
+        },
+    }
+
+
+@router.get("/sync-logs/{sync_id}/changes")
+def sync_log_changes(sync_id: int, db: Session = Depends(get_db), _=Depends(_get_current_admin)):
+    """Товары, участвовавшие в обмене: что за изменение, какие поля, какие картинки пришли."""
+    _sync_log_or_404(db, sync_id)
+    rows = db.scalars(
+        select(SyncChange)
+        .where(SyncChange.sync_log_id == sync_id)
+        .order_by(SyncChange.action, SyncChange.id)
+    ).all()
+    return [
+        {
+            "id": r.id, "product_id": r.product_id, "moysklad_id": r.moysklad_id,
+            "name": r.name, "action": r.action,
+            "changed_fields": r.changed_fields or {},
+            "has_image_field": r.has_image_field,
+            "images_in_xml": r.images_in_xml or [],
+        }
+        for r in rows
+    ]
+
+
+@router.get("/sync-logs/{sync_id}/xml")
+def sync_log_xml_download(sync_id: int, db: Session = Depends(get_db), _=Depends(_get_current_admin)):
+    """Отдаёт файлом сохранённую копию import.xml всего обмена (скачивание из админки)."""
+    from app.services.import_service import read_sync_xml
+
+    log = _sync_log_or_404(db, sync_id)
+    raw = read_sync_xml(log)
+    if not raw:
+        raise HTTPException(status_code=404, detail="Копия import.xml этого обмена не сохранена")
+    return Response(
+        content=raw,
+        media_type="application/xml",
+        headers={"Content-Disposition": f'attachment; filename="{log.xml_file}"'},
+    )
+
+
+@router.get("/sync-logs/{sync_id}/products/{moysklad_id}/xml", response_class=PlainTextResponse)
+def sync_log_product_xml(sync_id: int, moysklad_id: str,
+                         db: Session = Depends(get_db), _=Depends(_get_current_admin)):
+    """Отдаёт кусок `<Товар>` из сохранённой копии import.xml этого обмена."""
+    from lxml import etree
+    from app.services.import_service import read_sync_xml
+
+    log = _sync_log_or_404(db, sync_id)
+    raw = read_sync_xml(log)
+    if not raw:
+        raise HTTPException(status_code=404, detail="Копия import.xml этого обмена не сохранена")
+    root = etree.fromstring(raw)
+    for t in (e for e in root.iter() if e.tag.endswith("Товар")):
+        ident = next((c.text for c in t.iter() if c.tag.endswith("Ид")), None)
+        if ident == moysklad_id:
+            return etree.tostring(t, encoding="unicode", pretty_print=True)
+    raise HTTPException(status_code=404, detail="Товар не найден в XML этого обмена")
 
 
 # ─── Покупатели (личные кабинеты) ──────────────────────────────────

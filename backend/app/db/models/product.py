@@ -77,3 +77,37 @@ class SyncLog(Base):
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
     started_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     finished_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    # Дельта-выгрузка (<Каталог СодержитТолькоИзменения="true">) или полный каталог
+    changes_only: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    # Сколько товаров было в import.xml этого обмена (не путать с созданными/обновлёнными)
+    products_in_xml: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    # Имя файла с сохранённой копией import.xml (media/sync_xml/<id>.xml); None — копии нет
+    xml_file: Mapped[str | None] = mapped_column(String(255), nullable=True)
+
+
+class SyncChange(Base):
+    """Что случилось с ОДНИМ товаром в рамках ОДНОГО обмена.
+
+    Пишется прямо во время :func:`app.services.import_service.upsert_catalog` — из тех же
+    данных, по которым принимаются решения (второго прохода по товарам нет).
+    """
+    __tablename__ = "sync_changes"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    sync_log_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("sync_logs.id", ondelete="CASCADE"), index=True
+    )
+    product_id: Mapped[str | None] = mapped_column(
+        String(36), ForeignKey("products.id", ondelete="SET NULL"), nullable=True
+    )
+    moysklad_id: Mapped[str] = mapped_column(String(36), index=True)
+    name: Mapped[str] = mapped_column(String(500))
+    # "created" — товар заведён; "updated" — что-то изменилось; "skipped" — пришёл без изменений
+    action: Mapped[str] = mapped_column(String(20))
+    # {"price": [было, стало], "images": [[...], [...]], ...} — только реально изменившиеся поля
+    changed_fields: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    # Был ли у товара тег <Картинка> в import.xml этого захода (даже пустой)
+    has_image_field: Mapped[bool] = mapped_column(Boolean, default=False)
+    # Имена файлов картинок в том порядке, в каком их прислал МойСклад
+    images_in_xml: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())

@@ -1,19 +1,21 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import AdminShell from "@/components/AdminShell";
 import HelpHint from "@/components/HelpHint";
 import { adminFetch } from "@/lib/adminApi";
 import { formatMsk } from "@/lib/format";
 import { useIsMobile } from "@/lib/useIsMobile";
 
-interface SyncLog { id: number; source: string; status: string; products_created: number; products_updated: number; error_message: string | null; started_at: string; finished_at: string | null; }
+interface SyncLog { id: number; source: string; status: string; products_created: number; products_updated: number; error_message: string | null; started_at: string; finished_at: string | null; changes_only: boolean; products_in_xml: number; has_xml: boolean; }
 
 const STATUS_COLOR: Record<string, string> = { success: "var(--success)", error: "var(--critical)", running: "var(--primary)" };
 
 export default function SyncPage() {
   const [logs, setLogs] = useState<SyncLog[]>([]);
   const isMobile = useIsMobile();
+  const router = useRouter();
 
   function load() { adminFetch<SyncLog[]>("/sync-logs").then(setLogs).catch(() => {}); }
   useEffect(() => { load(); }, []);
@@ -33,7 +35,8 @@ export default function SyncPage() {
         /* Мобильный вид — карточки вместо таблицы */
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           {logs.map(log => (
-            <div key={log.id} style={{ background: "var(--canvas)", border: "1px solid var(--hairline-soft)", borderRadius: 12, padding: 14 }}>
+            <div key={log.id}
+                 style={{ background: "var(--canvas)", border: "1px solid var(--hairline-soft)", borderRadius: 12, padding: 14 }}>
               <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center", marginBottom: 8 }}>
                 <span style={{ color: STATUS_COLOR[log.status] ?? "var(--ink)", fontWeight: 700 }}>{log.status}</span>
                 <span style={{ fontSize: 13, color: "var(--ink-secondary)" }}>{formatMsk(log.finished_at)}</span>
@@ -43,6 +46,10 @@ export default function SyncPage() {
                 <span>Создано: {log.products_created}</span>
                 <span>Обновлено: {log.products_updated}</span>
               </div>
+              <button className="btn btn--ghost btn--sm" style={{ marginTop: 10 }}
+                      onClick={() => router.push(`/admin/sync/${log.id}`)}>
+                Подробнее →
+              </button>
               {log.error_message && <p style={{ fontSize: 12, color: "var(--critical)", marginTop: 6 }}>{log.error_message.slice(0, 120)}</p>}
             </div>
           ))}
@@ -52,7 +59,7 @@ export default function SyncPage() {
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
             <thead>
               <tr style={{ borderBottom: "1px solid var(--hairline-soft)" }}>
-                {["Источник", "Статус", "Создано", "Обновлено", "Дата"].map(h => (
+                {["Источник", "Статус", "Создано", "Обновлено", "Дата", "Действия"].map(h => (
                   <th key={h} style={{ padding: "12px 16px", textAlign: "left", fontWeight: 600, color: "var(--ink-secondary)", fontSize: 12 }}>{h}</th>
                 ))}
               </tr>
@@ -69,6 +76,11 @@ export default function SyncPage() {
                   <td style={{ padding: "14px 16px" }}>{log.products_updated}</td>
                   <td style={{ padding: "14px 16px", color: "var(--ink-secondary)" }}>
                     {formatMsk(log.finished_at)}
+                  </td>
+                  <td style={{ padding: "14px 16px" }}>
+                    <button className="btn btn--ghost btn--sm" onClick={() => router.push(`/admin/sync/${log.id}`)}>
+                      Подробнее →
+                    </button>
                   </td>
                 </tr>
               ))}

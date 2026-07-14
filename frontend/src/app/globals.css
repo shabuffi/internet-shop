@@ -586,6 +586,7 @@ button, input, textarea, select { font-family: inherit; }
 .btn--sm { height: 36px; padding: 0 var(--s-4); }
 .btn--block { width: 100%; }
 .btn:disabled { background: var(--fog); color: var(--graphite); border-color: transparent; cursor: not-allowed; }
+.btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 .iconbtn {
   display: inline-flex; align-items: center; justify-content: center;

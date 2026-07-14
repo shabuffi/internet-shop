@@ -5,7 +5,7 @@ import uuid
 from datetime import datetime, timezone
 from sqlalchemy.orm import Session
 from app.core.config import settings
-from app.db.models.product import Product, Category, SyncLog
+from app.db.models.product import Product, Category, SyncLog, SyncChange
 from app.integrations.moysklad.commerceml_parser import ParsedCatalog
 from app.services.media_storage import image_name
 
@@ -18,6 +18,9 @@ MAX_IMAGE_CLEARS = 30
 
 # Сколько последних слепков привязок фото храним (для восстановления без МойСклад).
 IMAGE_MANIFEST_KEEP = 30
+
+# Сколько последних обменов храним в истории (строки sync_changes + копии import.xml на диске) —
+# настраивается через SYNC_HISTORY_KEEP в .env; см. app/core/config.py.
 
 # Флаги-галочки из МойСклад (доп-поля). Распознаём по имени поля (частичное совпадение),
 # значение-галочка считается «включённой», если не входит в _FLAG_FALSE.
@@ -127,6 +130,70 @@ def restore_images_from_manifest(db: Session, path: str | None = None) -> int:
     return reattached
 
 
+def _sync_xml_dir() -> str:
+    return os.path.join(settings.MEDIA_DIR, "sync_xml")
+
+
+def save_sync_xml(db: Session, log: SyncLog, xml_bytes: bytes) -> str | None:
+    """Кладёт копию import.xml обмена на диск и прописывает её имя в журнал.
+
+    Файл лежит на том же томе, что картинки и слепки — ``media/sync_xml/<дата>_<id>.xml``
+    (например ``20260714_164556_447.xml``): по имени сразу видно, когда прошёл обмен, файлы
+    сортируются по времени и их удобно искать руками. БД не раздувается, история переживает
+    перезапуск и очистку Redis. Хранится столько обменов, сколько задано в
+    ``settings.SYNC_HISTORY_KEEP``; чистится в :func:`prune_sync_history`.
+
+    Returns:
+        Имя сохранённого файла или ``None``, если записать не удалось.
+    """
+    try:
+        os.makedirs(_sync_xml_dir(), exist_ok=True)
+        stamp = (log.started_at or _utcnow())
+        name = f"{stamp:%Y%m%d_%H%M%S}_{log.id}.xml"
+        with open(os.path.join(_sync_xml_dir(), name), "wb") as f:
+            f.write(xml_bytes)
+        log.xml_file = name
+        db.commit()
+        return name
+    except OSError as exc:
+        print("save_sync_xml error:", exc, flush=True)
+        return None
+
+
+def read_sync_xml(log: SyncLog) -> bytes | None:
+    """Читает сохранённую копию import.xml обмена (или ``None``, если её нет)."""
+    if not log.xml_file:
+        return None
+    path = os.path.join(_sync_xml_dir(), os.path.basename(log.xml_file))
+    if not os.path.isfile(path):
+        return None
+    with open(path, "rb") as f:
+        return f.read()
+
+
+def prune_sync_history(db: Session) -> None:
+    """Оставляет историю только по последним ``settings.SYNC_HISTORY_KEEP`` обменам.
+
+    Удаляет строки ``sync_changes`` старых обменов (сами записи ``sync_logs`` остаются —
+    журнал как был) и их копии import.xml на диске.
+    """
+    keep = max(1, settings.SYNC_HISTORY_KEEP)
+    keep_ids = [
+        i for (i,) in db.query(SyncLog.id).order_by(SyncLog.id.desc()).limit(keep)
+    ]
+    if not keep_ids:
+        return
+    oldest_kept = min(keep_ids)
+    db.query(SyncChange).filter(SyncChange.sync_log_id < oldest_kept).delete(synchronize_session=False)
+    for old in db.query(SyncLog).filter(SyncLog.id < oldest_kept, SyncLog.xml_file.isnot(None)):
+        try:
+            os.remove(os.path.join(_sync_xml_dir(), os.path.basename(old.xml_file)))
+        except OSError:
+            pass
+        old.xml_file = None
+    db.commit()
+
+
 def upsert_catalog(db: Session, catalog: ParsedCatalog, source: str = "commerceml") -> SyncLog:
     """Сохраняет распарсенный каталог в БД (upsert по ``moysklad_id``).
 
@@ -204,6 +271,12 @@ def upsert_catalog(db: Session, catalog: ParsedCatalog, source: str = "commercem
         pending_image_clears: list[Product] = []
         images_touched = False
 
+        # История обмена: по строке на товар. Копится здесь же, из тех же сравнений —
+        # второго прохода по каталогу нет. Строки для товаров без изменений («skipped»)
+        # пишем только в дельте: в полном каталоге их 12k+ на каждый обмен.
+        changes: list[SyncChange] = []
+        change_by_msid: dict[str, SyncChange] = {}
+
         # Удаление фото ловим ТОЛЬКО в дельта-выгрузке (<Каталог СодержитТолькоИзменения="true">).
         # На этом аккаунте МойСклад так устроен (проверено на проде): ПОЛНЫЙ каталог (false) несёт
         # весь ассортимент, но БЕЗ единой <Картинка> — там отсутствие тега НЕ значит удаление, фото
@@ -244,36 +317,55 @@ def upsert_catalog(db: Session, catalog: ParsedCatalog, source: str = "commercem
                 created += 1
                 if product.images:
                     images_touched = True   # новый товар с фото → обновим слепок привязок
+                changes.append(SyncChange(
+                    sync_log_id=log.id,
+                    product_id=product.id,
+                    moysklad_id=parsed_product.moysklad_id,
+                    name=parsed_product.name[:500],
+                    action="created",
+                    changed_fields=None,
+                    has_image_field=parsed_product.has_image_field,
+                    images_in_xml=list(product.images) or None,
+                ))
             else:
                 # Считаем «Обновлено» по РЕАЛЬНЫМ изменениям (иначе журнал показывал бы весь
                 # каталог 12555 на каждом обмене, хотя ничего не поменялось). Поле трогаем и
                 # флаг ставим только когда значение отличается.
                 changed = False
+                diff: dict = {}   # поле → [было, стало]; уходит в историю обмена (sync_changes)
                 if product.name != parsed_product.name:
+                    diff["name"] = [product.name, parsed_product.name]
                     product.name = parsed_product.name; changed = True
                 # Артикул/код обновляем только если пришли — иначе «дозаливка картинок»
                 # вторым import.xml (без артикула) затёрла бы их в None.
                 if parsed_product.article and product.article != parsed_product.article:
+                    diff["article"] = [product.article, parsed_product.article]
                     product.article = parsed_product.article; changed = True
                 if parsed_product.code and product.code != parsed_product.code:
+                    diff["code"] = [product.code, parsed_product.code]
                     product.code = parsed_product.code; changed = True
                 if product.category_id != cat_id:
+                    diff["category_id"] = [product.category_id, cat_id]
                     product.category_id = cat_id; changed = True
                 # Цену/остаток перезаписываем ТОЛЬКО если они пришли в offers.xml этого
                 # захода. Иначе import.xml без offers (например, второй заход с картинкой)
                 # обнулил бы их. (parsed.has_offer ставится в parse_offers_xml.)
                 if parsed_product.has_offer:
                     if product.price != parsed_product.price:
+                        diff["price"] = [str(product.price), str(parsed_product.price)]
                         product.price = parsed_product.price; changed = True
                     if product.stock != parsed_product.stock:
+                        diff["stock"] = [product.stock, parsed_product.stock]
                         product.stock = parsed_product.stock; changed = True
                 # Описание приходит в import.xml (<Описание>), картинка — отдельным файлом
                 # обмена (<Картинка> = имя файла). Перезаписываем только если обмен реально
                 # что-то прислал — чтобы пустое значение не затёрло уже сохранённое.
                 if parsed_product.description and product.description != parsed_product.description:
+                    diff["description"] = ["изменено", "изменено"]   # текст целиком в историю не пишем
                     product.description = parsed_product.description; changed = True
                 # Характеристики обновляем только если пришли (как и описание/артикул)
                 if parsed_product.attributes and product.attributes != parsed_product.attributes:
+                    diff["attributes"] = ["изменено", "изменено"]
                     product.attributes = parsed_product.attributes; changed = True
                 # Флаги «Новинка»/«Распродажа»/«Убойные» пересчитываем, когда обмен принёс схему
                 # этого доп-поля (`*_defined`) — тогда снятая в МойСклад галочка тоже снимется у нас.
@@ -283,10 +375,13 @@ def upsert_catalog(db: Session, catalog: ParsedCatalog, source: str = "commercem
                 sale_flag = _attr_flag(parsed_product.attributes, _SALE_PATTERNS)
                 hot_flag = _attr_flag(parsed_product.attributes, _HOT_PATTERNS)
                 if (new_defined or new_flag) and product.is_new != new_flag:
+                    diff["is_new"] = [product.is_new, new_flag]
                     product.is_new = new_flag; changed = True
                 if (sale_defined or sale_flag) and product.is_sale != sale_flag:
+                    diff["is_sale"] = [product.is_sale, sale_flag]
                     product.is_sale = sale_flag; changed = True
                 if (hot_defined or hot_flag) and product.is_hot != hot_flag:
+                    diff["is_hot"] = [product.is_hot, hot_flag]
                     product.is_hot = hot_flag; changed = True
                 # Картинки трогаем ПОФАЙЛОВО — только если У ЭТОГО товара в import.xml реально
                 # был тег <Картинка> (или пришли имена файлов). Раньше решали «по всему раунду»
@@ -306,6 +401,7 @@ def upsert_catalog(db: Session, catalog: ParsedCatalog, source: str = "commercem
                 if imgs:
                     if product.images != imgs:
                         # добавление/замена фото — применяем сразу, потери нет
+                        diff["images"] = [list(product.images or []), imgs]
                         product.images = imgs
                         product.image_url = imgs[0]
                         product.images_manual = False   # МойСклад снова управляет фото этого товара
@@ -321,6 +417,22 @@ def upsert_catalog(db: Session, catalog: ParsedCatalog, source: str = "commercem
                 if changed:
                     updated += 1
 
+                # Строка истории: «изменён» — всегда; «без изменений» — только в дельте
+                # (в полном каталоге это 12k+ строк на каждый обмен, смысла в них нет).
+                if changed or changes_only:
+                    row = SyncChange(
+                        sync_log_id=log.id,
+                        product_id=product.id,
+                        moysklad_id=parsed_product.moysklad_id,
+                        name=parsed_product.name[:500],
+                        action="updated" if changed else "skipped",
+                        changed_fields=diff or None,
+                        has_image_field=parsed_product.has_image_field,
+                        images_in_xml=imgs or None,
+                    )
+                    changes.append(row)
+                    change_by_msid[parsed_product.moysklad_id] = row
+
         # ── Предохранитель от массового стирания фото ─────────────────────────
         # Немного «стираний» (<= MAX_IMAGE_CLEARS) — это реальные удаления, применяем.
         # Много — это аномалия/сбой выгрузки (инцидент 29.06.2026): НЕ стираем, фото остаются,
@@ -328,6 +440,13 @@ def upsert_catalog(db: Session, catalog: ParsedCatalog, source: str = "commercem
         image_clear_warning: str | None = None
         if len(pending_image_clears) <= MAX_IMAGE_CLEARS:
             for p in pending_image_clears:
+                # В историю стирание попадает как обычное изменение поля images ([...] → [])
+                row = change_by_msid.get(p.moysklad_id)
+                if row is not None:
+                    fields = dict(row.changed_fields or {})
+                    fields["images"] = [list(p.images or []), []]
+                    row.changed_fields = fields
+                    row.action = "updated"
                 p.images = []
                 p.image_url = None
                 updated += 1
@@ -340,6 +459,7 @@ def upsert_catalog(db: Session, catalog: ParsedCatalog, source: str = "commercem
             )
             print("upsert_catalog:", image_clear_warning, flush=True)
 
+        db.add_all(changes)
         db.commit()
 
         log.status = "success"
@@ -347,7 +467,15 @@ def upsert_catalog(db: Session, catalog: ParsedCatalog, source: str = "commercem
         log.products_updated = updated
         log.error_message = image_clear_warning
         log.finished_at = _utcnow()
+        log.changes_only = changes_only
+        log.products_in_xml = len(catalog.products)
         db.commit()
+
+        # История ограничена последними SYNC_HISTORY_KEEP обменами (строки + копии XML).
+        try:
+            prune_sync_history(db)
+        except Exception as exc:   # чистка не критична — обмен уже зафиксирован
+            print("upsert_catalog: prune_sync_history error:", exc, flush=True)
 
         # Слепок привязок фото — только если фото в этом обмене реально менялись.
         # Это наша «страховка»: из него можно восстановить фото без выгрузки из МойСклад.

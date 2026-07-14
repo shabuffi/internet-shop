@@ -27,6 +27,10 @@ class Settings(BaseSettings):
     # Каталог для картинок товаров, пришедших файлами в обмене CommerceML
     MEDIA_DIR: str = "/app/media"
 
+    # Сколько последних обменов держим в истории: строки sync_changes + копии import.xml
+    # на диске (media/sync_xml). Старше — чистятся после каждого обмена.
+    SYNC_HISTORY_KEEP: int = 30
+
     # App
     SECRET_KEY: str
     DEBUG: bool = False

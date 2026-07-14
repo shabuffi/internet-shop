@@ -27,6 +27,19 @@ export async function adminFetch<T>(path: string, init?: RequestInit): Promise<T
   return res.json();
 }
 
+// То же, но ответ — простой текст (например, XML товара из истории обмена).
+export async function adminFetchText(path: string): Promise<string> {
+  const res = await fetch(`${API}${path}`, { credentials: "same-origin", cache: "no-store" });
+
+  if (res.status === 401) {
+    if (typeof window !== "undefined") window.location.href = "/admin/login";
+    throw new Error("Unauthorized");
+  }
+  if (!res.ok) throw new Error("Request failed");
+
+  return res.text();
+}
+
 // Загрузка файла (multipart). Content-Type НЕ ставим — браузер сам добавит boundary.
 export async function adminUpload<T>(path: string, formData: FormData): Promise<T> {
   const res = await fetch(`${API}${path}`, {

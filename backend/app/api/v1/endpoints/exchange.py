@@ -30,7 +30,7 @@ from app.db.models.order import Order, OrderItem
 from app.db.models.product import Product
 from app.integrations.moysklad.commerceml_parser import parse_import_xml, parse_offers_xml
 from app.integrations.moysklad.commerceml_orders import build_orders_xml
-from app.services.import_service import upsert_catalog
+from app.services.import_service import upsert_catalog, save_sync_xml
 from app.services.media_storage import is_image_filename, save_image
 
 logger = logging.getLogger(__name__)
@@ -472,6 +472,9 @@ async def exchange_get(
                 logger.error("PARSE ERROR offers.xml: %s", exc)
 
         log = upsert_catalog(db, catalog, source="commerceml")
+        # Копия import.xml этого обмена — на диск (media/sync_xml/<дата>_<id>.xml), для детализации
+        # синхронизации в админке. Redis-диагностика перезатирается следующим заходом, диск — нет.
+        save_sync_xml(db, log, import_xml)
         redis_client.delete(_file_key("import.xml"), _file_key("offers.xml"))
         logger.info("Imported: %d created, %d updated", log.products_created, log.products_updated)
         return f"success\nИмпортировано: {log.products_created} новых, {log.products_updated} обновлено"
