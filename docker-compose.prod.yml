@@ -79,6 +79,9 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile.prod
+      args:
+        # Домен нужен на СБОРКЕ (sitemap — ISR, пре-рендерится на билде). Публичный, не секрет.
+        SITE_URL: ${SITE_URL}
     restart: always
     mem_limit: 1024m          # Next.js SSR может зависать на маленьком лимите под ботами/каталогом
     # НЕ передаём фронту весь .env.prod (пароль БД, токены ТГ/ВК, exchange_*): при RCE в
