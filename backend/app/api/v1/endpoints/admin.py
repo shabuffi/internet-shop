@@ -13,15 +13,17 @@ from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from sqlalchemy import func, or_, select
+from sqlalchemy.exc import IntegrityError
 
 from app.core.config import settings
 from app.db.session import get_db
 from app.db.models.admin import AdminUser, ShopSettings
 from app.db.models.product import Product, Category, SyncLog, SyncChange
+from app.db.models.promo import PromoCategory, MoySkladProperty, product_promo_categories
 from app.db.models.order import Order, OrderItem
 from app.db.models.user import User as Customer
 from app.schemas.auth import UserOut
-from app.services import media_storage
+from app.services import media_storage, promo_service, property_registry
 from decimal import Decimal, InvalidOperation
 
 router = APIRouter(prefix="/admin", tags=["Admin"])
@@ -544,6 +546,11 @@ def get_settings(db: Session = Depends(get_db), _=Depends(_get_current_admin)):
         "category_sort":      _get_setting(db, "category_sort", "moysklad"),
         # Единый поиск: «1» — поиск только на «Каталоге» (по умолчанию), «0» — своя строка на каждой странице
         "unified_search":     _get_setting(db, "unified_search", "1") != "0",
+        # Доп-поле МойСклад со «старой ценой» (для зачёркнутой цены): ИД строки реестра, а не
+        # имя — имя резолвится через реестр, поэтому переименование поля ничего не ломает.
+        # Выбирается владельцем из выпадающего списка на странице «Промо-разделы».
+        # Пусто — фича выключена.
+        "promo_old_price_field_id": _get_setting(db, promo_service.OLD_PRICE_SETTING_KEY),
     }
 
 
@@ -578,6 +585,9 @@ def save_settings(body: dict, db: Session = Depends(get_db), _=Depends(_get_curr
         "category_sort",
         # единый поиск («1» — только на «Каталоге», «0» — своя строка на каждой странице)
         "unified_search",
+        # доп-поле МойСклад со «старой ценой»: ид строки реестра (страница «Промо-разделы»);
+        # пусто — выключено
+        promo_service.OLD_PRICE_SETTING_KEY,
     }
     # Настройки сайта (чат/соцсети/SEO/тема) перенесены на dev-страницу — см. save_dev_settings.
     for key, value in body.items():
@@ -1008,6 +1018,13 @@ def _used_image_names(db: Session) -> tuple[set[str], str]:
         used.update(images or [])
         if image_url:
             used.add(image_url)
+    # Иконки промо-категорий — тоже «занятые» файлы (иначе попали бы в «бесхозные»).
+    # Через icon_file_name, а не сырым значением: иконка кодируется как
+    # "upload:<файл>:<цвет>", и сырая строка с именем файла на диске не совпадёт.
+    for (icon,) in db.execute(select(PromoCategory.icon)):
+        file_name = promo_service.icon_file_name(icon)
+        if file_name:
+            used.add(file_name)
     blob = "\n".join(v or "" for (v,) in db.execute(select(ShopSettings.value)))
     return used, blob
 
@@ -1531,3 +1548,262 @@ def delete_user(user_id: str, db: Session = Depends(get_db), _=Depends(_get_curr
     db.delete(user)
     db.commit()
     return {"message": "Покупатель удалён", "id": user_id}
+
+
+# ─── Промо-категории (управляет владелец; только бизнес-настройки) ───
+
+@router.get("/moysklad-properties")
+def list_moysklad_properties(db: Session = Depends(get_db), _=Depends(_get_current_admin)):
+    """Реестр доп-полей МойСклад — источник выпадающего списка при выборе поля категории.
+
+    Имя поля вводить руками нельзя: владелец выбирает из этого списка. Реестр наполняется сам
+    на каждом обмене (запросить список у МойСклад невозможно — CommerceML работает только на
+    приём, инициатор всегда МойСклад).
+
+    Поля-«галочки» идут первыми — это подсказка, а не фильтр: выбрать можно любое поле.
+    """
+    from app.schemas.promo import MoySkladPropertyOut
+
+    counts = property_registry.product_counts(db)
+    flag_like = property_registry.flag_like_names(db)
+    taken = {
+        pid: title for pid, title in db.execute(
+            select(PromoCategory.source_field_id, PromoCategory.title)
+            .where(PromoCategory.source_field_id.isnot(None))
+        ).all()
+    }
+    out = []
+    for p in db.query(MoySkladProperty).all():
+        item = MoySkladPropertyOut.model_validate(p)
+        item.product_count = counts.get(p.name, 0)
+        item.looks_like_flag = p.name in flag_like
+        item.taken_by = taken.get(p.id)
+        out.append(item)
+    # Сначала похожие на галочку, внутри — по убыванию заполненности, затем по имени.
+    out.sort(key=lambda i: (not i.looks_like_flag, -i.product_count, i.name))
+    return out
+
+
+@router.get("/promo-categories")
+def list_promo_categories_admin(db: Session = Depends(get_db), _=Depends(_get_current_admin)):
+    """Все промо-категории для админки (с числом товаров и подписью выбранного доп-поля).
+
+    slug не отдаём — техническая деталь, пользователю не показывается.
+    """
+    from app.schemas.promo import PromoCategoryAdmin
+    counts = dict(
+        db.execute(
+            select(product_promo_categories.c.promo_category_id, func.count())
+            .group_by(product_promo_categories.c.promo_category_id)
+        ).all()
+    )
+    cats = db.query(PromoCategory).order_by(
+        PromoCategory.display_order.asc(), PromoCategory.title.asc()
+    ).all()
+    out = []
+    for c in cats:
+        item = PromoCategoryAdmin.model_validate(c)
+        item.product_count = counts.get(c.id, 0)
+        out.append(item)
+    return out
+
+
+def _check_source_field(db: Session, source_field_id: str | None, exclude_id: str | None = None):
+    """Проверяет, что поле существует в реестре и не занято другой категорией.
+
+    Занятость проверяем и здесь (чтобы отдать понятный текст), и полагаемся на UNIQUE в БД:
+    между проверкой и записью два админа могут вклиниться (см. IntegrityError → 409 ниже).
+    """
+    if source_field_id is None:
+        return
+    if not db.get(MoySkladProperty, source_field_id):
+        raise HTTPException(status_code=400, detail="Доп-поле МойСклад не найдено")
+    q = db.query(PromoCategory).filter(PromoCategory.source_field_id == source_field_id)
+    if exclude_id:
+        q = q.filter(PromoCategory.id != exclude_id)
+    taken = q.first()
+    if taken:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Поле уже используется категорией «{taken.title}»",
+        )
+
+
+@router.post("/promo-categories")
+def create_promo_category(
+    body: dict, db: Session = Depends(get_db), _=Depends(_get_current_admin)
+):
+    """Создаёт промо-категорию: название + выбранное из списка доп-поле МойСклад.
+
+    Новая категория НЕактивна и скрыта — safe-by-default: витрина не меняется, пока владелец
+    не настроит и не включит. slug генерируется из title (не показывается и не редактируется).
+    """
+    from app.schemas.promo import PromoCategoryCreate
+    data = PromoCategoryCreate(**body)
+    title = (data.title or "").strip()
+    if not title:
+        raise HTTPException(status_code=400, detail="Укажите название категории")
+    _check_source_field(db, data.source_field_id)
+
+    taken_slugs = {s for (s,) in db.query(PromoCategory.slug).all()}
+    next_order = (db.query(func.max(PromoCategory.display_order)).scalar() or -1) + 1
+    next_prio = (db.query(func.max(PromoCategory.priority)).scalar() or -1) + 1
+    cat = PromoCategory(
+        id=str(uuid.uuid4()),
+        source_field_id=data.source_field_id,
+        slug=promo_service.unique_slug(promo_service.slugify(title), taken_slugs),
+        title=title,
+        subtitle=(data.subtitle or None),
+        display_order=next_order,
+        priority=next_prio,
+        is_active=False,
+    )
+    db.add(cat)
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="Поле уже используется другой категорией")
+    return {"message": "Категория создана", "id": cat.id}
+
+
+@router.patch("/promo-categories/{cat_id}")
+def update_promo_category(
+    cat_id: str, body: dict, db: Session = Depends(get_db), _=Depends(_get_current_admin)
+):
+    """Правит настройки категории. slug через API не меняется (публичные URL стабильны).
+
+    Файл иконки при смене НЕ удаляется: картинка живёт в библиотеке
+    (``promo.icon_library``) и может стоять сразу у нескольких разделов — удаление здесь
+    погасило бы бейдж у соседей. Библиотекой управляет DELETE /promo-icons/{name},
+    который сначала проверяет, что иконку никто не занял.
+    """
+    from app.schemas.promo import PromoCategoryUpdate
+    cat = db.get(PromoCategory, cat_id)
+    if not cat:
+        raise HTTPException(status_code=404, detail="Категория не найдена")
+    data = PromoCategoryUpdate(**body).model_dump(exclude_unset=True)
+    if "source_field_id" in data:
+        _check_source_field(db, data["source_field_id"], exclude_id=cat_id)
+    for key, value in data.items():
+        setattr(cat, key, value)
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="Поле уже используется другой категорией")
+    return {"message": "Категория обновлена", "id": cat_id}
+
+
+@router.delete("/promo-categories/{cat_id}")
+def delete_promo_category(cat_id: str, db: Session = Depends(get_db), _=Depends(_get_current_admin)):
+    """Удаляет ТОЛЬКО настройки сайта: строку категории и её связи с товарами (каскад).
+    Данные МойСклад (Product.attributes) и строка реестра не трогаются.
+
+    Файл иконки остаётся в библиотеке (``promo.icon_library``): он мог стоять и у других
+    разделов, а даже если нет — библиотека и есть место, где иконка ждёт следующего раздела.
+
+    ⚠️ Удаление окончательно: обмен категорию НЕ восстановит (категории создаёт только админ).
+    Вернуть можно вручную — поле остаётся в выпадающем списке, членство пересоберётся на
+    ближайшем обмене, но slug сгенерируется заново → прежний URL раздела не восстановится.
+    Чтобы временно убрать раздел с витрины, правильнее выключить (is_active=false).
+    """
+    cat = db.get(PromoCategory, cat_id)
+    if not cat:
+        raise HTTPException(status_code=404, detail="Категория не найдена")
+    db.delete(cat)   # product_promo_categories чистится каскадом (ondelete=CASCADE)
+    db.commit()
+    return {"message": "Категория удалена", "id": cat_id}
+
+
+# ─── Библиотека своих иконок промо-разделов ────────────────────────
+# Хранилище — ShopSettings['promo.icon_library'] (JSON-список имён файлов), как `brands`:
+# новых таблиц и миграций не требует. Загруженная иконка живёт в библиотеке независимо от
+# разделов, поэтому её можно поставить сразу нескольким и снять, ничего не потеряв.
+
+def _load_icon_library(db: Session) -> list[str]:
+    """Имена файлов своих иконок из настроек — новые сверху (порядок хранения)."""
+    raw = _get_setting(db, promo_service.ICON_LIBRARY_SETTING_KEY)
+    try:
+        data = json.loads(raw) if raw else []
+    except (ValueError, TypeError):
+        return []
+    if not isinstance(data, list):
+        return []
+    # is_image_filename смотрит только на расширение, поэтому отдельно требуем, чтобы имя
+    # совпадало со своим basename: путь в настройке — не то, что стоит нести до delete_image.
+    return [
+        n for n in data
+        if isinstance(n, str) and n == os.path.basename(n) and media_storage.is_image_filename(n)
+    ]
+
+
+def _icon_usage(db: Session) -> dict[str, list[str]]:
+    """Какими разделами занята каждая иконка: имя файла → названия разделов."""
+    usage: dict[str, list[str]] = {}
+    for icon, title in db.execute(select(PromoCategory.icon, PromoCategory.title)):
+        file_name = promo_service.icon_file_name(icon)
+        if file_name:
+            usage.setdefault(file_name, []).append(title)
+    return usage
+
+
+@router.get("/promo-icons")
+def list_promo_icons(db: Session = Depends(get_db), _=Depends(_get_current_admin)):
+    """Библиотека своих иконок: имя файла + кем занята.
+
+    Список — это настройка ПЛЮС файлы, которые уже стоят у разделов: иконку могли загрузить
+    до появления библиотеки (или настройку почистить руками), и тогда она не должна пропасть
+    из галереи. Порядок настройки сохраняем, найденное добавляем в конец.
+
+    Returns:
+        ``{"items": [{"name": str, "used_by": [str, ...]}]}`` — ``used_by`` пуст, если
+        иконку не выбрал ни один раздел (только такие можно удалить).
+    """
+    usage = _icon_usage(db)
+    names = _load_icon_library(db)
+    names += sorted(n for n in usage if n not in names)
+    return {"items": [{"name": n, "used_by": usage.get(n, [])} for n in names]}
+
+
+@router.post("/promo-icons")
+async def upload_promo_icon(
+    file: UploadFile = File(...), db: Session = Depends(get_db), _=Depends(_get_current_admin),
+):
+    """Кладёт свою иконку в медиа-хранилище и добавляет её в библиотеку."""
+    data = await file.read()
+    try:
+        name = media_storage.save_upload(file.filename or "icon.png", data)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Можно загружать только изображения")
+    library = _load_icon_library(db)
+    if name not in library:
+        library.insert(0, name)   # свежая иконка — первой, её сейчас и будут выбирать
+    _set_setting(db, promo_service.ICON_LIBRARY_SETTING_KEY, json.dumps(library, ensure_ascii=False))
+    db.commit()
+    return {"name": name}
+
+
+@router.delete("/promo-icons/{name}")
+def delete_promo_icon(name: str, db: Session = Depends(get_db), _=Depends(_get_current_admin)):
+    """Убирает свою иконку из библиотеки и с диска.
+
+    Занятую иконку не удаляем — иначе у раздела молча погас бы бейдж. Встроенные иконки
+    сюда не попадают в принципе: за ними нет файла, их нет в библиотеке.
+    """
+    library = _load_icon_library(db)
+    if name not in library:
+        raise HTTPException(status_code=404, detail="Иконки нет в библиотеке")
+    used_by = _icon_usage(db).get(name, [])
+    if used_by:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Иконка занята разделами: {', '.join(used_by)}. Сначала смените её там.",
+        )
+    _set_setting(
+        db, promo_service.ICON_LIBRARY_SETTING_KEY,
+        json.dumps([n for n in library if n != name], ensure_ascii=False),
+    )
+    db.commit()
+    media_storage.delete_image(name)
+    return {"message": "Иконка удалена", "name": name}

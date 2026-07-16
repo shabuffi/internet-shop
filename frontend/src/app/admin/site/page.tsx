@@ -1,11 +1,26 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import AdminShell from "@/components/AdminShell";
+import AdminTabs, { type AdminTab } from "@/components/AdminTabs";
 import HelpHint from "@/components/HelpHint";
 import PasswordField from "@/components/PasswordField";
+import PromoCategoriesPanel from "@/components/PromoCategoriesPanel";
 import { adminFetch, adminUpload } from "@/lib/adminApi";
 import { brandImageUrl, type Brand } from "@/lib/brands";
+
+// Вкладки страницы. Порядок — от «про магазин» к «про доступ»; список будет расти, поэтому
+// полоса вкладок умеет прокручиваться (AdminTabs).
+const TABS: AdminTab[] = [
+  { id: "general", label: "Общие" },
+  { id: "promo",   label: "Промо-разделы" },
+  { id: "brands",  label: "Бренды" },
+  { id: "catalog", label: "Каталог" },
+  { id: "search",  label: "Поиск" },
+  { id: "access",  label: "Доступ" },
+];
+const DEFAULT_TAB = "general";
 
 interface ShopSettings {
   shop_name: string; contact_phone: string; contact_email: string; contact_hours: string;
@@ -30,8 +45,31 @@ const cardStyle: React.CSSProperties = {
 const inputStyle = { display: "flex", flexDirection: "column" as const, gap: 6, marginBottom: 16 };
 
 // «Настройка сайта» — всё, что владелец меняет на витрине: магазин/контакты/реквизиты,
-// показ остатка, логотипы брендов, а также смена пароля входа в админку.
-export default function AdminSitePage() {
+// промо-разделы, логотипы брендов, каталог и поиск, а также смена пароля входа в админку.
+// Разнесено по вкладкам; активная вкладка живёт в ?tab= (см. SiteSettings).
+function SiteSettings() {
+  // ── Вкладка ──
+  // Источник правды — URL, а не state: так на вкладку можно дать ссылку, а «назад» в браузере
+  // возвращает на предыдущую. Незнакомое значение из адреса тихо сводим к «Общим».
+  const router = useRouter();
+  const params = useSearchParams();
+  const asked = params.get("tab");
+  const tab = TABS.some((t) => t.id === asked) ? asked! : DEFAULT_TAB;
+  const setTab = (id: string) => {
+    // Ошибка сохранения относится к своему блоку — на соседней вкладке она бы висела
+    // непонятной красной строкой, не относящейся к тому, что человек видит.
+    setError("");
+    // replace, а не push: перебор вкладок не должен копиться в истории.
+    // На вкладке по умолчанию параметр не тащим — адрес страницы остаётся чистым.
+    router.replace(id === DEFAULT_TAB ? "/admin/site" : `/admin/site?tab=${id}`, { scroll: false });
+  };
+  // Промо-панель держит своё состояние внутри (незаконченная форма «Новый раздел», открытый
+  // выбор иконки). Размонтировать её на переключении вкладки — молча терять набранное, поэтому
+  // после первого открытия она остаётся в дереве и просто прячется. До первого открытия не
+  // монтируем вовсе: на маунте она тянет свои четыре эндпоинта.
+  const [promoSeen, setPromoSeen] = useState(false);
+  useEffect(() => { if (tab === "promo") setPromoSeen(true); }, [tab]);
+
   // ── Магазин + показ остатка ──
   const [form, setForm] = useState<ShopSettings>(EMPTY);
   const [savedSection, setSavedSection] = useState<string | null>(null);
@@ -175,15 +213,27 @@ export default function AdminSitePage() {
   };
 
   return (
-    <AdminShell>
-      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 24 }}>
+    <>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
         <h1 style={{ fontSize: 24, fontWeight: 700, letterSpacing: -0.3 }}>Настройка сайта</h1>
-        <HelpHint text={"Всё, что видно покупателю: название и контакты магазина, реквизиты, показ остатка, логотипы брендов. Здесь же — смена пароля входа в админку.\n\nКаждый блок сохраняется своей кнопкой."} />
+        <HelpHint text={"Всё, что видно покупателю: название и контакты магазина, реквизиты, промо-разделы, логотипы брендов, каталог и поиск. Здесь же — смена пароля входа в админку.\n\nРазделы разложены по вкладкам; каждый блок сохраняется своей кнопкой."} />
       </div>
+
+      <AdminTabs tabs={TABS} active={tab} onChange={setTab} />
+
+      <div role="tabpanel" id={`panel-${tab}`} aria-labelledby={`tab-${tab}`}>
 
       {error && <p className="form-error" style={{ maxWidth: 520, marginBottom: 16 }}>{error}</p>}
 
+      {/* Промо-разделы: см. promoSeen — монтируем лениво, дальше только прячем. */}
+      {promoSeen && (
+        <div style={{ display: tab === "promo" ? "block" : "none" }}>
+          <PromoCategoriesPanel />
+        </div>
+      )}
+
       {/* Магазин */}
+      {tab === "general" && (
       <form style={cardStyle} onSubmit={e => saveSection(e, "shop", ["shop_name", "contact_phone", "contact_email", "contact_hours", "company_legal_name", "company_inn", "company_ogrn", "warehouse_address", "warehouse_coords", "delivery_info"])}>
         <p style={{ fontWeight: 600, fontSize: 16, marginBottom: 16 }}>Магазин</p>
         <div style={inputStyle}>
@@ -237,8 +287,10 @@ export default function AdminSitePage() {
         </div>
         {saveRow("shop")}
       </form>
+      )}
 
       {/* Показ остатка на витрине */}
+      {tab === "catalog" && (
       <form style={cardStyle} onSubmit={e => saveSection(e, "stock", ["show_stock_qty"])}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
           <p style={{ fontWeight: 600, fontSize: 16, margin: 0 }}>Показ остатка</p>
@@ -265,8 +317,10 @@ export default function AdminSitePage() {
         </label>
         {saveRow("stock")}
       </form>
+      )}
 
-      {/* Сортировка категорий каталога */}
+      {/* Сортировка категорий каталога — та же вкладка «Каталог», что и показ остатка */}
+      {tab === "catalog" && (
       <form style={cardStyle} onSubmit={e => saveSection(e, "category_sort", ["category_sort"])}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
           <p style={{ fontWeight: 600, fontSize: 16, margin: 0 }}>Порядок категорий</p>
@@ -293,8 +347,10 @@ export default function AdminSitePage() {
         </label>
         {saveRow("category_sort")}
       </form>
+      )}
 
       {/* Поиск товаров: единый (только на «Каталоге») или своя строка на каждой странице */}
+      {tab === "search" && (
       <form style={cardStyle} onSubmit={e => saveSection(e, "unified_search", ["unified_search"])}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
           <p style={{ fontWeight: 600, fontSize: 16, margin: 0 }}>Поиск товаров</p>
@@ -321,8 +377,10 @@ export default function AdminSitePage() {
         </label>
         {saveRow("unified_search")}
       </form>
+      )}
 
       {/* Бренды */}
+      {tab === "brands" && (
       <div style={cardStyle}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
           <p style={{ fontWeight: 600, fontSize: 16, margin: 0 }}>Бренды</p>
@@ -405,8 +463,10 @@ export default function AdminSitePage() {
           </>
         )}
       </div>
+      )}
 
       {/* Смена пароля админа */}
+      {tab === "access" && (
       <form style={cardStyle} onSubmit={handleChangePassword}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
           <p style={{ fontWeight: 600, fontSize: 16, margin: 0 }}>Пароль входа в админку</p>
@@ -432,6 +492,20 @@ export default function AdminSitePage() {
           {pwLoading ? "Меняем..." : "Сменить пароль"}
         </button>
       </form>
+      )}
+      </div>
+    </>
+  );
+}
+
+/** `useSearchParams` требует Suspense — иначе сборка ругается и страница теряет пререндер
+ *  (тот же приём, что в app/reset/page.tsx и components/HeaderSearch.tsx). */
+export default function AdminSitePage() {
+  return (
+    <AdminShell>
+      <Suspense fallback={<p style={{ color: "var(--charcoal)" }}>Загрузка…</p>}>
+        <SiteSettings />
+      </Suspense>
     </AdminShell>
   );
 }

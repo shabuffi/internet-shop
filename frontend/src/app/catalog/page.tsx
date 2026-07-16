@@ -1,14 +1,15 @@
 export const dynamic = 'force-dynamic';
 
 import Link from "next/link";
-import { getProducts, getCategories, getStoreInfo } from "@/lib/api";
+import { getProducts, getCategories, getStoreInfo, getPromoCategories } from "@/lib/api";
+import { primaryPromo } from "@/lib/promo";
 import { CATEGORY_GROUPS, normCatName } from "@/lib/categoryGroups";
 import type { Category } from "@/types/product";
-import { formatPrice } from "@/lib/format";
 import AddToCartCard from "@/components/AddToCartCard";
 import ChestnyZnakBadge from "@/components/ChestnyZnakBadge";
-import FeaturedBadge from "@/components/FeaturedBadge";
+import PromoBadge from "@/components/PromoBadge";
 import ProductName from "@/components/ProductName";
+import ProductPrice from "@/components/ProductPrice";
 import HeaderSearch from "@/components/HeaderSearch";
 import CatalogList from "@/components/CatalogList";
 import CartBar from "@/components/CartBar";
@@ -88,12 +89,15 @@ export default async function CatalogPage({ searchParams }: Props) {
   const sort = params.sort === "price_asc" || params.sort === "price_desc" ? params.sort : "name";
   const withPhoto = params.photo === "1";
 
-  const [data, categories, store] = await Promise.all([
+  const [data, categories, store, promo] = await Promise.all([
     // В списке («бланк заказа») показываем больше товаров на странице
     getProducts({ category_id: categoryId, search, page, sort, with_photo: withPhoto, page_size: listView ? 100 : undefined }),
     getCategories(),
     getStoreInfo().catch(() => null),
+    getPromoCategories().catch(() => []),
   ]);
+  // Конфиг категорий для бейджа: slug → категория (название/иконка/приоритет).
+  const promoBySlug = new Map(promo.map((c) => [c.slug, c]));
   // Показ остатка: «N шт.» (по умолчанию) или только «В наличии» — настройка сайта.
   const showQty = store?.show_stock_qty !== false;
 
@@ -228,10 +232,12 @@ export default async function CatalogPage({ searchParams }: Props) {
               <CatalogList products={data.items} showQty={showQty} />
             ) : (
               <div className="catalog-grid">
-                {data.items.map((p) => (
+                {data.items.map((p) => {
+                  const badge = primaryPromo(p.promo_slugs, promoBySlug);
+                  return (
                   <article className="pcard" key={p.id}>
                     <Link href={`/products/${p.id}`} className="pcard__media" aria-label={p.name}>
-                      <FeaturedBadge product={p} />
+                      {badge && <PromoBadge category={badge} />}
                       <span className="pcard__badge">
                         {p.available && p.stock > 0
                           ? <span className="badge badge--stock"><span className="badge__dot" />{showQty ? `${p.stock} шт.` : "В наличии"}</span>
@@ -253,12 +259,13 @@ export default async function CatalogPage({ searchParams }: Props) {
                       </div>
                       <div className="pcard__sku">{p.article ? `Арт. ${p.article}` : " "}</div>
                       <div className="pcard__foot">
-                        <span className="price">{Number(p.price) > 0 ? formatPrice(p.price) : "—"}</span>
+                        <ProductPrice p={p} />
                         <AddToCartCard product={p} />
                       </div>
                     </div>
                   </article>
-                ))}
+                  );
+                })}
               </div>
             )}
 

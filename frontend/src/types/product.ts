@@ -17,13 +17,30 @@ export interface Product {
   stock: number;
   available: boolean;
   is_active: boolean;
-  is_new?: boolean;    // флаг «Новинка» из МойСклад
-  is_sale?: boolean;   // флаг «Распродажа/Спецпредложение» из МойСклад
-  is_hot?: boolean;    // флаг «Убойные цены» из МойСклад
+  // Слаги активных промо-категорий товара (по возрастанию display_order; первый — «основной»).
+  promo_slugs?: string[];
+  // «Старая цена» для показа зачёркнутой (уже готова к показу; null — не показываем).
+  old_price?: string | null;
+  // Deprecated: выводятся из membership на переходный период — новый код использует promo_slugs.
+  is_new?: boolean;
+  is_sale?: boolean;
+  is_hot?: boolean;
   category: Category | null;
   updated_at: string;
   // Товар с обязательной маркировкой «Честный знак» (вычисляется на границе API).
   chestnyZnak?: boolean;
+}
+
+// Промо-категория для витрины (меню, ленты главной, страницы разделов).
+export interface PromoCategory {
+  slug: string;
+  title: string;
+  subtitle: string | null;
+  icon: string | null;         // имя файла в media_storage; URL — /api/v1/admin/media/<icon>
+  display_order: number;
+  show_in_menu: boolean;
+  show_on_home: boolean;
+  show_old_price: boolean;
 }
 
 export interface ProductListResponse {

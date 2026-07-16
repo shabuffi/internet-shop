@@ -160,6 +160,15 @@ export function IconDoc(p: SVGProps<SVGSVGElement>) {
 
 // Стопка страниц (две наложенные) — раздел «Страницы» (инфо-страницы сайта).
 // Визуально отличается от IconOrders/IconDoc (одиночный документ с линиями).
+export function IconTag(p: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base} {...p}>
+      <path d="M20.6 13.4 12 4.8V2H4v8h2.8l8.6 8.6a2 2 0 0 0 2.8 0l2.4-2.4a2 2 0 0 0 0-2.8Z" />
+      <circle cx="7.5" cy="7.5" r="1.2" />
+    </svg>
+  );
+}
+
 export function IconPages(p: SVGProps<SVGSVGElement>) {
   return (
     <svg {...base} {...p}>

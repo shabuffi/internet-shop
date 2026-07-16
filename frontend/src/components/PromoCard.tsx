@@ -1,21 +1,23 @@
 import Link from "next/link";
-import { formatPrice } from "@/lib/format";
-import { IconFlame } from "@/components/icons";
 import NoPhoto from "@/components/NoPhoto";
 import AddToCartCard from "@/components/AddToCartCard";
 import ChestnyZnakBadge from "@/components/ChestnyZnakBadge";
 import ProductName from "@/components/ProductName";
-import type { Product } from "@/types/product";
+import ProductPrice from "@/components/ProductPrice";
+import PromoBadge from "@/components/PromoBadge";
+import type { Product, PromoCategory } from "@/types/product";
 
-/** Карточка товара с бейджем NEW / % — для секций и страниц «Новинки»/«Спецпредложения».
- *  `compact` (только на главной) — витринный вид: вся карточка ссылка на товар, без степера,
- *  название режется до 2 строк. На страницах — обычный вид со степером и разворотом названия. */
-export default function PromoCard({ p, kind, compact = false }: { p: Product; kind: "new" | "sale" | "hot"; compact?: boolean }) {
-  const badge = (
-    <span className={`pcard__promo pcard__promo--${kind}`}>
-      {kind === "hot" ? <IconFlame /> : kind === "new" ? "NEW" : "%"}
-    </span>
-  );
+/** Карточка товара с бейджем промо-категории — для секций и страниц промо-категорий.
+ *  `category` — категория раздела (её бейдж рисуем поверх фото); нет — без бейджа.
+ *  `compact` (только на главной) — витринный вид: вся карточка ссылка, без степера. */
+export default function PromoCard({
+  p, category, compact = false,
+}: {
+  p: Product;
+  category?: Pick<PromoCategory, "slug" | "title" | "icon"> | null;
+  compact?: boolean;
+}) {
+  const badge = category ? <PromoBadge category={category} /> : null;
   const media = (
     <div className="photo photo--square">
       {p.image_url
@@ -23,7 +25,7 @@ export default function PromoCard({ p, kind, compact = false }: { p: Product; ki
         : <NoPhoto />}
     </div>
   );
-  const price = <span className="price">{Number(p.price) > 0 ? formatPrice(p.price) : "—"}</span>;
+  const price = <ProductPrice p={p} />;
 
   // Главная: вся карточка — одна ссылка на товар, без степера (витрина-тизер).
   if (compact) {
@@ -44,7 +46,7 @@ export default function PromoCard({ p, kind, compact = false }: { p: Product; ki
     );
   }
 
-  // Разделы (каталог/новинки/спец): картинка и название — ссылки, снизу цена + степер.
+  // Разделы (каталог/промо-страницы): картинка и название — ссылки, снизу цена + степер.
   return (
     <article className="pcard">
       <Link href={`/products/${p.id}`} className="pcard__media" aria-label={p.name}>

@@ -3,11 +3,14 @@ import glob
 import json
 import uuid
 from datetime import datetime, timezone
+from sqlalchemy import select, insert, delete, func
 from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.db.models.product import Product, Category, SyncLog, SyncChange
+from app.db.models.promo import PromoCategory, product_promo_categories
 from app.integrations.moysklad.commerceml_parser import ParsedCatalog
 from app.services.media_storage import image_name
+from app.services import promo_service, property_registry
 
 
 # Предохранитель: сколько товаров МАКСИМУМ можно «обнулить по фото» за один обмен.
@@ -21,40 +24,6 @@ IMAGE_MANIFEST_KEEP = 30
 
 # Сколько последних обменов храним в истории (строки sync_changes + копии import.xml на диске) —
 # настраивается через SYNC_HISTORY_KEEP в .env; см. app/core/config.py.
-
-# Флаги-галочки из МойСклад (доп-поля). Распознаём по имени поля (частичное совпадение),
-# значение-галочка считается «включённой», если не входит в _FLAG_FALSE.
-_NEW_PATTERNS = ("новин",)
-_SALE_PATTERNS = ("распродаж", "спецпредлож", "акци", "скидк")
-_HOT_PATTERNS = ("убойн",)          # «Убойные цены»
-_FLAG_FALSE = {"", "false", "нет", "0", "no", "off", "ложь", "none", "-"}
-
-
-def _attr_flag(attributes, patterns) -> bool:
-    """True, если среди доп-полей есть поле с именем из ``patterns`` и «включённым» значением."""
-    for a in attributes or []:
-        name = (a.get("name") or "").strip().lower()
-        if any(p in name for p in patterns):
-            val = str(a.get("value") or "").strip().lower()
-            if val not in _FLAG_FALSE:
-                return True
-    return False
-
-
-def _prop_defined(property_names, patterns) -> bool:
-    """True, если в схеме доп-полей обмена (``property_names``) есть поле из ``patterns``.
-
-    Отличает «полный каталог со схемой свойств» (флаг можно пересчитывать, в т.ч. СБРОСИТЬ
-    снятый в МойСклад) от «дозаливки» без свойств (флаги не трогаем). Раньше пересчёт был
-    завязан на наличие любых атрибутов у самого товара и залипал (флаг оставался True),
-    если снятое доп-поле было у товара единственным — атрибуты пустели, пересчёт пропускался.
-    """
-    for name in property_names or ():
-        low = (name or "").strip().lower()
-        if any(p in low for p in patterns):
-            return True
-    return False
-
 
 def _utcnow() -> datetime:
     """Наивный UTC-таймстамп (замена устаревшего datetime.utcnow())."""
@@ -258,12 +227,42 @@ def upsert_catalog(db: Session, catalog: ParsedCatalog, source: str = "commercem
         # SELECT'ов повесили бы обмен и дали таймаут у МойСклад).
         existing_products = {p.moysklad_id: p for p in db.query(Product).all()}
 
-        # Пришла ли в ЭТОМ обмене схема флаг-доп-полей (по классификатору). Если да — флаг
-        # пересчитываем для КАЖДОГО товара, в т.ч. сбрасываем снятый в МойСклад (значение
-        # свойства у товара исчезает из выгрузки). «Дозаливка» без схемы флаги не трогает.
-        new_defined = _prop_defined(catalog.property_names, _NEW_PATTERNS)
-        sale_defined = _prop_defined(catalog.property_names, _SALE_PATTERNS)
-        hot_defined = _prop_defined(catalog.property_names, _HOT_PATTERNS)
+        # ─── Реестр доп-полей МойСклад ────────────────────────────────────────
+        # Схема свойств этого обмена → реестр (Ид → имя). Отсюда админ выбирает поле для
+        # промо-категории. Категорий здесь НЕ создаём: раньше это делала эвристика «у товара
+        # стоит галочка», и на реальных данных она ошибалась — «Минимальная единица отгрузки»
+        # со значением «1» у 467 товаров прошла бы как промо-категория, причём несмываемо
+        # (реквизиты не попадают в property_names → членство по ним не сбрасывается никогда).
+        # Что считать промо — решает владелец в админке.
+        property_registry.upsert_from_exchange(db, catalog.properties)
+        db.flush()
+
+        # ─── Промо-категории: связь по доп-полям МойСклад ─────────────────────
+        # Категории с выбранным полем. «Ручные»/ненастроенные (source_field_id NULL) импорт не
+        # трогает — их членство остаётся как есть. Имя поля берём из реестра (на категории оно
+        # не хранится), поэтому переименование в МойСклад связь не рвёт.
+        promo_cats = db.query(PromoCategory).filter(PromoCategory.source_field_id.isnot(None)).all()
+        cats_by_field: dict[str, PromoCategory] = {
+            c.source_field.name: c for c in promo_cats if c.source_field
+        }
+
+        known_fields = set(cats_by_field)
+        # Поля, схема которых пришла в ЭТОМ обмене (по классификатору) — по ним членство можно
+        # ПЕРЕСЧИТАТЬ, в т.ч. СНЯТЬ (галочку убрали в МойСклад). «Дозаливка» без схемы — не снимаем.
+        schema_fields = {f for f in known_fields if f in catalog.property_names}
+        field_by_cat_id: dict[str, str] = {c.id: name for name, c in cats_by_field.items()}
+        ms_cat_ids = set(field_by_cat_id)
+
+        # Существующее членство одним запросом (product_id → set(promo_category_id)).
+        existing_membership: dict[str, set[str]] = {}
+        for pid, cid in db.execute(
+            select(product_promo_categories.c.product_id, product_promo_categories.c.promo_category_id)
+        ):
+            existing_membership.setdefault(pid, set()).add(cid)
+
+        # Накопители изменений членства (применяем bulk перед commit).
+        ppc_inserts: list[dict] = []
+        ppc_deletes: list[tuple[str, str]] = []
 
         # Товары, у которых обмен просит УБРАТЬ фото — не применяем сразу, а копим и в конце
         # пропускаем через предохранитель (MAX_IMAGE_CLEARS). Добавление/замену фото применяем
@@ -304,9 +303,6 @@ def upsert_catalog(db: Session, catalog: ParsedCatalog, source: str = "commercem
                     image_url=image_name(parsed_product.image_url),
                     images=[image_name(x) for x in parsed_product.images],
                     attributes=parsed_product.attributes or None,
-                    is_new=_attr_flag(parsed_product.attributes, _NEW_PATTERNS),
-                    is_sale=_attr_flag(parsed_product.attributes, _SALE_PATTERNS),
-                    is_hot=_attr_flag(parsed_product.attributes, _HOT_PATTERNS),
                     price=parsed_product.price,
                     stock=parsed_product.stock,
                     category_id=cat_id,
@@ -315,6 +311,9 @@ def upsert_catalog(db: Session, catalog: ParsedCatalog, source: str = "commercem
                 db.add(product)
                 existing_products[parsed_product.moysklad_id] = product
                 created += 1
+                # Членство в промо-категориях: доп-поля с включённой галочкой.
+                for f in promo_service.matched_source_fields(parsed_product.attributes, known_fields):
+                    ppc_inserts.append({"product_id": product.id, "promo_category_id": cats_by_field[f].id})
                 if product.images:
                     images_touched = True   # новый товар с фото → обновим слепок привязок
                 changes.append(SyncChange(
@@ -367,22 +366,28 @@ def upsert_catalog(db: Session, catalog: ParsedCatalog, source: str = "commercem
                 if parsed_product.attributes and product.attributes != parsed_product.attributes:
                     diff["attributes"] = ["изменено", "изменено"]
                     product.attributes = parsed_product.attributes; changed = True
-                # Флаги «Новинка»/«Распродажа»/«Убойные» пересчитываем, когда обмен принёс схему
-                # этого доп-поля (`*_defined`) — тогда снятая в МойСклад галочка тоже снимется у нас.
-                # Плюс запасной случай: товар несёт включённый флаг в атрибутах, даже если схему
-                # почему-то не прислали (тогда только СТАВИМ True, снять без схемы не рискуем).
-                new_flag = _attr_flag(parsed_product.attributes, _NEW_PATTERNS)
-                sale_flag = _attr_flag(parsed_product.attributes, _SALE_PATTERNS)
-                hot_flag = _attr_flag(parsed_product.attributes, _HOT_PATTERNS)
-                if (new_defined or new_flag) and product.is_new != new_flag:
-                    diff["is_new"] = [product.is_new, new_flag]
-                    product.is_new = new_flag; changed = True
-                if (sale_defined or sale_flag) and product.is_sale != sale_flag:
-                    diff["is_sale"] = [product.is_sale, sale_flag]
-                    product.is_sale = sale_flag; changed = True
-                if (hot_defined or hot_flag) and product.is_hot != hot_flag:
-                    diff["is_hot"] = [product.is_hot, hot_flag]
-                    product.is_hot = hot_flag; changed = True
+                # Членство в промо-категориях. ДОБАВЛЯЕМ, если товар несёт включённую галочку
+                # доп-поля. СНИМАЕМ только у полей, чья схема пришла в этом обмене (schema_fields) —
+                # тогда снятая в МойСклад галочка снимется и у нас; «дозаливка» без схемы членство
+                # не снимает (иначе флаги залипали/сбрасывались бы неверно). Манульные категории
+                # (source_field NULL, не в ms_cat_ids) импорт не трогает.
+                desired_ids = {
+                    cats_by_field[f].id
+                    for f in promo_service.matched_source_fields(parsed_product.attributes, known_fields)
+                }
+                current_ms_ids = existing_membership.get(product.id, set()) & ms_cat_ids
+                to_add = desired_ids - current_ms_ids
+                to_remove = {
+                    cid for cid in current_ms_ids
+                    if field_by_cat_id[cid] in schema_fields and cid not in desired_ids
+                }
+                if to_add or to_remove:
+                    diff["promo"] = ["изменено", "изменено"]
+                    changed = True
+                    for cid in to_add:
+                        ppc_inserts.append({"product_id": product.id, "promo_category_id": cid})
+                    for cid in to_remove:
+                        ppc_deletes.append((product.id, cid))
                 # Картинки трогаем ПОФАЙЛОВО — только если У ЭТОГО товара в import.xml реально
                 # был тег <Картинка> (или пришли имена файлов). Раньше решали «по всему раунду»
                 # (round_has_images): если в заходе была хоть одна картинка, у ВСЕХ товаров без
@@ -460,6 +465,21 @@ def upsert_catalog(db: Session, catalog: ParsedCatalog, source: str = "commercem
             print("upsert_catalog:", image_clear_warning, flush=True)
 
         db.add_all(changes)
+
+        # ── Применяем изменения членства в промо-категориях (bulk) ────────────
+        # Flush, чтобы новые товары и авто-созданные категории существовали в БД до
+        # вставок в таблицу связи (FK). Всё в одной транзакции.
+        db.flush()
+        for pid, cid in ppc_deletes:
+            db.execute(
+                delete(product_promo_categories).where(
+                    product_promo_categories.c.product_id == pid,
+                    product_promo_categories.c.promo_category_id == cid,
+                )
+            )
+        if ppc_inserts:
+            db.execute(insert(product_promo_categories), ppc_inserts)
+
         db.commit()
 
         log.status = "success"

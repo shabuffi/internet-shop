@@ -2,12 +2,16 @@ import { test, expect, type Page } from "@playwright/test";
 
 // Внешняя (браузерная) проверка регистрации покупателя против поднятого стека.
 // Каждый тест — свой изолированный контекст (куки не протекают между тестами).
-// Email уникален на прогон (метка времени + случайность), чтобы не натыкаться на
-// уже существующего пользователя; созданные e2e-аккаунты чистит global-teardown
-// (удаляет users с email вида e2e-reg-*@example.test).
+// Email И ТЕЛЕФОН уникальны на регистрацию: бэкенд требует уникальности обоих
+// (иначе 2-я регистрация с тем же телефоном → 409 «телефон уже зарегистрирован»,
+// и все тесты после первого падают). Аккаунты чистит global-teardown (e2e-reg-*).
 
 const uniqueEmail = () =>
   `e2e-reg-${Date.now()}-${Math.floor(Math.random() * 1e6)}@example.test`;
+
+// Валидный уникальный РФ-мобильный: 10 цифр, первая «9» (см. normalizeRuPhone).
+const uniquePhone = () =>
+  "+79" + String(Math.floor(Math.random() * 1e9)).padStart(9, "0");
 
 // Заполняет общие поля формы регистрации. Тип заказчика и ИНН — отдельно по месту.
 async function fillCommon(page: Page, email: string, password = "Passw0rd!23") {
@@ -16,7 +20,7 @@ async function fillCommon(page: Page, email: string, password = "Passw0rd!23") {
   // может занять секунды) — иначе fill полей иногда упирается в таймаут.
   await expect(page.getByRole("button", { name: "Зарегистрироваться" })).toBeVisible();
   await page.getByPlaceholder("you@example.ru").fill(email);
-  await page.getByPlaceholder("+7 999 123 45 67").fill("+7 900 123-45-67");
+  await page.getByPlaceholder("+7 999 123 45 67").fill(uniquePhone());
   await page.locator('input[type="password"]').fill(password);
   await page.locator('input[type="checkbox"]').check();
 }
@@ -79,7 +83,7 @@ test.describe("Регистрация покупателя", () => {
     const email = uniqueEmail();
     await page.goto("/register");
     await page.getByPlaceholder("you@example.ru").fill(email);
-    await page.getByPlaceholder("+7 999 123 45 67").fill("+7 900 123-45-67");
+    await page.getByPlaceholder("+7 999 123 45 67").fill(uniquePhone());
     await page.getByPlaceholder("Иванов Иван Иванович").fill("Без Согласия");
     await page.locator('input[type="password"]').fill("Passw0rd!23");
     // НЕ ставим галочку согласия

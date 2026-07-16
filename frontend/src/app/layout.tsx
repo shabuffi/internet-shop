@@ -12,7 +12,7 @@ import VkChatWidget from "@/components/VkChatWidget";
 import CookieConsent from "@/components/CookieConsent";
 // import RegisterNotice from "@/components/RegisterNotice"; // плашка скрыта по просьбе заказчика (см. ниже)
 import { SITE_URL, SITE_NAME, SITE_DESCRIPTION } from "@/lib/site";
-import { getStoreInfo } from "@/lib/api";
+import { getStoreInfo, getPromoCategories } from "@/lib/api";
 import { chatConfigFromStore } from "@/lib/chat";
 
 // Метаданные (включая <title> вкладки) берут название из настройки магазина —
@@ -55,6 +55,8 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const store = await getStoreInfo().catch(() => null);
+  // Промо-разделы меню — из конфига; недоступность API не должна ронять шапку (фолбэк: без них).
+  const promo = await getPromoCategories().catch(() => []);
   const shopName = store?.shop_name || SITE_NAME;
   const phone = store?.contact_phone || "";
   const telHref = phone ? `tel:${phone.replace(/[^+\d]/g, "")}` : "";
@@ -97,13 +99,13 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                   : <img src="/logo.svg" alt={shopName} style={{ height: 40, width: "auto", display: "block" }} />}
               </Link>
 
-              <MainNav />
+              <MainNav promo={promo} />
 
               <div className="header__actions">
                 <HeaderSearch className="hide-mobile" unified={store?.unified_search !== false} />
                 <AccountNav />
                 <CartIcon />
-                <MobileMenu />
+                <MobileMenu promo={promo} />
               </div>
             </div>
           </header>

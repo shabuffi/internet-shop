@@ -12,6 +12,8 @@ const NAV = [
   { href: "/admin/sync",     label: "Синхронизация", Icon: IconSync },
   { href: "/admin/products", label: "Товары",        Icon: IconBox },
   { href: "/admin/orders",   label: "Заказы",        Icon: IconOrders },
+  // «Промо-разделы» отдельным пунктом больше нет — это вкладка «Настройки сайта»
+  // (/admin/site?tab=promo).
   { href: "/admin/site",     label: "Настройка сайта", Icon: IconSettings },
   { href: "/admin/notifications", label: "Уведомления", Icon: IconBell },
   { href: "/admin/pages",    label: "Страницы",      Icon: IconPages },

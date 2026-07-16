@@ -78,6 +78,9 @@ button, input, textarea, select { font-family: inherit; }
 .fine  { color: var(--graphite); font-size: var(--t-xs); }
 .eyebrow { font-size: var(--t-xs); letter-spacing: .16em; text-transform: uppercase; color: var(--graphite); font-weight: 600; }
 .price { font-size: var(--t-price); font-weight: 600; letter-spacing: -.01em; font-variant-numeric: tabular-nums; }
+/* Единый показ цены: текущая (заметная) + зачёркнутая старая рядом. */
+.price-box { display: inline-flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.price--old { font-size: .82em; font-weight: 500; color: var(--ink-tertiary, #9aa0a6); text-decoration: line-through; }
 .only-mobile { display: none !important; }
 .clist-mobile { display: none; }
 
@@ -945,6 +948,13 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .
 /* «Убойные цены» — тёплый красно-оранжевый; иконка-огонёк крупнее (размер по font-size),
    бейдж чуть выше и почти квадратный, чтобы огонёк было хорошо видно */
 .pcard__promo--hot { background: color-mix(in srgb, #E4572E 92%, transparent); font-size: 19px; height: 26px; padding: 0 6px; }
+/* Иконка раздела: ровный круг, цвет — инлайном из настройки категории */
+.pcard__promo--icon { width: 26px; height: 26px; min-width: 26px; padding: 0; border-radius: 999px; }
+/* Белый штрих для набора Lucide; своя картинка обесцвечивается в белый силуэт —
+   бейджи остаются одностилевыми, чем бы ни была загруженная иконка */
+.pcard__promo__glyph { width: 15px; height: 15px; object-fit: contain; color: #fff; filter: brightness(0) invert(1); }
+/* Иконка-надпись (NEW) — контуру хватает 15px, слову нужен почти весь круг */
+.pcard__promo__glyph--text { width: 22px; height: 22px; }
 .pagination { display: flex; align-items: center; justify-content: center; gap: var(--s-2); margin-top: var(--s-12); }
 .page-dot { min-width: 42px; height: 42px; padding: 0 var(--s-3); border-radius: var(--r-md); border: 1px solid var(--hairline); background: var(--paper); color: var(--ink); font-size: var(--t-sm); font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; text-decoration: none; }
 .page-dot:hover { border-color: var(--steel); }
@@ -1087,6 +1097,11 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .
   40%, 60% { transform: translateX(5px); }
 }
 @media (prefers-reduced-motion: reduce) { .shake-a, .shake-b { animation: none; } }
+
+/* Тумблер админки: настоящий checkbox визуально скрыт, поэтому фокус с клавиатуры
+   показываем на самой дорожке — иначе Tab по тумблерам идёт вслепую */
+.adm-toggle { position: relative; }
+.adm-toggle:focus-within .adm-toggle__track { box-shadow: 0 0 0 3px var(--accent-soft), 0 0 0 4px var(--accent); }
 
 /* ── совместимость старых классов (админка использует их) ── */
 .btn-primary { background: var(--accent); color: var(--on-accent); }

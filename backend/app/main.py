@@ -58,6 +58,7 @@ from app.api.v1.endpoints.admin import router as admin_router
 from app.api.v1.endpoints.leads import router as leads_router
 from app.api.v1.endpoints.auth import router as auth_router
 from app.api.v1.endpoints.legal import router as legal_router
+from app.api.v1.endpoints.promo import router as promo_router
 
 app.include_router(exchange_router, prefix="/api/v1")
 app.include_router(products_router, prefix="/api/v1")
@@ -66,3 +67,4 @@ app.include_router(admin_router, prefix="/api/v1")
 app.include_router(leads_router, prefix="/api/v1")
 app.include_router(auth_router, prefix="/api/v1")
 app.include_router(legal_router, prefix="/api/v1")
+app.include_router(promo_router, prefix="/api/v1")

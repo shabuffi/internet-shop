@@ -3,8 +3,9 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useCart } from "@/context/CartContext";
-import { formatPrice, minOrderQty } from "@/lib/format";
+import { minOrderQty } from "@/lib/format";
 import NoPhoto from "@/components/NoPhoto";
+import ProductPrice from "@/components/ProductPrice";
 import ChestnyZnakBadge from "@/components/ChestnyZnakBadge";
 import type { Product } from "@/types/product";
 
@@ -125,7 +126,7 @@ export default function CatalogList({ products, showQty = true }: { products: Pr
                     ? <span style={{ fontSize: 13, fontWeight: 600, color: "var(--stock)" }}>{showQty ? `${p.stock} шт.` : "В наличии"}</span>
                     : <span style={{ fontSize: 13, fontWeight: 600, color: "var(--ink-tertiary)" }}>Нет</span>}
                 </td>
-                <td style={{ ...td, textAlign: "right", fontWeight: 700, whiteSpace: "nowrap" }}>{Number(p.price) > 0 ? formatPrice(p.price) : "—"}</td>
+                <td style={{ ...td, textAlign: "right", fontWeight: 700, whiteSpace: "nowrap" }}><ProductPrice p={p} priceClassName="" /></td>
                 <td style={{ ...td, textAlign: "center" }}><QtyCell product={p} /></td>
               </tr>
             ))}
@@ -147,7 +148,7 @@ export default function CatalogList({ products, showQty = true }: { products: Pr
                   fontSize: 14, lineHeight: 1.35 }}>{p.name}</Link>
               </span>
               <span style={{ fontWeight: 700, whiteSpace: "nowrap", fontSize: 14 }}>
-                {Number(p.price) > 0 ? formatPrice(p.price) : "—"}
+                <ProductPrice p={p} priceClassName="" />
               </span>
             </div>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>

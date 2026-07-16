@@ -1,16 +1,17 @@
 export const dynamic = "force-dynamic";
 
 import Link from "next/link";
-import { getCategories, getProducts, getStoreInfo } from "@/lib/api";
+import { getCategories, getProducts, getStoreInfo, getPromoCategories } from "@/lib/api";
 import { CATEGORY_GROUPS, normCatName } from "@/lib/categoryGroups";
 import { parseBrands } from "@/lib/brands";
+import { promoPath } from "@/lib/promo";
 import PromoCard from "@/components/PromoCard";
 import PromoCarousel from "@/components/PromoCarousel";
 import BrandsSlider from "@/components/BrandsSlider";
 import DeliveryMap from "@/components/DeliveryMap";
 import RegionsMarquee from "@/components/RegionsMarquee";
 import Reveal from "@/components/Reveal";
-import type { Product } from "@/types/product";
+import type { Product, PromoCategory } from "@/types/product";
 
 // Плитки категорий. `title` — ключ группы в CATEGORY_GROUPS (там список реальных категорий
 // каталога). `icon` — имя файла картинки в /public/categories/<icon>.png.
@@ -70,21 +71,18 @@ export default async function HomePage() {
   // Логотипы брендов для слайдера над футером (из настроек сайта).
   const brands = parseBrands((await getStoreInfo().catch(() => null))?.brands);
 
-  // Промо-ленты на главной наполняются ТОЛЬКО по флагам из МойСклад (доп-поля «Убойные
-  // цены»/«Новинка»/«Распродажа»). Фолбэка-подмены больше нет: если по флагу товаров нет —
-  // секцию на главной просто НЕ показываем (пункт остаётся в меню, но пустой лентой не мозолит).
-  let hot: Product[] = [];
-  let novinki: Product[] = [];
-  let special: Product[] = [];
+  // Промо-ленты на главной строятся из конфигурируемых промо-категорий (show_on_home),
+  // по порядку display_order. Новые категории появляются здесь автоматически — без правок кода.
+  // Пустые ленты (нет товаров по категории) не показываем.
+  let homeSections: { category: PromoCategory; items: Product[] }[] = [];
   try {
-    const [h, n, s] = await Promise.all([
-      getProducts({ page_size: 12, featured: "hot" }),
-      getProducts({ page_size: 12, featured: "new" }),
-      getProducts({ page_size: 12, featured: "sale" }),
-    ]);
-    hot = h.items;
-    novinki = n.items;
-    special = s.items;
+    const cats = (await getPromoCategories()).filter((c) => c.show_on_home);
+    const results = await Promise.all(
+      cats.map((c) => getProducts({ page_size: 12, featured: c.slug })),
+    );
+    homeSections = cats
+      .map((category, i) => ({ category, items: results[i].items }))
+      .filter((s) => s.items.length > 0);
   } catch { /* без товаров секции просто не покажем */ }
 
   // Ссылка плитки → каталог, отфильтрованный сразу по группе категорий (CATEGORY_GROUPS).
@@ -156,44 +154,19 @@ export default async function HomePage() {
         </div>
       </div>
 
-      {/* Убойные цены (по полю «Убойные цены» из МойСклад) — первой секцией */}
-      {hot.length > 0 && (
-        <div id="hot" className="container section section--promo">
+      {/* Промо-ленты из конфигурируемых категорий (show_on_home), по display_order.
+          Новая категория появляется здесь автоматически после включения в админке. */}
+      {homeSections.map(({ category, items }) => (
+        <div key={category.slug} id={category.slug} className="container section section--promo">
           <div className="section-head section-head--line">
-            <h2 className="section-title section-title--caps section-title--xl section-title--line">Убойные цены</h2>
-            <Link href="/hot" className="see-all">Посмотреть все <ArrowIcon size={16} /></Link>
+            <h2 className="section-title section-title--caps section-title--xl section-title--line">{category.title}</h2>
+            <Link href={promoPath(category.slug)} className="see-all">Посмотреть все <ArrowIcon size={16} /></Link>
           </div>
           <PromoCarousel>
-            {hot.map(p => <PromoCard key={p.id} p={p} kind="hot" compact />)}
+            {items.map(p => <PromoCard key={p.id} p={p} category={category} compact />)}
           </PromoCarousel>
         </div>
-      )}
-
-      {/* Новинки (по полю «Новинка» из МойСклад; нет флага — секции нет) */}
-      {novinki.length > 0 && (
-        <div id="novinki" className="container section section--promo">
-          <div className="section-head section-head--line">
-            <h2 className="section-title section-title--caps section-title--xl section-title--line">Новинки</h2>
-            <Link href="/novinki" className="see-all">Посмотреть все <ArrowIcon size={16} /></Link>
-          </div>
-          <PromoCarousel>
-            {novinki.map(p => <PromoCard key={p.id} p={p} kind="new" compact />)}
-          </PromoCarousel>
-        </div>
-      )}
-
-      {/* Спецпредложения (по полю «Распродажа/Спецпредложение» из МойСклад; нет флага — секции нет) */}
-      {special.length > 0 && (
-        <div id="special" className="container section section--promo">
-          <div className="section-head section-head--line">
-            <h2 className="section-title section-title--caps section-title--xl section-title--line">Спецпредложения</h2>
-            <Link href="/special" className="see-all">Посмотреть все <ArrowIcon size={16} /></Link>
-          </div>
-          <PromoCarousel>
-            {special.map(p => <PromoCard key={p.id} p={p} kind="sale" compact />)}
-          </PromoCarousel>
-        </div>
-      )}
+      ))}
 
       {/* Категории */}
       <div className="container section section--cats">

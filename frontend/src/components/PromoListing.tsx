@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { getProducts, getStoreInfo } from "@/lib/api";
+import type { PromoCategory } from "@/types/product";
 import PromoCard from "@/components/PromoCard";
 import HeaderSearch from "@/components/HeaderSearch";
 import CatalogList from "@/components/CatalogList";
@@ -10,12 +11,12 @@ import SortSelect from "@/components/SortSelect";
  *  (сортировка, «С фото», переключатель плитка/список) + сетка карточек (или список —
  *  «бланк заказа»). Источник — ТОЛЬКО флаг из МойСклад (kind); нет товаров — пустое состояние. */
 export default async function PromoListing({
-  basePath, title, subtitle, kind, defaultSort, params,
+  basePath, title, subtitle, category, defaultSort, params,
 }: {
   basePath: string;
   title: string;
   subtitle: string;
-  kind: "new" | "sale" | "hot";
+  category: PromoCategory;
   defaultSort: string;
   params: { view?: string; sort?: string; photo?: string; search?: string };
 }) {
@@ -26,10 +27,9 @@ export default async function PromoListing({
   // Поиск ищет ВНУТРИ раздела (search + featured комбинируются на бэкенде), а не по всему каталогу.
   const search = params.search?.trim() || undefined;
 
-  // Источник — ТОЛЬКО флаг из МойСклад («Убойные цены»/«Новинка»/«Распродажа»). kind = featured.
-  // Фолбэка на категорию/сортировку больше нет: если по флагу пусто — показываем пустое
-  // состояние, а не подменяем чужими товарами (иначе снятый в МС флаг «не убирал» товар с сайта).
-  const featured = kind;
+  // Источник — промо-категория (её slug). Фолбэка на категорию/сортировку нет: если пусто —
+  // показываем пустое состояние, а не подменяем чужими товарами.
+  const featured = category.slug;
   const pageSize = listView ? 100 : 48;
   const data = await getProducts({ page_size: pageSize, with_photo: withPhoto || undefined, sort, featured, search });
   const items = data.items;
@@ -118,7 +118,7 @@ export default async function PromoListing({
           <CatalogList products={items} showQty={showQty} />
         ) : (
           <div className="catalog-grid">
-            {items.map((p) => <PromoCard key={p.id} p={p} kind={kind} />)}
+            {items.map((p) => <PromoCard key={p.id} p={p} category={category} />)}
           </div>
         )}
       </div>

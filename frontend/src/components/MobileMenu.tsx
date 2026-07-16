@@ -4,22 +4,16 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { getMe } from "@/lib/authApi";
-
-const LINKS = [
-  { href: "/", label: "Главная" },
-  { href: "/catalog", label: "Каталог" },
-  { href: "/hot", label: "Убойные цены" },
-  { href: "/novinki", label: "Новинки" },
-  { href: "/special", label: "Спецпредложения" },
-  { href: "/about", label: "О компании" },
-  { href: "/contacts", label: "Контакты" },
-];
+import type { PromoCategory } from "@/types/product";
+import { navLinks } from "@/lib/promo";
 
 // Бургер-меню для телефона: кнопка в шапке + выезжающая панель с навигацией.
-export default function MobileMenu() {
+// Промо-разделы — из конфига (пробрасывает layout), состав совпадает с десктопным меню.
+export default function MobileMenu({ promo }: { promo?: PromoCategory[] }) {
   const [open, setOpen] = useState(false);
   const [authed, setAuthed] = useState<boolean | null>(null);
   const path = usePathname() || "/";
+  const links = navLinks(promo);
 
   // Узнаём статус входа при первом открытии меню (на мобильной шапке ссылки «Войти» нет).
   useEffect(() => {
@@ -50,7 +44,7 @@ export default function MobileMenu() {
                 <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="7" /><line x1="21" y1="21" x2="16.5" y2="16.5" /></svg>
               </button>
             </form>
-            {LINKS.map((l) => {
+            {links.map((l) => {
               const active = l.href === "/" ? path === "/" : path.startsWith(l.href);
               return (
                 <Link key={l.href} href={l.href} className={active ? "mmenu__link active" : "mmenu__link"} onClick={() => setOpen(false)}>

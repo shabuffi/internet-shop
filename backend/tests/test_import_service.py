@@ -8,6 +8,7 @@ import pytest
 
 from app.core.config import settings
 from app.db.models.product import Product, Category
+from app.db.models.promo import PromoCategory, MoySkladProperty
 from app.integrations.moysklad.commerceml_parser import ParsedCatalog, ParsedCategory, ParsedProduct
 from app.services.import_service import (
     upsert_catalog,
@@ -25,9 +26,19 @@ def isolate_media(tmp_path, monkeypatch):
     return d
 
 
-def _catalog(products, categories=None, property_names=None):
+def _catalog(products, categories=None, property_names=None, properties=None):
+    """Каталог для теста.
+
+    ``properties`` — схема доп-полей как {Ид: имя} (то, что реально шлёт МойСклад). Если не
+    задана, но заданы ``property_names``, собираем Ид автоматически — так старые тесты, которым
+    важен только факт «схема пришла», остаются читаемыми.
+    """
+    props = dict(properties or {})
+    if not props and property_names:
+        props = {f"prop-{i}": n for i, n in enumerate(sorted(property_names))}
     return ParsedCatalog(categories=categories or [], products=products,
-                         property_names=property_names or set())
+                         property_names=property_names or set(props.values()),
+                         properties=props)
 
 
 def test_upsert_creates_new(db_session):
@@ -294,8 +305,75 @@ def test_manifest_restore_skips_missing_files_and_manual(db_session, isolate_med
     assert restore_images_from_manifest(db_session) == 0   # файла нет → не восстанавливаем
 
 
-def test_upsert_sets_new_sale_flags(db_session):
-    """Флаги-галочки из доп-полей МойСклад проставляют is_new / is_sale / is_hot."""
+def _promo_fields(product) -> set[str]:
+    """Имена доп-полей МойСклад промо-категорий, к которым привязан товар (имя — из реестра)."""
+    return {c.source_field.name for c in product.promo_categories if c.source_field}
+
+
+def _configure(db, field_name: str, *, slug=None, ms_id=None) -> PromoCategory:
+    """Заводит промо-категорию, привязанную к доп-полю ``field_name`` — как это делает владелец
+    в админке (обмен категорий не создаёт, он только пополняет реестр)."""
+    prop = MoySkladProperty(id=f"reg-{field_name}", ms_property_id=ms_id, name=field_name,
+                            origin="classifier" if ms_id else "backfill")
+    cat = PromoCategory(id=f"cat-{field_name}", source_field_id=prop.id,
+                        slug=slug or f"s-{abs(hash(field_name)) % 10000}", title=field_name,
+                        is_active=True)
+    db.add_all([prop, cat])
+    db.commit()
+    return cat
+
+
+def test_upsert_does_not_autocreate_categories(db_session):
+    """Обмен НЕ заводит промо-категории сам — что считать промо, решает владелец.
+
+    Регресс на реальные прод-данные: «Минимальная единица отгрузки» имеет значение «1» у 467
+    товаров. Прежняя эвристика «значение похоже на галочку» завела бы по нему промо-категорию
+    на первом же обмене, причём несмываемо (реквизиты не приходят в схеме → членство по ним не
+    сбрасывается никогда).
+    """
+    upsert_catalog(db_session, _catalog(products=[
+        ParsedProduct(moysklad_id="p1", name="Т1",
+                      attributes=[{"name": "Минимальная единица отгрузки", "value": "1"}]),
+        ParsedProduct(moysklad_id="p2", name="Т2", attributes=[{"name": "Новинка", "value": "1"}]),
+    ], property_names={"Новинка", "Минимальная единица отгрузки"}))
+    assert db_session.query(PromoCategory).count() == 0
+    assert _promo_fields(db_session.query(Product).filter_by(moysklad_id="p1").first()) == set()
+    # ...но поля попали в реестр — владелец выберет из него нужное.
+    assert {p.name for p in db_session.query(MoySkladProperty).all()} == {
+        "Новинка", "Минимальная единица отгрузки"}
+
+
+def test_upsert_registry_latches_id_and_follows_rename(db_session):
+    """Реестр: строка без Ид «защёлкивает» его по имени, затем следует за переименованием.
+
+    Защёлка не трогает категории — ``source_field_id`` ссылается на строку реестра, а не на Ид,
+    поэтому привязка переживает и защёлку, и переименование поля в МойСклад.
+    """
+    cat = _configure(db_session, "Убойные цены")          # строка бэкфилла: ms_property_id = NULL
+    upsert_catalog(db_session, _catalog(
+        products=[ParsedProduct(moysklad_id="p", name="Т",
+                                attributes=[{"name": "Убойные цены", "value": "1"}])],
+        properties={"ms-1": "Убойные цены"}))
+    prop = db_session.query(MoySkladProperty).filter_by(name="Убойные цены").one()
+    assert prop.ms_property_id == "ms-1" and prop.origin == "classifier"   # защёлка
+    assert _promo_fields(db_session.query(Product).filter_by(moysklad_id="p").first()) == {"Убойные цены"}
+
+    # Поле переименовали в МойСклад: тот же Ид, новое имя.
+    upsert_catalog(db_session, _catalog(
+        products=[ParsedProduct(moysklad_id="p", name="Т",
+                                attributes=[{"name": "Убойные цены!", "value": "1"}])],
+        properties={"ms-1": "Убойные цены!"}))
+    db_session.expire_all()
+    assert db_session.query(MoySkladProperty).count() == 1                 # дубля не завели
+    assert db_session.get(PromoCategory, cat.id).source_field.name == "Убойные цены!"
+    # Связь не порвалась и товар не потерялся.
+    assert _promo_fields(db_session.query(Product).filter_by(moysklad_id="p").first()) == {"Убойные цены!"}
+
+
+def test_upsert_creates_promo_membership(db_session):
+    """Товары привязываются к категории по выбранному владельцем доп-полю."""
+    for f in ("Новинка", "Распродажа", "Убойные цены"):
+        _configure(db_session, f)
     upsert_catalog(db_session, _catalog(products=[
         ParsedProduct(moysklad_id="n", name="Новинка", attributes=[{"name": "Новинка", "value": "true"}]),
         ParsedProduct(moysklad_id="s", name="Спец", attributes=[{"name": "Распродажа", "value": "да"}]),
@@ -304,54 +382,74 @@ def test_upsert_sets_new_sale_flags(db_session):
         ParsedProduct(moysklad_id="off", name="Снятый", attributes=[{"name": "Новинка", "value": "false"}]),
     ]))
     g = lambda ms: db_session.query(Product).filter_by(moysklad_id=ms).first()
-    assert g("n").is_new is True and g("n").is_sale is False and g("n").is_hot is False
-    assert g("s").is_sale is True and g("s").is_new is False
-    assert g("h").is_hot is True and g("h").is_new is False and g("h").is_sale is False
-    assert g("r").is_new is False and g("r").is_sale is False and g("r").is_hot is False
-    assert g("off").is_new is False          # value "false" → флаг не стоит
+    assert _promo_fields(g("n")) == {"Новинка"}
+    assert _promo_fields(g("s")) == {"Распродажа"}
+    assert _promo_fields(g("h")) == {"Убойные цены"}
+    assert _promo_fields(g("r")) == set()      # поле не выбрано владельцем → не промо
+    assert _promo_fields(g("off")) == set()    # value "false" → членства нет
 
 
-def test_upsert_flag_recompute_clears_on_update(db_session):
-    """Снятая в МойСклад галочка снимается и у нас при следующем обмене со схемой доп-полей."""
+def test_upsert_ignores_unconfigured_category(db_session):
+    """Категория без выбранного поля (source_field_id NULL) импортом не трогается.
+
+    Так ведёт себя и «ручная» категория, и та, где владелец ещё не выбрал поле: членство
+    заморожено на том, что есть, — витрина работает, товары не теряются.
+    """
+    cat = PromoCategory(id="manual", source_field_id=None, slug="manual", title="Хит", is_active=True)
+    db_session.add(cat)
+    db_session.commit()
+    upsert_catalog(db_session, _catalog(
+        products=[ParsedProduct(moysklad_id="p", name="Т", attributes=[{"name": "Хит", "value": "1"}])],
+        property_names={"Хит"}))
+    assert _promo_fields(db_session.query(Product).filter_by(moysklad_id="p").first()) == set()
+
+
+def test_upsert_membership_clears_on_update(db_session):
+    """Снятая в МойСклад галочка снимает членство при следующем обмене со схемой доп-полей."""
+    _configure(db_session, "Новинка")
     upsert_catalog(db_session, _catalog(products=[
         ParsedProduct(moysklad_id="p1", name="Т", attributes=[{"name": "Новинка", "value": "true"}])]))
-    assert db_session.query(Product).filter_by(moysklad_id="p1").first().is_new is True
+    assert _promo_fields(db_session.query(Product).filter_by(moysklad_id="p1").first()) == {"Новинка"}
     # Следующий полный каталог: доп-поле «Новинка» всё ещё в схеме, но значения у товара нет.
     upsert_catalog(db_session, _catalog(
         products=[ParsedProduct(moysklad_id="p1", name="Т",
                                 attributes=[{"name": "Количество штук в коробке", "value": "5"}])],
         property_names={"Новинка", "Количество штук в коробке"}))
-    assert db_session.query(Product).filter_by(moysklad_id="p1").first().is_new is False
+    db_session.expire_all()
+    assert _promo_fields(db_session.query(Product).filter_by(moysklad_id="p1").first()) == set()
 
 
-def test_upsert_flag_clears_when_it_was_only_attribute(db_session):
-    """Регресс: снятая галочка сбрасывает флаг, даже если доп-поле было у товара единственным.
+def test_upsert_membership_clears_when_it_was_only_attribute(db_session):
+    """Регресс: снятая галочка снимает членство, даже если доп-поле было у товара единственным.
 
-    Раньше пересчёт был под ``if parsed_product.attributes:`` — при снятии единственного
-    доп-поля атрибуты товара пустели, пересчёт пропускался и is_sale залипал True. Теперь
-    сигнал «пришла схема доп-полей» — ``property_names`` из классификатора, а не атрибуты товара.
+    Сигнал «пришла схема доп-полей» — ``property_names`` из классификатора, а не атрибуты товара;
+    поэтому пустые атрибуты при наличии схемы всё равно снимают членство.
     """
+    _configure(db_session, "Распродажа")
     upsert_catalog(db_session, _catalog(
         products=[ParsedProduct(moysklad_id="p", name="Т", attributes=[{"name": "Распродажа", "value": "1"}])],
         property_names={"Распродажа"}))
-    assert db_session.query(Product).filter_by(moysklad_id="p").first().is_sale is True
-    # Галочку сняли → у товара НЕТ атрибутов, но схема доп-поля в обмене есть → флаг сбрасываем.
+    assert _promo_fields(db_session.query(Product).filter_by(moysklad_id="p").first()) == {"Распродажа"}
+    # Галочку сняли → у товара НЕТ атрибутов, но схема доп-поля в обмене есть → членство снимаем.
     upsert_catalog(db_session, _catalog(
         products=[ParsedProduct(moysklad_id="p", name="Т", attributes=[])],
         property_names={"Распродажа"}))
-    assert db_session.query(Product).filter_by(moysklad_id="p").first().is_sale is False
+    db_session.expire_all()
+    assert _promo_fields(db_session.query(Product).filter_by(moysklad_id="p").first()) == set()
 
 
-def test_upsert_flag_not_cleared_without_schema(db_session):
-    """«Дозаливка» без схемы доп-полей (напр. второй import.xml с картинкой) флаги НЕ трогает."""
+def test_upsert_membership_not_cleared_without_schema(db_session):
+    """«Дозаливка» без схемы доп-полей (напр. второй import.xml с картинкой) членство НЕ трогает."""
+    _configure(db_session, "Распродажа")
     upsert_catalog(db_session, _catalog(
         products=[ParsedProduct(moysklad_id="p", name="Т", attributes=[{"name": "Распродажа", "value": "1"}])],
         property_names={"Распродажа"}))
-    assert db_session.query(Product).filter_by(moysklad_id="p").first().is_sale is True
-    # Обмен без схемы (property_names пуст) — is_sale остаётся, чтобы не обнулить по ошибке.
+    assert _promo_fields(db_session.query(Product).filter_by(moysklad_id="p").first()) == {"Распродажа"}
+    # Обмен без схемы (property_names пуст) — членство остаётся, чтобы не снять по ошибке.
     upsert_catalog(db_session, _catalog(
         products=[ParsedProduct(moysklad_id="p", name="Т", attributes=[], has_image_field=True)]))
-    assert db_session.query(Product).filter_by(moysklad_id="p").first().is_sale is True
+    db_session.expire_all()
+    assert _promo_fields(db_session.query(Product).filter_by(moysklad_id="p").first()) == {"Распродажа"}
 
 
 def test_upsert_logs_counts(db_session):

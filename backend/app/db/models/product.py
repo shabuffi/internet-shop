@@ -20,6 +20,11 @@ class Category(Base):
     children: Mapped[list["Category"]] = relationship("Category")
 
 
+# NB: связь Product ↔ PromoCategory объявлена ниже как relationship(secondary=...) по имени
+# таблицы связи из db/models/promo.py — импортировать сам модуль здесь не нужно (во избежание
+# циклического импорта); SQLAlchemy разрешает строковые ссылки через общий реестр Base.
+
+
 class Product(Base):
     """Товар из МойСклад."""
     __tablename__ = "products"
@@ -57,12 +62,20 @@ class Product(Base):
     available: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
     # Флаги из МойСклад (доп-поля «Новинка»/«Распродажа»/«Убойные цены»). Проставляются при обмене;
     # в каталоге сортируем убойные → новинки → спецпредложения → остальные и фильтруем по ним.
+    # Deprecated: членство теперь в promo_categories (см. db/models/promo.py). Колонки оставлены
+    # на переходный период (backward-compat выдачи), удаляются отдельной миграцией после перехода фронта.
     is_new: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false", index=True)
     is_sale: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false", index=True)
     is_hot: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false", index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
     synced_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+    # Промо-категории товара (many-to-many; см. db/models/promo.py). secondary задан по имени
+    # таблицы связи — модуль promo не импортируем здесь, чтобы избежать циклической зависимости.
+    promo_categories: Mapped[list["PromoCategory"]] = relationship(  # noqa: F821
+        secondary="product_promo_categories", back_populates="products"
+    )
 
 
 class SyncLog(Base):

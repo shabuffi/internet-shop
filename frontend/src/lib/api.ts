@@ -1,4 +1,4 @@
-import type { Product, ProductListResponse, Category } from "@/types/product";
+import type { Product, ProductListResponse, Category, PromoCategory } from "@/types/product";
 import { cleanProductName, cleanCategoryName, isChestnyZnak } from "@/lib/format";
 
 // Чистим отображаемые имена в одной точке — на границе API, чтобы префиксы
@@ -65,7 +65,7 @@ export async function getProducts(params?: {
   category_id?: string;
   sort?: string;          // name | price_asc | price_desc
   with_photo?: boolean;   // только товары с фото
-  featured?: string;      // hot | new | sale — Убойные цены / Новинки / Спецпредложения
+  featured?: string;      // slug активной промо-категории (hot / novinki / special / …)
 }): Promise<ProductListResponse> {
   const query = new URLSearchParams();
   if (params?.page) query.set("page", String(params.page));
@@ -87,6 +87,17 @@ export async function getProduct(id: string): Promise<Product> {
 export async function getCategories(): Promise<Category[]> {
   const cats = await apiFetch<Category[]>("/products/categories");
   return cats.map((c) => ({ ...c, name: cleanCategoryName(c.name) }));
+}
+
+/** Активные промо-категории для витрины (меню, ленты главной, страницы разделов). */
+export async function getPromoCategories(): Promise<PromoCategory[]> {
+  return apiFetch<PromoCategory[]>("/promo-categories");
+}
+
+/** Одна активная промо-категория по слагу (или null). */
+export async function getPromoCategory(slug: string): Promise<PromoCategory | null> {
+  const cats = await getPromoCategories();
+  return cats.find((c) => c.slug === slug) ?? null;
 }
 
 export interface StoreInfo {

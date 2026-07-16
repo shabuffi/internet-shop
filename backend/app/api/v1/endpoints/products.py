@@ -2,15 +2,17 @@ import re
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import Response
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session, joinedload, selectinload
 from sqlalchemy import select, func, or_, and_, case
 
 from app.db.session import get_db
 from app.db.models.product import Product, Category
+from app.db.models.promo import PromoCategory, MoySkladProperty, product_promo_categories
 from app.db.models.admin import ShopSettings
 from app.schemas.product import ProductOut, ProductListOut, CategoryOut
 from app.services.media_storage import read_image
 from app.services.pricing import adjusted_price
+from app.services import promo_service
 from app.api.v1.endpoints.auth import get_optional_user
 from app.db.models.user import User
 
@@ -168,14 +170,73 @@ def _percent_for(user: User | None):
     return user.discount_percent if user is not None else None
 
 
-def _product_out(product: Product, percent=None) -> ProductOut:
-    """Сериализует товар в :class:`ProductOut` с витринной ценой.
+def _old_price_field(db: Session) -> str | None:
+    """Актуальное имя доп-поля со «старой ценой» (или None — фича не настроена).
 
-    Цена = базовая цена МойСклад + корректировка: для гостя — наценка
-    ``DEFAULT_MARKUP_PERCENT``, для вошедшего — его ``discount_percent``.
+    В настройке лежит ИД строки реестра, а имя берётся из реестра — как и у промо-категорий.
+    Поэтому переименование поля в МойСклад не рвёт привязку: имя подтягивается само. Строка
+    реестра пропала (её не удаляют, но подстрахуемся) → фича просто спит.
+    """
+    row = db.get(ShopSettings, promo_service.OLD_PRICE_SETTING_KEY)
+    prop_id = (row.value or "").strip() if row else ""
+    if not prop_id:
+        return None
+    prop = db.get(MoySkladProperty, prop_id)
+    return prop.name if prop else None
+
+
+def _hidden_attr_names(db: Session, old_price_field: str | None) -> frozenset[str]:
+    """Имена служебных доп-полей, которые НЕ показываем в характеристиках: поля всех
+    промо-категорий + «Старая цена». Данные в БД сохраняются — прячем только вывод.
+
+    Имена берём ИЗ РЕЕСТРА (join по source_field_id), а не из кэша на категории: иначе после
+    переименования поля в МойСклад фильтр отстал бы и служебное поле вылезло бы в характеристики.
+    """
+    fields = {
+        name for (name,) in db.query(MoySkladProperty.name)
+        .join(PromoCategory, PromoCategory.source_field_id == MoySkladProperty.id)
+        .all() if name
+    }
+    if old_price_field:
+        fields.add(old_price_field)
+    return frozenset(fields)
+
+
+def _product_out(product: Product, percent=None, hidden_names: frozenset[str] = frozenset(),
+                 old_price_field: str | None = None) -> ProductOut:
+    """Сериализует товар в :class:`ProductOut` с витринной ценой и промо-полями.
+
+    Цена = базовая цена МойСклад + корректировка (наценка гостя / скидка вошедшего).
+    promo_slugs/old_price/is_* и скрытие служебных доп-полей вычисляются здесь — единая точка.
     """
     po = ProductOut.model_validate(product)
     po.price = adjusted_price(po.price, percent)
+
+    # Активные промо-категории товара по возрастанию priority (первая — «основная»: её секция и
+    # её бейдж). Именно priority, а не display_order: порядок показа в меню и приоритет
+    # эксклюзивности — разные вещи (в старом коде меню hot→novinki→special, приоритет
+    # hot>special>novinki).
+    active = sorted((c for c in product.promo_categories if c.is_active),
+                    key=lambda c: c.priority)
+    po.promo_slugs = [c.slug for c in active]
+    slugs = set(po.promo_slugs)
+    # Deprecated-шим для обратной совместимости фронта.
+    po.is_hot = "hot" in slugs
+    po.is_sale = "special" in slugs
+    po.is_new = "novinki" in slugs
+
+    # «Старая цена»: показываем зачёркнутой, если она есть в доп-полях, больше текущей и хотя бы
+    # одна активная категория товара включила показ старой цены. Приводим к той же ценовой базе.
+    op = promo_service.old_price_from_attributes(product.attributes, old_price_field)
+    if op is not None and any(c.show_old_price for c in active):
+        op_adj = adjusted_price(op, percent)
+        if op_adj > po.price:
+            po.old_price = op_adj
+
+    # Прячем служебные доп-поля из характеристик (данные в БД остаются нетронутыми).
+    if po.attributes and hidden_names:
+        po.attributes = [a for a in po.attributes
+                         if (a.get("name") or "").strip() not in hidden_names] or None
     return po
 
 
@@ -187,7 +248,7 @@ def list_products(
     search: str | None = Query(None),
     sort: str | None = Query(None),
     with_photo: bool = Query(False),
-    featured: str | None = Query(None),   # hot | new | sale — «Убойные цены» / «Новинки» / «Спецпредложения»
+    featured: str | None = Query(None),   # slug активной промо-категории (hot / novinki / special / …)
     db: Session = Depends(get_db),
     user: User | None = Depends(get_optional_user),
 ):
@@ -208,7 +269,7 @@ def list_products(
     """
     query = (
         select(Product)
-        .options(joinedload(Product.category))
+        .options(joinedload(Product.category), selectinload(Product.promo_categories))
         # Товары с остатком 0 на витрине не показываем (в админке они остаются)
         .where(Product.is_active == True, Product.stock > 0)
     )
@@ -236,15 +297,26 @@ def list_products(
     if with_photo:
         query = query.where(Product.image_url.isnot(None), Product.image_url != "")
 
-    # Фильтр «Убойные цены» / «Новинки» / «Спецпредложения» (флаги из МойСклад).
-    # Приоритет (эксклюзивность секций): убойные > спецпредложения > новинки — товар с
-    # несколькими флагами показываем только в самой «сильной» секции, из остальных исключаем.
-    if featured == "hot":
-        query = query.where(Product.is_hot == True)
-    elif featured == "sale":
-        query = query.where(Product.is_sale == True, Product.is_hot == False)
-    elif featured == "new":
-        query = query.where(Product.is_new == True, Product.is_sale == False, Product.is_hot == False)
+    # Фильтр по промо-категории (slug). Эксклюзивность секций сохранена: товар показываем
+    # только в секции его «основной» (сильнейшей по priority) активной категории —
+    # из более слабых секций исключаем. Неизвестный/неактивный slug → пустая выдача.
+    if featured is not None:
+        target = db.query(PromoCategory).filter(
+            PromoCategory.slug == featured, PromoCategory.is_active == True
+        ).first()
+        if target is None:
+            return ProductListOut(items=[], total=0, page=page, page_size=page_size, pages=1)
+        members = select(product_promo_categories.c.product_id).where(
+            product_promo_categories.c.promo_category_id == target.id
+        )
+        # Более «сильные» активные категории (меньший priority) — товар уходит в них.
+        stronger = (
+            select(product_promo_categories.c.product_id)
+            .join(PromoCategory, PromoCategory.id == product_promo_categories.c.promo_category_id)
+            .where(PromoCategory.is_active == True,
+                   PromoCategory.priority < target.priority)
+        )
+        query = query.where(Product.id.in_(members), Product.id.notin_(stronger))
 
     # Имя без кода склада «с1/с2 …» и без префикса «ЧЗ» (Честный знак) —
     # для сортировки и оценки релевантности (товар «ЧЗ Апельсины» сортируется под «А»).
@@ -265,16 +337,19 @@ def list_products(
         order_cols = [relevance, clean_name.asc()]
     else:
         order_cols = [clean_name.asc()]
-    # По умолчанию сверху новинки, ниже распродажа, потом остальные (в любой категории/поиске).
-    # Приоритет распродажи: товар с обоими флагами идёт в группу распродажи (не в новинки).
+    # По умолчанию сверху — товары «сильнейших» промо-категорий (меньший priority),
+    # затем остальные. Ранг = минимальный priority среди активных категорий товара.
     # При явной сортировке по цене — не вмешиваемся (пользователь хочет чистый порядок по цене).
     if sort not in ("price_asc", "price_desc"):
-        featured_rank = case(
-            (Product.is_hot == True, 0),                                    # убойные цены → сверху
-            (Product.is_sale == True, 1),                                   # распродажа (в т.ч. с новинкой)
-            (Product.is_new == True, 2),                                     # только новинка
-            else_=3,                                                        # обычные
+        rank_subq = (
+            select(func.min(PromoCategory.priority))
+            .select_from(product_promo_categories)
+            .join(PromoCategory, PromoCategory.id == product_promo_categories.c.promo_category_id)
+            .where(product_promo_categories.c.product_id == Product.id,
+                   PromoCategory.is_active == True)
+            .scalar_subquery()
         )
+        featured_rank = func.coalesce(rank_subq, 9999)
         order_cols = [featured_rank, *order_cols]
     query = query.order_by(*order_cols)
 
@@ -282,8 +357,10 @@ def list_products(
     items = db.scalars(query.offset((page - 1) * page_size).limit(page_size)).all()
 
     percent = _percent_for(user)
+    old_price_field = _old_price_field(db)
+    hidden = _hidden_attr_names(db, old_price_field)
     return ProductListOut(
-        items=[_product_out(p, percent) for p in items],
+        items=[_product_out(p, percent, hidden, old_price_field) for p in items],
         total=total,
         page=page,
         page_size=page_size,
@@ -365,9 +442,11 @@ def get_product(product_id: str, db: Session = Depends(get_db),
     """
     product = db.scalar(
         select(Product)
-        .options(joinedload(Product.category))
+        .options(joinedload(Product.category), selectinload(Product.promo_categories))
         .where(Product.id == product_id, Product.is_active == True)
     )
     if not product:
         raise HTTPException(status_code=404, detail="Товар не найден")
-    return _product_out(product, _percent_for(user))
+    old_price_field = _old_price_field(db)
+    return _product_out(product, _percent_for(user),
+                        _hidden_attr_names(db, old_price_field), old_price_field)

@@ -26,9 +26,15 @@ class ProductOut(BaseModel):
     stock: int
     available: bool = True
     is_active: bool
-    is_new: bool = False        # флаг «Новинка» из МойСклад
-    is_sale: bool = False       # флаг «Распродажа/Спецпредложение» из МойСклад
-    is_hot: bool = False        # флаг «Убойные цены» из МойСклад
+    # Слаги активных промо-категорий товара (по возрастанию display_order; первый — «основной»).
+    promo_slugs: list[str] = []
+    # «Старая цена» для показа зачёркнутой — уже с учётом наценки/скидки и только когда её нужно
+    # показывать (см. _product_out); None — не показываем.
+    old_price: Decimal | None = None
+    # Deprecated: выводятся из membership на переходный период (пока фронт не перешёл на promo_slugs).
+    is_new: bool = False        # = принадлежит категории со слагом «novinki»
+    is_sale: bool = False       # = слаг «special»
+    is_hot: bool = False        # = слаг «hot»
     category: CategoryOut | None = None
     updated_at: datetime
 

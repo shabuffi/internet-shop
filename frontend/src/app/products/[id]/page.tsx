@@ -3,11 +3,12 @@ export const dynamic = 'force-dynamic';
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getProduct, getStoreInfo } from "@/lib/api";
-import { formatPrice, minOrderQtyText, MIN_ORDER_QTY_LABEL } from "@/lib/format";
+import { minOrderQtyText, MIN_ORDER_QTY_LABEL } from "@/lib/format";
 import AddToCartButton from "@/components/AddToCartButton";
 import CartBar from "@/components/CartBar";
 import BackButton from "@/components/BackButton";
 import ProductGallery from "@/components/ProductGallery";
+import ProductPrice from "@/components/ProductPrice";
 import ChestnyZnakBadge from "@/components/ChestnyZnakBadge";
 import { chatConfigFromStore, buildChatUrl, isChatReady } from "@/lib/chat";
 import { IconChat } from "@/components/icons";
@@ -65,11 +66,10 @@ export default async function ProductPage({ params }: Props) {
   // Характеристики = модификации/реквизиты из МойСклад + базовые поля товара в одной таблице.
   // Поле «минимальное количество» выносим отдельной строкой с понятным названием и показываем
   // у ВСЕХ товаров (если не задано — «—»), поэтому исключаем его из общего списка реквизитов.
+  // Служебные промо-поля и «Старую цену» вырезает backend при сериализации — фильтровать здесь
+  // не нужно.
   const attributes = (product.attributes?.filter((item) => item.name && item.value) ?? [])
-    .filter((x) => !/минимальн.*(единиц.*отгрузк|количеств)/iu.test(x.name))
-    // Флаги «Новинка»/«Распродажа»/«Убойные цены» — служебные (для сортировки/лент),
-    // в характеристиках товара их не показываем (шаблоны как в backend import_service).
-    .filter((x) => !/новин|распродаж|спецпредлож|акци|скидк|убойн/iu.test(x.name));
+    .filter((x) => !/минимальн.*(единиц.*отгрузк|количеств)/iu.test(x.name));
   const specs: { name: string; value: string }[] = [
     { name: MIN_ORDER_QTY_LABEL, value: minOrderQtyText(product.attributes) },
     ...attributes,
@@ -117,7 +117,7 @@ export default async function ProductPage({ params }: Props) {
               {showQty && inStock && <span className="pdp__sku">Остаток: {stockLabel}</span>}
             </div>
 
-            <div className="pdp__price">{formatPrice(product.price)}</div>
+            <div className="pdp__price"><ProductPrice p={product} priceClassName="" /></div>
 
             <AddToCartButton product={product} />
 
