@@ -291,8 +291,10 @@ export default function PromoCategoriesPanel() {
 
         {/* ─── Шапка ─── */}
         {/* Заголовка нет намеренно: имя раздела уже написано на вкладке. */}
-        <header style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16 }}>
-          <div>
+        {/* wrap: кнопка не сжимается, поэтому на узком экране без переноса пояснению
+            оставалось бы по одному слову в строке — уводим кнопку на свою строку. */}
+        <header style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
+          <div style={{ flex: "1 1 260px", minWidth: 0 }}>
             <p style={{ margin: 0, fontSize: 13.5, color: "var(--ink-secondary)", maxWidth: 640 }}>
               Разделы вроде «Убойные цены» или «Новинки». Товар попадает в раздел, если в МойСклад
               у него заполнено выбранное здесь доп-поле.
@@ -349,7 +351,7 @@ export default function PromoCategoriesPanel() {
         {creating && (
           <div style={{ ...card, borderColor: "var(--accent)", background: "var(--accent-soft)" }}>
             <h2 style={{ margin: "0 0 14px", fontSize: 15, fontWeight: 700 }}>Новый раздел</h2>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+            <div className="promo-adm__new">
               <label style={fieldCol}>
                 <span className="form-label">Название на сайте</span>
                 <input
@@ -366,7 +368,7 @@ export default function PromoCategoriesPanel() {
                 <FieldSelect value={newField} props={props} onChange={setNewField} />
               </label>
             </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 16 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 16, flexWrap: "wrap" }}>
               <button className="btn btn-primary" disabled={!newTitle.trim()} onClick={() => void create()}>
                 Создать
               </button>
@@ -419,14 +421,12 @@ export default function PromoCategoriesPanel() {
             </p>
           </div>
         ) : (
-          <div style={{
-            display: "grid", gap: 16,
-            gridTemplateColumns: "repeat(auto-fill, minmax(430px, 1fr))",
-          }}>
+          <div className="promo-adm__list">
             {cats.map((c) => {
               const unconfigured = !c.source_field_id;
               return (
-                <div key={c.id} style={{ ...card, display: "flex", flexDirection: "column", gap: 14 }}>
+                <div key={c.id} className="promo-adm__card"
+                  style={{ ...card, display: "flex", flexDirection: "column", gap: 14 }}>
 
                   {/* Шапка карточки: иконка · название · статусы · действия */}
                   <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
@@ -497,7 +497,7 @@ export default function PromoCategoriesPanel() {
                   )}
 
                   {/* Источник + числа: связанные поля рядом */}
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 92px 92px", gap: 10, alignItems: "end" }}>
+                  <div className="promo-adm__meta">
                     <label style={fieldCol}>
                       <FieldLabel text="Доп-поле МойСклад" hint="Поле, по которому товары автоматически попадают в данный раздел." />
                       <FieldSelect
@@ -564,7 +564,7 @@ export default function PromoCategoriesPanel() {
                   </label>
 
                   {/* Тумблеры */}
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                  <div className="promo-adm__toggles">
                     <AdminToggle
                       label="Показывать раздел" hint="Виден на сайте"
                       labelHint="Неактивный раздел не отображается на сайте и не участвует в распределении товаров."

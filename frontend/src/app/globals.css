@@ -417,7 +417,9 @@ button, input, textarea, select { font-family: inherit; }
   position: relative;
   z-index: 1;
   max-height: 118px;
-  max-width: 170px;
+  /* min(...,100%), а не 170px: фиксированная ширина задаёт плитке min-content, из-за
+     которого грид-трек не мог сжаться и сетка вылезала за экран на узких телефонах. */
+  max-width: min(170px, 100%);
   width: auto;
   height: auto;
   object-fit: contain;
@@ -1100,8 +1102,43 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .
 
 /* Тумблер админки: настоящий checkbox визуально скрыт, поэтому фокус с клавиатуры
    показываем на самой дорожке — иначе Tab по тумблерам идёт вслепую */
-.adm-toggle { position: relative; }
+.adm-toggle { position: relative; padding: 10px 12px; }
 .adm-toggle:focus-within .adm-toggle__track { box-shadow: 0 0 0 3px var(--accent-soft), 0 0 0 4px var(--accent); }
+
+/* ---------- админка: карточки промо-разделов ---------- */
+/* min(430px, 100%), а не голый 430px: минимум трека — жёсткий пол, сжать который нельзя,
+   поэтому на экране уже 430px карточка вылезала за край экрана. 100% ограничивает пол
+   шириной контейнера, и карточка всегда влезает. */
+.promo-adm__list {
+  display: grid; gap: 16px;
+  grid-template-columns: repeat(auto-fill, minmax(min(430px, 100%), 1fr));
+}
+/* Карточка — контейнер запроса: внутренние сетки перестраиваются по ширине КАРТОЧКИ, а не
+   экрана. Брейкпоинт по экрану тут врал бы: карточек в ряду может быть одна или несколько
+   (auto-fill), т.е. одной ширине экрана отвечают разные ширины карточки. */
+.promo-adm__card { container-type: inline-size; }
+/* Доп-поле · Порядок · Приоритет. minmax(0, 1fr), а не 1fr: голый 1fr = minmax(auto, 1fr),
+   и `auto` не даёт колонке стать уже min-content подписи — трек распирало. */
+.promo-adm__meta {
+  display: grid; grid-template-columns: minmax(0, 1fr) 92px 92px; gap: 10px; align-items: end;
+}
+.promo-adm__meta > label { min-width: 0; }
+.promo-adm__toggles { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+/* Узкая карточка: числа переезжают под поле, тумблеры — в одну колонку. 340px — ширина
+   контента карточки, ниже которой «1fr 92px 92px» (нужно ~301px) и два тумблера в ряд
+   (нужно ~334px) перестают помещаться. На ПК карточка ≥384px — вид не меняется. */
+@container (max-width: 340px) {
+  .promo-adm__meta { grid-template-columns: 1fr 1fr; }
+  .promo-adm__meta > :first-child { grid-column: 1 / -1; }
+  /* В колонку тумблеры лежат сплошной лентой — плашки почти смыкаются. Даём воздух между
+     ними и возвращаем его, ужимая сам блок: высота столбца не растёт, а граница между
+     соседними плашками читается. */
+  .promo-adm__toggles { grid-template-columns: 1fr; gap: 14px; }
+  .promo-adm__toggles .adm-toggle { padding: 7px 12px; }
+}
+/* Форма «Новый раздел» тянется во всю ширину страницы — ей брейкпоинт по экрану и нужен */
+.promo-adm__new { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+@media (max-width: 560px) { .promo-adm__new { grid-template-columns: 1fr; } }
 
 /* ── совместимость старых классов (админка использует их) ── */
 .btn-primary { background: var(--accent); color: var(--on-accent); }
@@ -1177,14 +1214,17 @@ textarea.form-input { height: auto; min-height: 90px; padding: var(--s-3) var(--
   .trust-item .ic img { width: 62px; height: 62px; }
   .trust-item .big { font-size: 17px; }
   .trust-item .small { font-size: 11px; line-height: 1.2; }
-  .cat-grid { grid-template-columns: 1fr 1fr; gap: var(--s-3); }
+  /* minmax(0, 1fr), а не 1fr: голый 1fr = minmax(auto, 1fr), и `auto` не даёт колонке
+     стать уже min-content плитки — трек распирало до ширины картинки и сетка вылезала
+     за экран (см. max-width картинки ниже). */
+  .cat-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--s-3); }
   /* Секция «Популярные разделы» на мобильном: меньше пустоты сверху (иначе двойной
      отступ с предыдущей секцией) и больше воздуха снизу — чтобы нижний ряд карточек
      не примыкал к синему футеру. */
   .section--cats { padding-top: var(--s-6); padding-bottom: var(--s-16); }
   .cat-tile { min-height: 0; }
   .cat-tile__media { height: 124px; padding: var(--s-4); }
-  .cat-tile__media img { max-height: 86px; max-width: 132px; }
+  .cat-tile__media img { max-height: 86px; max-width: min(132px, 100%); }
   .cat-tile__body { padding: var(--s-4); }
   .cat-tile__name { font-size: var(--t-body); }
   .home-hero__grid { padding-top: var(--s-12); gap: var(--s-8); }

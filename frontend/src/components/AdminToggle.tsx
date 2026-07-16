@@ -1,10 +1,15 @@
 "use client";
 
+import { useId } from "react";
+
 import HelpHint from "@/components/HelpHint";
 
 /** Тумблер админки: подпись + пояснение слева, переключатель справа. Вся строка кликабельна.
- *  labelHint — значок «?» рядом с подписью с развёрнутым пояснением (клик по нему не переключает
- *  тумблер: браузер не активирует label при клике по вложенной кнопке). */
+ *  labelHint — значок «?» рядом с подписью с развёрнутым пояснением.
+ *
+ *  htmlFor/id обязательны: без явной привязки label активирует ПЕРВЫЙ labelable-потомок, а им
+ *  оказывается кнопка «?» из HelpHint (она стоит в разметке раньше чекбокса) — тогда клик по
+ *  любому месту строки открывает подсказку вместо переключения, и onChange не срабатывает. */
 export default function AdminToggle({
   checked, onChange, label, hint, labelHint, disabled = false,
 }: {
@@ -15,12 +20,16 @@ export default function AdminToggle({
   labelHint?: string;
   disabled?: boolean;
 }) {
+  const id = useId();
   return (
     <label
+      htmlFor={id}
       className="adm-toggle"
       style={{
+        // padding живёт в CSS (.adm-toggle), а не здесь: инлайн-стиль не перебить
+        // медиа-/контейнер-запросом, а на узкой карточке тумблер ужимается.
         display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12,
-        padding: "10px 12px", borderRadius: "var(--r-md)",
+        borderRadius: "var(--r-md)",
         background: checked ? "var(--accent-soft)" : "var(--cloud)",
         border: `1px solid ${checked ? "color-mix(in srgb, var(--accent) 25%, transparent)" : "transparent"}`,
         cursor: disabled ? "not-allowed" : "pointer",
@@ -40,6 +49,7 @@ export default function AdminToggle({
 
       {/* Настоящий checkbox оставляем в разметке (доступность, клавиатура), прячем визуально. */}
       <input
+        id={id}
         type="checkbox"
         checked={checked}
         disabled={disabled}

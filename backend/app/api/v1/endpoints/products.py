@@ -49,6 +49,88 @@ def _layout_variants(s: str) -> list[str]:
     return variants
 
 
+# --- Порядок категорий (единый источник правды для фильтра и сортировки «По категориям») ---
+# Иерархия у этого каталога зашита в числовом код-префиксе имени («001», «001.02»), а не в
+# parent_id. Эти три чистые функции задают: код категории, алфавитный ключ и ключ «как в
+# МойСклад» (по сегментам кода как по числам). Их используют и list_categories, и сортировка
+# товаров — правило порядка должно быть одно.
+def _cat_code(name: str) -> str | None:
+    m = re.match(r"\s*([\d.]+)", name)
+    return m.group(1).rstrip(".") if m and m.group(1).strip(".") else None
+
+
+def _cat_sort_key(name: str) -> str:
+    # Имя без числового код-префикса (как cleanCategoryName на фронте), в нижнем регистре,
+    # ё→е — для стабильной алфавитной сортировки по-русски.
+    cleaned = re.sub(r"^\d[\d.]*\.[\d.]*\s+", "", name).strip() or name
+    return cleaned.casefold().replace("ё", "е")
+
+
+def _cat_ms_key(name: str) -> tuple:
+    # Числовой код-префикс кодирует порядок из МойСклад — сравниваем сегменты как числа.
+    # Категории без кода — в конец, между собой по алфавиту (стабильно).
+    code = _cat_code(name)
+    if code:
+        try:
+            return (0, tuple(int(s) for s in code.split(".") if s))
+        except ValueError:
+            pass
+    return (1, _cat_sort_key(name))
+
+
+def _category_order_index(db: Session) -> dict[str, int]:
+    """Позиция каждой категории в порядке показа витрины — тот же порядок, что отдаёт
+    ``list_categories`` (дерево: дети идут за родителем; порядок уровня — режим ``category_sort``
+    из настроек: код МойСклад или алфавит). Нужна для сортировки товаров «По категориям».
+
+    Фильтр по остатку тут не нужен: пустые категории просто не встретятся среди товаров.
+
+    Returns:
+        ``{category_id: порядковый_номер}`` — меньше номер, раньше показывается.
+    """
+    cats = db.scalars(select(Category)).all()
+
+    by_code: dict[str, Category] = {}
+    for c in cats:
+        code = _cat_code(c.name)
+        if code:
+            by_code[code] = c
+
+    def parent_code(code: str) -> str | None:
+        segs = code.split(".")
+        while len(segs) > 1:
+            segs = segs[:-1]
+            p = ".".join(segs)
+            if p in by_code:
+                return p
+        return None
+
+    info: dict[str, tuple[str | None, tuple, str]] = {}
+    for c in cats:
+        code = _cat_code(c.name)
+        pc = parent_code(code) if code else None
+        info[c.id] = (by_code[pc].id if pc else None, _cat_ms_key(c.name), _cat_sort_key(c.name))
+
+    children: dict[str | None, list[str]] = {}
+    for cid, (pid, _m, _k) in info.items():
+        children.setdefault(pid, []).append(cid)
+
+    mode_row = db.get(ShopSettings, "category_sort")
+    mode = mode_row.value if mode_row else "moysklad"
+    key_idx = 2 if mode == "alpha" else 1  # info[..][2] — алфавит, [1] — порядок МойСклад
+
+    order: dict[str, int] = {}
+
+    def walk(cid: str) -> None:
+        order[cid] = len(order)
+        for ch in sorted(children.get(cid, []), key=lambda x: info[x][key_idx]):
+            walk(ch)
+
+    for cid in sorted(children.get(None, []), key=lambda x: info[x][key_idx]):
+        walk(cid)
+    return order
+
+
 @router.get("/categories", response_model=list[CategoryOut])
 def list_categories(db: Session = Depends(get_db)):
     """Возвращает категории с вычисленной вложенностью (для фильтра на витрине).
@@ -78,13 +160,9 @@ def list_categories(db: Session = Depends(get_db)):
     ).all()
     counts: dict[str, int] = {cid: n for cid, n in count_rows}
 
-    def code_of(name: str) -> str | None:
-        m = re.match(r"\s*([\d.]+)", name)
-        return m.group(1).rstrip(".") if m and m.group(1).strip(".") else None
-
     by_code: dict[str, Category] = {}
     for c in cats:
-        code = code_of(c.name)
+        code = _cat_code(c.name)
         if code:
             by_code[code] = c
 
@@ -105,24 +183,8 @@ def list_categories(db: Session = Depends(get_db)):
                 d += 1
         return d
 
-    def sort_key(name: str) -> str:
-        # Ключ = отображаемое имя без числового код-префикса (как cleanCategoryName на фронте),
-        # в нижнем регистре, ё→е — для стабильной алфавитной сортировки по-русски.
-        cleaned = re.sub(r"^\d[\d.]*\.[\d.]*\s+", "", name).strip() or name
-        return cleaned.casefold().replace("ё", "е")
-
-    def ms_key(name: str) -> tuple:
-        # Ключ «как в МойСклад»: числовой код-префикс имени (001, 001.02) кодирует порядок,
-        # заданный в МойСклад, — сортируем по сегментам как по числам. Категории без кода — в
-        # конец, между собой по алфавиту (стабильно). Сравниваются только ключи одного уровня.
-        code = code_of(name)
-        if code:
-            try:
-                return (0, tuple(int(s) for s in code.split(".") if s))
-            except ValueError:
-                pass
-        return (1, sort_key(name))
-
+    # Ключи порядка (алфавит / «как в МойСклад») — общие с сортировкой товаров: _cat_sort_key /
+    # _cat_ms_key на уровне модуля.
     # Режим сортировки категорий из настроек магазина: «moysklad» (порядок МойСклад,
     # рекомендуемый) или «alpha» (по алфавиту). Влияет только на порядок вывода.
     mode_row = db.get(ShopSettings, "category_sort")
@@ -132,12 +194,12 @@ def list_categories(db: Session = Depends(get_db)):
     # parent_id / depth для каждой категории (иерархия — из кода; без кода — корень)
     info: dict[str, tuple[str | None, int, str, Category, tuple]] = {}
     for c in cats:
-        code = code_of(c.name)
+        code = _cat_code(c.name)
         if code:
             pc = parent_code(code)
-            info[c.id] = (by_code[pc].id if pc else None, depth_of(code), sort_key(c.name), c, ms_key(c.name))
+            info[c.id] = (by_code[pc].id if pc else None, depth_of(code), _cat_sort_key(c.name), c, _cat_ms_key(c.name))
         else:
-            info[c.id] = (None, 0, sort_key(c.name), c, ms_key(c.name))
+            info[c.id] = (None, 0, _cat_sort_key(c.name), c, _cat_ms_key(c.name))
 
     children: dict[str | None, list[str]] = {}
     for cid, (pid, _d, _k, _c, _m) in info.items():
@@ -259,8 +321,9 @@ def list_products(
         page_size: Размер страницы (1–100).
         category_id: Если задан — фильтр по категории.
         search: Если задан — поиск без учёта регистра по названию или артикулу.
-        sort: Порядок: ``price_asc`` / ``price_desc`` / ``name`` (по умолчанию — name).
-            При сортировке по имени отбрасываем код склада в начале («с1/с2 …»).
+        sort: Порядок: ``price_asc`` / ``price_desc`` / ``category`` / ``name`` (по умолчанию —
+            name). При сортировке по имени отбрасываем код склада в начале («с1/с2 …»).
+            ``category`` — блоками в порядке показа категорий, внутри блока по алфавиту.
         db: Сессия БД.
 
     Returns:
@@ -326,6 +389,19 @@ def list_products(
         order_cols = [Product.price.asc()]
     elif sort == "price_desc":
         order_cols = [Product.price.desc()]
+    elif sort == "category":
+        # «По категориям»: товары идут блоками в порядке показа категорий (тот же порядок, что в
+        # фильтре и меню), внутри блока — по алфавиту. Позицию категории берём из общего источника
+        # (_category_order_index). Товары без категории / вне индекса — в конец.
+        order_index = _category_order_index(db)
+        if order_index:
+            cat_pos = case(
+                *[(Product.category_id == cid, pos) for cid, pos in order_index.items()],
+                else_=len(order_index),
+            )
+            order_cols = [cat_pos, clean_name.asc()]
+        else:
+            order_cols = [clean_name.asc()]
     elif search:
         # Релевантность: точное совпадение названия → название начинается с запроса → прочее.
         q = search.strip()
@@ -340,6 +416,8 @@ def list_products(
     # По умолчанию сверху — товары «сильнейших» промо-категорий (меньший priority),
     # затем остальные. Ранг = минимальный priority среди активных категорий товара.
     # При явной сортировке по цене — не вмешиваемся (пользователь хочет чистый порядок по цене).
+    # Во всех остальных режимах (в т.ч. «По категориям», дефолт витрины) промо-товары идут СВЕРХУ,
+    # независимо от порядка: сначала промо-блок, внутри него — тот же порядок (категории/алфавит).
     if sort not in ("price_asc", "price_desc"):
         rank_subq = (
             select(func.min(PromoCategory.priority))

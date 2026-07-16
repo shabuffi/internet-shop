@@ -28,7 +28,10 @@ function buildHref(params: { category_id?: string; search?: string; page?: numbe
   if (params.category_id) q.set("category_id", params.category_id);
   if (params.search) q.set("search", params.search);
   if (params.view) q.set("view", params.view);
-  if (params.sort && params.sort !== "name") q.set("sort", params.sort);
+  // Дефолт целевого контекста ссылки не пишем в URL (чистые ссылки). Та же логика, что defaultSort
+  // ниже: «Все категории» без поиска → «category», иначе → «name».
+  const dft = !params.category_id && !params.search ? "category" : "name";
+  if (params.sort && params.sort !== dft) q.set("sort", params.sort);
   if (params.photo) q.set("photo", "1");
   if (params.page && params.page > 1) q.set("page", String(params.page));
   const s = q.toString();
@@ -86,7 +89,15 @@ export default async function CatalogPage({ searchParams }: Props) {
   const page = Math.max(1, parseInt(params.page ?? "1", 10) || 1);
   const view = params.view === "list" ? "list" : "grid";
   const listView = view === "list";
-  const sort = params.sort === "price_asc" || params.sort === "price_desc" ? params.sort : "name";
+  // Явно выбранная сортировка (или undefined → действует дефолт). В ссылках тащим именно
+  // explicitSort: дефолт в URL не пишем и не «залипаем» на нём при смене категории/сбросе поиска.
+  const explicitSort =
+    params.sort === "price_asc" || params.sort === "price_desc" ||
+    params.sort === "name" || params.sort === "category" ? params.sort : undefined;
+  // Дефолт: «Все категории» без поиска → «По категориям»; иначе — по алфавиту (в категории блоки
+  // не нужны; при поиске «name» уходит в релевантность). Совпадает с defaultSort в SortSelect.
+  const defaultSort = !categoryId && !search ? "category" : "name";
+  const sort = explicitSort ?? defaultSort;
   const withPhoto = params.photo === "1";
 
   const [data, categories, store, promo] = await Promise.all([
@@ -147,7 +158,7 @@ export default async function CatalogPage({ searchParams }: Props) {
                   <span key={c.id}>
                     {" → "}
                     {i < categoryPath.length - 1 ? (
-                      <Link href={buildHref({ category_id: c.id, view: listView ? "list" : undefined, sort, photo: withPhoto })}
+                      <Link href={buildHref({ category_id: c.id, view: listView ? "list" : undefined, sort: explicitSort, photo: withPhoto })}
                         style={{ color: "var(--accent)", textDecoration: "underline" }}>{c.name}</Link>
                     ) : (
                       <b>{c.name}</b>
@@ -173,7 +184,7 @@ export default async function CatalogPage({ searchParams }: Props) {
           <div className="active-filter">
             <span>Поиск: <b>«{search}»</b></span>
             <Link className="active-filter__reset"
-              href={buildHref({ category_id: categoryId, sort, view: listView ? "list" : undefined, photo: withPhoto })}>
+              href={buildHref({ category_id: categoryId, sort: explicitSort, view: listView ? "list" : undefined, photo: withPhoto })}>
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" aria-hidden="true"><line x1="6" y1="6" x2="18" y2="18" /><line x1="18" y1="6" x2="6" y2="18" /></svg>
               Сбросить поиск
             </Link>
@@ -181,9 +192,9 @@ export default async function CatalogPage({ searchParams }: Props) {
         )}
         {/* Тулбар: фильтры + сортировка + переключатель режима + счётчик */}
         <div className="toolbar">
-          <CategorySelect categories={categories} current={categoryId} search={search} view={listView ? "list" : undefined} sort={sort} photo={withPhoto} />
-          <SortSelect current={sort} categoryId={categoryId} search={search} view={listView ? "list" : undefined} photo={withPhoto} />
-          <Link href={buildHref({ category_id: categoryId, search, sort, view: listView ? "list" : undefined, photo: !withPhoto })}
+          <CategorySelect categories={categories} current={categoryId} search={search} view={listView ? "list" : undefined} sort={explicitSort} photo={withPhoto} />
+          <SortSelect current={sort} categoryId={categoryId} search={search} view={listView ? "list" : undefined} photo={withPhoto} withCategory />
+          <Link href={buildHref({ category_id: categoryId, search, sort: explicitSort, view: listView ? "list" : undefined, photo: !withPhoto })}
             style={{ display: "inline-flex", alignItems: "center", gap: 8, height: 40, padding: "0 14px", borderRadius: 10,
               border: "1px solid " + (withPhoto ? "var(--accent)" : "color-mix(in srgb, var(--accent), #fff 55%)"),
               background: withPhoto ? "var(--accent)" : "var(--paper)", color: withPhoto ? "var(--on-accent)" : "var(--ink)",
@@ -193,8 +204,8 @@ export default async function CatalogPage({ searchParams }: Props) {
           </Link>
           <div style={{ display: "flex", alignItems: "center", gap: "var(--s-4)", marginLeft: "auto" }}>
             <div style={{ display: "inline-flex", border: "1px solid var(--hairline)", borderRadius: 8, overflow: "hidden" }}>
-              <Link href={buildHref({ category_id: categoryId, search, sort, photo: withPhoto })} style={toggle(!listView)} title="Плиткой" aria-label="Плиткой">{IconGrid}</Link>
-              <Link href={buildHref({ category_id: categoryId, search, sort, photo: withPhoto, view: "list" })} style={toggle(listView)} title="Списком (бланк заказа)" aria-label="Списком (бланк заказа)">{IconRows}</Link>
+              <Link href={buildHref({ category_id: categoryId, search, sort: explicitSort, photo: withPhoto })} style={toggle(!listView)} title="Плиткой" aria-label="Плиткой">{IconGrid}</Link>
+              <Link href={buildHref({ category_id: categoryId, search, sort: explicitSort, photo: withPhoto, view: "list" })} style={toggle(listView)} title="Списком (бланк заказа)" aria-label="Списком (бланк заказа)">{IconRows}</Link>
             </div>
             <span className="result-count">{data.total} товаров</span>
           </div>
@@ -212,7 +223,7 @@ export default async function CatalogPage({ searchParams }: Props) {
                 </p>
                 {totalWithoutCategory > 0 ? (
                   <Link className="btn btn--primary"
-                    href={buildHref({ search, sort, view: listView ? "list" : undefined, photo: withPhoto })}>
+                    href={buildHref({ search, sort: explicitSort, view: listView ? "list" : undefined, photo: withPhoto })}>
                     Искать во всех категориях ({totalWithoutCategory})
                   </Link>
                 ) : (
@@ -272,14 +283,14 @@ export default async function CatalogPage({ searchParams }: Props) {
             {data.pages > 1 && (
               <div className="pagination">
                 {page > 1
-                  ? <Link href={buildHref({ category_id: categoryId, search, sort, photo: withPhoto, page: page - 1, view: listView ? "list" : undefined })} className="page-dot" aria-label="Назад">‹</Link>
+                  ? <Link href={buildHref({ category_id: categoryId, search, sort: explicitSort, photo: withPhoto, page: page - 1, view: listView ? "list" : undefined })} className="page-dot" aria-label="Назад">‹</Link>
                   : <span className="page-dot page-dot--disabled">‹</span>}
                 {pageNumbers(page, data.pages).map((n) => (
-                  <Link key={n} href={buildHref({ category_id: categoryId, search, sort, photo: withPhoto, page: n, view: listView ? "list" : undefined })}
+                  <Link key={n} href={buildHref({ category_id: categoryId, search, sort: explicitSort, photo: withPhoto, page: n, view: listView ? "list" : undefined })}
                     className={"page-dot " + (n === page ? "page-dot--active" : "")}>{n}</Link>
                 ))}
                 {page < data.pages
-                  ? <Link href={buildHref({ category_id: categoryId, search, sort, photo: withPhoto, page: page + 1, view: listView ? "list" : undefined })} className="page-dot" aria-label="Вперёд">›</Link>
+                  ? <Link href={buildHref({ category_id: categoryId, search, sort: explicitSort, photo: withPhoto, page: page + 1, view: listView ? "list" : undefined })} className="page-dot" aria-label="Вперёд">›</Link>
                   : <span className="page-dot page-dot--disabled">›</span>}
               </div>
             )}

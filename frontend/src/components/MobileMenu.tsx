@@ -6,10 +6,12 @@ import { usePathname } from "next/navigation";
 import { getMe } from "@/lib/authApi";
 import type { PromoCategory } from "@/types/product";
 import { navLinks } from "@/lib/promo";
+import HeaderSearch from "@/components/HeaderSearch";
 
 // Бургер-меню для телефона: кнопка в шапке + выезжающая панель с навигацией.
 // Промо-разделы — из конфига (пробрасывает layout), состав совпадает с десктопным меню.
-export default function MobileMenu({ promo }: { promo?: PromoCategory[] }) {
+// `unified` — та же настройка «единого поиска», что и в десктопной шапке (пробрасывает layout).
+export default function MobileMenu({ promo, unified }: { promo?: PromoCategory[]; unified?: boolean }) {
   const [open, setOpen] = useState(false);
   const [authed, setAuthed] = useState<boolean | null>(null);
   const path = usePathname() || "/";
@@ -36,14 +38,12 @@ export default function MobileMenu({ promo }: { promo?: PromoCategory[] }) {
                 <line x1="6" y1="6" x2="18" y2="18" /><line x1="18" y1="6" x2="6" y2="18" />
               </svg>
             </button>
-            {/* Поиск прямо в меню — доступен с любой страницы */}
-            <form action="/catalog" method="get" className="search search--full" role="search"
-              style={{ marginBottom: "var(--s-4)" }} onSubmit={() => setOpen(false)}>
-              <input name="search" placeholder="Поиск товаров…" aria-label="Поиск товаров" autoComplete="off" />
-              <button type="submit" className="search__btn" aria-label="Найти">
-                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="7" /><line x1="21" y1="21" x2="16.5" y2="16.5" /></svg>
-              </button>
-            </form>
+            {/* Поиск прямо в меню — тот же компонент, что в десктопной шапке (единая логика:
+                липкое значение, крестик очистки, сохранение фильтров, единый/секционный поиск).
+                Submit — обычная GET-навигация, она же закрывает меню (страница перезагружается). */}
+            <div style={{ marginBottom: "var(--s-4)" }}>
+              <HeaderSearch className="search--full" unified={unified} />
+            </div>
             {links.map((l) => {
               const active = l.href === "/" ? path === "/" : path.startsWith(l.href);
               return (
