@@ -1601,6 +1601,8 @@ def list_promo_categories_admin(db: Session = Depends(get_db), _=Depends(_get_cu
     membership = dict(
         db.execute(
             select(product_promo_categories.c.promo_category_id, func.count())
+            .join(Product, Product.id == product_promo_categories.c.product_id)
+            .where(Product.is_active == True)   # noqa: E712 — архивных на витрине нет
             .group_by(product_promo_categories.c.promo_category_id)
         ).all()
     )
