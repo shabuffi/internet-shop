@@ -11,7 +11,7 @@ from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, UploadFile, File, Query
 from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, aliased
 from sqlalchemy import func, or_, select
 from sqlalchemy.exc import IntegrityError
 
@@ -1586,16 +1586,18 @@ def list_moysklad_properties(db: Session = Depends(get_db), _=Depends(_get_curre
 
 @router.get("/promo-categories")
 def list_promo_categories_admin(db: Session = Depends(get_db), _=Depends(_get_current_admin)):
-    """Все промо-категории для админки (с числом товаров и подписью выбранного доп-поля).
+    """Все промо-категории для админки. Два числа на карточку — разной природы:
 
-    ``product_count`` считаем ПО ВЫБРАННОМУ ДОП-ПОЛЮ (товары с включённой галочкой), а не по
-    таблице членства: членство пересобирает только обмен, поэтому сразу после смены поля бейдж
-    показывал бы состав по старому полю, а рядом, в выпадающем списке, стояло бы число по
-    новому — те самые «непонятные числа». Теперь оба числа считаются одинаково и совпадают,
-    а витрина догоняет их на ближайшем обмене.
+    ``product_count`` — сколько товаров ПОПАДЁТ в раздел: активные с включённой галочкой в
+    выбранном доп-поле (а не по таблице членства — членство пересобирает только обмен, поэтому
+    сразу после смены поля бейдж показывал бы состав по старому полю). У категории без поля
+    (``source_field_id`` NULL) считать по полю нечего — берём размер её членства.
 
-    У категории без поля (``source_field_id`` NULL) считать по полю нечего — там членство
-    заморожено, и его размер и есть честное число.
+    ``visible_count`` — сколько СЕЙЧАС видно на сайте: точное число со страницы раздела. Товар
+    попадает сюда, если он в членстве, активен, с остатком > 0 и не ушёл в более «сильную»
+    активную категорию — тот же ``featured``-фильтр, что в products.py. Отсюда честная картина
+    «в поле 37, а на сайте 0» у распроданного раздела: остаток в первое число намеренно не
+    входит (он временный), а второе показывает фактическую витрину.
     """
     from app.schemas.promo import PromoCategoryAdmin
     membership = dict(
@@ -1607,6 +1609,33 @@ def list_promo_categories_admin(db: Session = Depends(get_db), _=Depends(_get_cu
         ).all()
     )
     by_field = property_registry.product_counts(db)
+
+    # «На сайте»: повторяет featured-фильтр витрины (см. products.py). Эксклюзивность —
+    # товар уходит в сильнейшую активную категорию (меньший priority) и из слабых пропадает.
+    ppc = product_promo_categories
+    stronger_cat = aliased(PromoCategory)
+    s = ppc.alias("s")
+    stronger = (
+        select(1)
+        .select_from(s.join(stronger_cat, stronger_cat.id == s.c.promo_category_id))
+        .where(s.c.product_id == ppc.c.product_id,
+               stronger_cat.is_active == True,                        # noqa: E712
+               stronger_cat.priority < PromoCategory.priority)
+    )
+    visible = dict(
+        db.execute(
+            select(ppc.c.promo_category_id, func.count())
+            .select_from(
+                ppc.join(Product, Product.id == ppc.c.product_id)
+                   .join(PromoCategory, PromoCategory.id == ppc.c.promo_category_id))
+            .where(PromoCategory.is_active == True,                   # noqa: E712
+                   Product.is_active == True,                         # noqa: E712
+                   Product.stock > 0,
+                   ~stronger.exists())
+            .group_by(ppc.c.promo_category_id)
+        ).all()
+    )
+
     cats = db.query(PromoCategory).order_by(
         PromoCategory.display_order.asc(), PromoCategory.title.asc()
     ).all()
@@ -1617,6 +1646,7 @@ def list_promo_categories_admin(db: Session = Depends(get_db), _=Depends(_get_cu
             by_field.get(c.source_field_name or "", 0) if c.source_field_id
             else membership.get(c.id, 0)
         )
+        item.visible_count = visible.get(c.id, 0)
         out.append(item)
     return out
 

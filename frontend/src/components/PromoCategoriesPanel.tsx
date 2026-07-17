@@ -22,6 +22,7 @@ interface PromoCategoryAdmin {
   show_old_price: boolean;
   is_active: boolean;
   product_count: number;
+  visible_count: number;
   source_field_id: string | null;
   source_field_name: string | null;
 }
@@ -418,6 +419,14 @@ export default function PromoCategoriesPanel() {
                           text={`${c.product_count} ${plural2(c.product_count, "товар", "товара", "товаров")}`}
                           tone="plain"
                         />
+                        {/* Второе число — только когда расходится с первым (часть распродана
+                            или ушла в приоритетный раздел): иначе оно ничего не добавляет. */}
+                        {c.visible_count !== c.product_count && (
+                          <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                            <Chip text={`${c.visible_count} на сайте`} tone="off" />
+                            <HelpHint text="Сколько товаров раздела сейчас видит покупатель: в наличии и не ушли в более приоритетный раздел. Меньше общего числа, если часть распродана или ждёт ближайшего обмена с МойСклад." />
+                          </span>
+                        )}
                       </div>
                     </div>
 
