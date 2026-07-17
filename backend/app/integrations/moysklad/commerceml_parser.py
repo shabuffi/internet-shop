@@ -42,6 +42,8 @@ offers.xml:
 
 from dataclasses import dataclass, field
 from decimal import Decimal
+from io import BytesIO
+
 from lxml import etree
 
 
@@ -141,41 +143,91 @@ def parse_import_xml(xml_bytes: bytes) -> ParsedCatalog:
     Namespace определяется автоматически (МойСклад обычно шлёт XML без ``xmlns``).
     Цены и остатки на этом шаге ещё нулевые — они приходят отдельно в ``offers.xml``.
 
+    Разбор **потоковый** (``iterparse``): каждый <Товар> разбирается на своём ``end``-событии
+    и тут же выбрасывается из дерева вместе с уже обработанными соседями. Полный DOM каталога
+    в памяти не строится — на 12.5к товаров это экономит ~100 МБ и, что важнее, убирает цикл
+    «выделили 100 МБ → освободили» на каждом обмене (раз в 30 минут), от которого куча
+    фрагментировалась и RSS воркера полз вверх.
+
     Args:
         xml_bytes: Сырые байты ``import.xml``.
 
     Returns:
         :class:`ParsedCatalog` с заполненными списками категорий и товаров.
+
+    Raises:
+        ValueError: Если <Классификатор> пришёл ПОСЛЕ товаров. Потоковый разбор видит документ
+            по порядку, поэтому такая перестановка молча дала бы товары без характеристик
+            (и порвала бы членство в промо-категориях). Лучше явная ошибка обмена, чем тихая
+            порча данных. Реальный МойСклад всегда шлёт классификатор первым.
     """
-    root = etree.fromstring(xml_bytes)
-    ns = _detect_ns(root)
     catalog = ParsedCatalog()
-
-    # ─── Категории ────────────────────────────────────────────────────────────
-    classifier = root.find(_tag("Классификатор", ns))
     prop_map: dict[str, str] = {}
-    if classifier is not None:
-        groups_el = classifier.find(_tag("Группы", ns))
-        if groups_el is not None:
-            catalog.categories = _parse_groups(groups_el, parent_id=None, ns=ns)
-        # Карта свойств классификатора (Ид → название) для характеристик товара
-        prop_map = _parse_properties(classifier, ns=ns)
-        # Имена доп-полей этого обмена — сигнал «пришла схема свойств» (см. ParsedCatalog).
-        catalog.properties = dict(prop_map)
-        catalog.property_names = set(prop_map.values())
+    ns = ""
+    tags: dict[str, str] = {}
+    catalog_seen = False        # первый <Каталог> — как root.find() брал именно первый
+    classifier_done = False
 
-    # ─── Товары ───────────────────────────────────────────────────────────────
-    catalog_el = root.find(_tag("Каталог", ns))
-    if catalog_el is not None:
-        # <Каталог СодержитТолькоИзменения="true"> — дельта-выгрузка (только изменённые товары),
-        # именно в ней приходит удаление фото. У полного каталога значение "false"/нет атрибута.
-        catalog.changes_only = (catalog_el.get("СодержитТолькоИзменения") or "").strip().lower() == "true"
-        products_el = catalog_el.find(_tag("Товары", ns))
-        if products_el is not None:
-            for товар in products_el.findall(_tag("Товар", ns)):
-                product = _parse_product(товар, ns=ns, prop_map=prop_map)
+    # Только end-события и только для нужных тегов. Без фильтра lxml дёргал бы Python на каждом
+    # из ~200к узлов файла, и разбор выходил дороже DOM'а. start не нужен: внутри разбора
+    # changes_only не используется (его читает уже потребитель готового ParsedCatalog), а
+    # принадлежность товара каталогу видна по цепочке родителей.
+    # "{*}X" ловит тег и с namespace, и без — МойСклад шлёт без, но это не гарантия.
+    for _event, elem in etree.iterparse(
+        BytesIO(xml_bytes),
+        events=("end",),
+        tag=("{*}Классификатор", "{*}Каталог", "{*}Товар"),
+    ):
+        if not tags:
+            # Namespace берём с первого же подошедшего элемента: он тот же, что у корня
+            # (раньше — _detect_ns(root)), а корень при фильтре по тегам событий не даёт.
+            ns = _detect_ns(elem)
+            tags = {n: _tag(n, ns) for n in
+                    ("Классификатор", "Группы", "Каталог", "Товары", "Товар")}
+
+        # ─── Категории и свойства классификатора ─────────────────────────────
+        if elem.tag == tags["Классификатор"] and not classifier_done:
+            if catalog.products:
+                raise ValueError(
+                    "<Классификатор> пришёл после <Товары> — характеристики товаров были бы "
+                    "потеряны при потоковом разборе"
+                )
+            classifier_done = True
+            groups_el = elem.find(tags["Группы"])
+            if groups_el is not None:
+                catalog.categories = _parse_groups(groups_el, parent_id=None, ns=ns)
+            # Карта свойств классификатора (Ид → название) для характеристик товара
+            prop_map = _parse_properties(elem, ns=ns)
+            # Имена доп-полей этого обмена — сигнал «пришла схема свойств» (см. ParsedCatalog).
+            catalog.properties = dict(prop_map)
+            catalog.property_names = set(prop_map.values())
+            elem.clear()
+
+        # ─── Товары ──────────────────────────────────────────────────────────
+        elif elem.tag == tags["Товар"]:
+            # Только прямые дети <Товары> первого <Каталог> — как раньше
+            # root.find("Каталог").find("Товары").findall("Товар").
+            parent = elem.getparent()
+            if (parent is not None and parent.tag == tags["Товары"]
+                    and (gp := parent.getparent()) is not None and gp.tag == tags["Каталог"]):
+                product = _parse_product(elem, ns=ns, prop_map=prop_map)
                 if product:
                     catalog.products.append(product)
+                # Освобождаем разобранный товар И уже обработанных соседей: одного clear()
+                # мало — родитель продолжает держать опустевшие элементы, и дерево всё равно
+                # растёт на весь файл.
+                elem.clear()
+                while elem.getprevious() is not None:
+                    del parent[0]
+
+        elif elem.tag == tags["Каталог"] and not catalog_seen:
+            # <Каталог СодержитТолькоИзменения="true"> — дельта-выгрузка (только изменённые
+            # товары), именно в ней приходит удаление фото. У полного каталога "false"/нет
+            # атрибута. end у <Каталог> приходит после его товаров — разбору это не мешает.
+            catalog_seen = True
+            catalog.changes_only = (
+                (elem.get("СодержитТолькоИзменения") or "").strip().lower() == "true"
+            )
 
     return catalog
 
