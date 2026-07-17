@@ -23,7 +23,7 @@ from app.db.models.promo import PromoCategory, MoySkladProperty, product_promo_c
 from app.db.models.order import Order, OrderItem
 from app.db.models.user import User as Customer
 from app.schemas.auth import UserOut
-from app.services import media_storage, promo_service, property_registry
+from app.services import media_storage, promo_service, property_registry, top_categories
 from decimal import Decimal, InvalidOperation
 
 router = APIRouter(prefix="/admin", tags=["Admin"])
@@ -546,6 +546,9 @@ def get_settings(db: Session = Depends(get_db), _=Depends(_get_current_admin)):
         "category_sort":      _get_setting(db, "category_sort", "moysklad"),
         # Единый поиск: «1» — поиск только на «Каталоге» (по умолчанию), «0» — своя строка на каждой странице
         "unified_search":     _get_setting(db, "unified_search", "1") != "0",
+        # Источник блока «Топ категорий» на главной: «1» — новая система из админки (по умолчанию),
+        # «0» — старые встроенные (захардкоженные) плитки.
+        "top_categories_admin": _get_setting(db, "top_categories_admin", "1") != "0",
         # Доп-поле МойСклад со «старой ценой» (для зачёркнутой цены): ИД строки реестра, а не
         # имя — имя резолвится через реестр, поэтому переименование поля ничего не ломает.
         # Выбирается владельцем из выпадающего списка на странице «Промо-разделы».
@@ -585,6 +588,8 @@ def save_settings(body: dict, db: Session = Depends(get_db), _=Depends(_get_curr
         "category_sort",
         # единый поиск («1» — только на «Каталоге», «0» — своя строка на каждой странице)
         "unified_search",
+        # источник блока «Топ категорий» («1» — новая система из админки, «0» — старые встроенные плитки)
+        "top_categories_admin",
         # доп-поле МойСклад со «старой ценой»: ид строки реестра (страница «Промо-разделы»);
         # пусто — выключено
         promo_service.OLD_PRICE_SETTING_KEY,
@@ -1189,6 +1194,9 @@ def store_info_public(db: Session = Depends(get_db)):
         "show_stock_qty":     _get_setting(db, "show_stock_qty", "1") != "0",
         # Единый поиск: «1» — поиск только на «Каталоге» (по умолчанию), «0» — своя строка на каждой странице
         "unified_search":     _get_setting(db, "unified_search", "1") != "0",
+        # Источник блока «Топ категорий» на главной: «1» — новая система из админки (по умолчанию),
+        # «0» — старые встроенные (захардкоженные) плитки.
+        "top_categories_admin": _get_setting(db, "top_categories_admin", "1") != "0",
     }
 
 
@@ -1850,3 +1858,74 @@ def delete_promo_icon(name: str, db: Session = Depends(get_db), _=Depends(_get_c
     db.commit()
     media_storage.delete_image(name)
     return {"message": "Иконка удалена", "name": name}
+
+
+# ─── Категории: иконка как свойство самой категории (вкладка «Категории») ──────────
+# Иконка живёт в Category.icon (media_storage), одна на категорию, используется везде, где
+# показывается категория. Обмен эту колонку не трогает. Список — ВСЕ синхронизированные
+# категории (включая пустые, которых нет на витрине), к API МойСклад не ходим.
+
+@router.get("/categories")
+def list_categories_admin(db: Session = Depends(get_db), _=Depends(_get_current_admin)):
+    """Все категории из БД (имя + иконка) для управления иконками. Порядок — по id стабильный;
+    сортировку/поиск делает фронт (чистит имя тем же правилом, что и витрина)."""
+    cats = db.scalars(select(Category).order_by(Category.name)).all()
+    return [{"id": c.id, "name": c.name, "icon": c.icon} for c in cats]
+
+
+@router.post("/categories/{category_id}/icon")
+async def upload_category_icon(
+    category_id: str, file: UploadFile = File(...),
+    db: Session = Depends(get_db), _=Depends(_get_current_admin),
+):
+    """Загружает/заменяет иконку категории. Старый файл при замене удаляется (без сирот на диске)."""
+    cat = db.get(Category, category_id)
+    if not cat:
+        raise HTTPException(status_code=404, detail="Категория не найдена")
+    data = await file.read()
+    try:
+        name = media_storage.save_upload(file.filename or "icon.png", data)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Можно загружать только изображения")
+    old = cat.icon
+    cat.icon = name
+    db.commit()
+    if old and old != name and old.startswith("upload_"):
+        media_storage.delete_image(old)
+    return {"name": name, "url": f"/api/v1/admin/media/{name}"}
+
+
+@router.delete("/categories/{category_id}/icon")
+def delete_category_icon(category_id: str, db: Session = Depends(get_db), _=Depends(_get_current_admin)):
+    """Убирает иконку категории (файл с диска + Category.icon=NULL). Категория остаётся без иконки."""
+    cat = db.get(Category, category_id)
+    if not cat:
+        raise HTTPException(status_code=404, detail="Категория не найдена")
+    old = cat.icon
+    cat.icon = None
+    db.commit()
+    if old and old.startswith("upload_"):
+        media_storage.delete_image(old)
+    return {"message": "Иконка удалена", "id": category_id}
+
+
+# ─── Топ категорий главной (8 слотов: ТОЛЬКО выбор категории + порядок) ──────────
+# Хранилище — ShopSettings['top_categories'] (JSON-список category_id), как banners/brands: без
+# новых таблиц. Иконка НЕ хранится здесь — берётся из Category.icon по category_id (см. выше).
+# Список категорий — GET /admin/categories (данные из БД). См. services/top_categories.py.
+
+@router.get("/top-categories")
+def get_top_categories(db: Session = Depends(get_db), _=Depends(_get_current_admin)):
+    """Ровно 8 слотов (category_id; недостающие — пустая строка) для формы админки."""
+    return {"slots": top_categories.load_padded(db)}
+
+
+@router.post("/top-categories")
+def save_top_categories(body: dict, db: Session = Depends(get_db), _=Depends(_get_current_admin)):
+    """Сохраняет порядок категорий (только category_id). Изменения сразу видит витрина."""
+    slots = body.get("slots")
+    if not isinstance(slots, list):
+        raise HTTPException(status_code=400, detail="Ожидался список слотов")
+    top_categories.save(db, slots)
+    db.commit()
+    return {"message": "Топ категорий сохранён"}

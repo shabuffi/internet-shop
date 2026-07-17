@@ -10,6 +10,18 @@ class CategoryOut(BaseModel):
     name: str
     parent_id: str | None = None
     depth: int = 0  # уровень вложенности (0 — корень), вычисляется из кода в названии
+    icon: str | None = None  # иконка категории (media_storage); свойство самой категории, None — без иконки
+
+
+class TopCategoryOut(BaseModel):
+    """Один слот блока «Топ категорий» на главной (уже резолвленный для витрины).
+
+    Хранит только порядок (см. :mod:`app.services.top_categories`); ``name`` и ``icon`` берутся
+    из самой категории по ``category_id`` — иконка не дублируется в конфиге блока.
+    """
+    category_id: str
+    name: str            # актуальное имя категории из БД (следует за синхронизацией МойСклад)
+    icon: str | None = None  # иконка КАТЕГОРИИ (Category.icon); None — плитка без картинки
 
 
 class ProductOut(BaseModel):

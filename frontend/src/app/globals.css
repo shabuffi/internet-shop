@@ -426,6 +426,24 @@ button, input, textarea, select { font-family: inherit; }
   transition: transform .25s ease;
 }
 .cat-tile:hover .cat-tile__media img { transform: scale(1.06); }
+
+/* Полнокадровая картинка плитки (старые/захардкоженные разделы «Топ категорий»): фото
+   заполняет весь медиа-блок edge-to-edge, без полей и декоративного акцента. Медиа-блок —
+   КВАДРАТНЫЙ (aspect-ratio: 1) под квадратные фото 1:1: картинка видна ЦЕЛИКОМ, без обрезки.
+   Селектор с .cat-tile повышает специфичность, чтобы перебить и базовое правило
+   `.cat-tile__media img` (contain), и фиксированную высоту/мобильный кламп ниже по файлу. */
+.cat-tile .cat-tile__media--cover { padding: 0; height: auto; aspect-ratio: 1; }
+.cat-tile__media--cover::before { display: none; }
+.cat-tile .cat-tile__media--cover img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  object-fit: cover;
+}
+
 .cat-tile__body {
   display: flex;
   flex-direction: column;

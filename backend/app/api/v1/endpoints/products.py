@@ -9,10 +9,10 @@ from app.db.session import get_db
 from app.db.models.product import Product, Category
 from app.db.models.promo import PromoCategory, MoySkladProperty, product_promo_categories
 from app.db.models.admin import ShopSettings
-from app.schemas.product import ProductOut, ProductListOut, CategoryOut
+from app.schemas.product import ProductOut, ProductListOut, CategoryOut, TopCategoryOut
 from app.services.media_storage import read_image
 from app.services.pricing import adjusted_price
-from app.services import promo_service
+from app.services import promo_service, top_categories
 from app.api.v1.endpoints.auth import get_optional_user
 from app.db.models.user import User
 
@@ -220,11 +220,22 @@ def list_categories(db: Session = Depends(get_db)):
             child_rows += emit(ch)
         if counts.get(cid, 0) == 0 and not child_rows:
             return []
-        return [CategoryOut(id=c.id, name=c.name, parent_id=pid2, depth=depth), *child_rows]
+        return [CategoryOut(id=c.id, name=c.name, parent_id=pid2, depth=depth, icon=c.icon), *child_rows]
 
     for cid in sorted(children.get(None, []), key=lambda x: info[x][key_idx]):
         out += emit(cid)
     return out
+
+
+@router.get("/top-categories", response_model=list[TopCategoryOut])
+def list_top_categories(db: Session = Depends(get_db)):
+    """Блок «Топ категорий» главной — из настроек админки (не из кода).
+
+    Отдаёт только заполненные слоты с существующей категорией, в порядке слотов. Ссылку и имя
+    строит витрина по ``category_id`` (раздел каталога МойСклад); ``icon`` — своя картинка или
+    ``None``. Пусто → главная просто не покажет блок. См. :mod:`app.services.top_categories`.
+    """
+    return top_categories.resolve_public(db)
 
 
 def _percent_for(user: User | None):

@@ -7,6 +7,8 @@ import AdminTabs, { type AdminTab } from "@/components/AdminTabs";
 import HelpHint from "@/components/HelpHint";
 import PasswordField from "@/components/PasswordField";
 import PromoCategoriesPanel from "@/components/PromoCategoriesPanel";
+import TopCategoriesPanel from "@/components/TopCategoriesPanel";
+import CategoryIconsPanel from "@/components/CategoryIconsPanel";
 import { adminFetch, adminUpload } from "@/lib/adminApi";
 import { brandImageUrl, type Brand } from "@/lib/brands";
 
@@ -15,6 +17,8 @@ import { brandImageUrl, type Brand } from "@/lib/brands";
 const TABS: AdminTab[] = [
   { id: "general", label: "Общие" },
   { id: "promo",   label: "Промо-разделы" },
+  { id: "categories", label: "Категории" },
+  { id: "top",     label: "Топ категорий" },
   { id: "brands",  label: "Бренды" },
   { id: "catalog", label: "Каталог" },
   { id: "search",  label: "Поиск" },
@@ -69,6 +73,13 @@ function SiteSettings() {
   // монтируем вовсе: на маунте она тянет свои четыре эндпоинта.
   const [promoSeen, setPromoSeen] = useState(false);
   useEffect(() => { if (tab === "promo") setPromoSeen(true); }, [tab]);
+  // «Топ категорий» — та же ленивая логика: не терять несохранённые правки слотов при
+  // переключении вкладки, но и не тянуть её эндпоинты, пока владелец на неё не зашёл.
+  const [topSeen, setTopSeen] = useState(false);
+  useEffect(() => { if (tab === "top") setTopSeen(true); }, [tab]);
+  // «Категории» (иконки категорий) — та же ленивая логика.
+  const [catsSeen, setCatsSeen] = useState(false);
+  useEffect(() => { if (tab === "categories") setCatsSeen(true); }, [tab]);
 
   // ── Магазин + показ остатка ──
   const [form, setForm] = useState<ShopSettings>(EMPTY);
@@ -229,6 +240,20 @@ function SiteSettings() {
       {promoSeen && (
         <div style={{ display: tab === "promo" ? "block" : "none" }}>
           <PromoCategoriesPanel />
+        </div>
+      )}
+
+      {/* Категории (иконки категорий): ленивое монтирование (см. catsSeen). */}
+      {catsSeen && (
+        <div style={{ display: tab === "categories" ? "block" : "none" }}>
+          <CategoryIconsPanel />
+        </div>
+      )}
+
+      {/* Топ категорий: то же ленивое монтирование (см. topSeen). */}
+      {topSeen && (
+        <div style={{ display: tab === "top" ? "block" : "none" }}>
+          <TopCategoriesPanel />
         </div>
       )}
 

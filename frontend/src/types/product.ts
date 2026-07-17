@@ -3,6 +3,7 @@ export interface Category {
   name: string;
   parent_id: string | null;
   depth?: number;   // уровень вложенности (0 — корень) для показа деревом
+  icon?: string | null;  // иконка категории (media_storage); свойство самой категории, null — без иконки
 }
 
 export interface Product {

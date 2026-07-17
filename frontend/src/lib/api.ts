@@ -94,6 +94,19 @@ export async function getPromoCategories(): Promise<PromoCategory[]> {
   return apiFetch<PromoCategory[]>("/promo-categories");
 }
 
+/** Один слот блока «Топ категорий» главной (уже резолвлен для витрины). */
+export interface TopCategory {
+  category_id: string;
+  name: string;
+  icon: string | null;   // имя файла своей иконки в media_storage; null — плитка без картинки
+}
+
+/** Заполненные слоты «Топ категорий» в порядке слотов (пустые/битые бэкенд не отдаёт). */
+export async function getTopCategories(): Promise<TopCategory[]> {
+  const cats = await apiFetch<TopCategory[]>("/products/top-categories");
+  return cats.map((c) => ({ ...c, name: cleanCategoryName(c.name) }));
+}
+
 /** Одна активная промо-категория по слагу (или null). */
 export async function getPromoCategory(slug: string): Promise<PromoCategory | null> {
   const cats = await getPromoCategories();
@@ -127,6 +140,9 @@ export interface StoreInfo {
   show_stock_qty?: boolean;
   // Единый поиск: true — поиск только на «Каталоге» (по умолчанию), false — своя строка на каждой странице
   unified_search?: boolean;
+  // Источник блока «Топ категорий» на главной: true — новая система из админки (по умолчанию),
+  // false — старые встроенные (захардкоженные) плитки.
+  top_categories_admin?: boolean;
 }
 
 export async function getStoreInfo(): Promise<StoreInfo> {

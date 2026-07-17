@@ -1,7 +1,9 @@
 export const dynamic = "force-dynamic";
 
 import Link from "next/link";
-import { getCategories, getProducts, getStoreInfo, getPromoCategories } from "@/lib/api";
+import { getTopCategories, getCategories, getProducts, getStoreInfo, getPromoCategories } from "@/lib/api";
+import CategoryImage from "@/components/CategoryImage";
+// [LEGACY] нужны только старому (захардкоженному) варианту блока «Топ категорий» — см. переключатель ниже.
 import { CATEGORY_GROUPS, normCatName } from "@/lib/categoryGroups";
 import { parseBrands } from "@/lib/brands";
 import { promoPath } from "@/lib/promo";
@@ -13,8 +15,27 @@ import RegionsMarquee from "@/components/RegionsMarquee";
 import Reveal from "@/components/Reveal";
 import type { Product, PromoCategory } from "@/types/product";
 
-// Плитки категорий. `title` — ключ группы в CATEGORY_GROUPS (там список реальных категорий
-// каталога). `icon` — имя файла картинки в /public/categories/<icon>.png.
+// ─────────────────────────────────────────────────────────────────────────────
+// ⚙️ ПЕРЕКЛЮЧАТЕЛЬ блока «Популярные разделы» (Топ категорий) на главной.
+//
+//   НОВАЯ система (true)  — 8 плиток управляются из админки (Настройка сайта → «Топ
+//           категорий»); иконка — свойство категории, без иконки → монограмма.
+//   СТАРОЕ поведение (false) — захардкоженные плитки TILES (иконки /public/categories/*.jpg,
+//           ссылка через эвристику CATEGORY_GROUPS).
+//
+// Живой переключатель — КНОПКА В АДМИНКЕ (Настройка сайта → «Топ категорий»): настройка
+// `top_categories_admin` в БД, приходит на главную через store-info (см. ниже). Владелец
+// переключает без правок кода и передеплоя.
+//
+// Константа ниже — только ДЕФОЛТ на случай, когда настройка ещё не задана / store-info
+// недоступен. Обе реализации ниже живут в коде и компилируются (тип boolean держит обе ветки
+// достижимыми). После окончательного приёма новой системы старый путь (TILES + tileHref +
+// импорт CATEGORY_GROUPS/normCatName/getCategories) и переключатель удаляются ОТДЕЛЬНОЙ задачей.
+const DEFAULT_USE_ADMIN_TOP_CATEGORIES = true;
+
+// [LEGACY / fallback] Захардкоженные плитки категорий — действуют, когда переключатель выключен (см. выше).
+// `title` — ключ группы в CATEGORY_GROUPS (там список реальных категорий каталога).
+// `icon` — имя файла картинки в /public/categories/<icon>.jpg.
 const TILES = [
   { icon: "cat-chem", title: "Бытовая химия" },
   { icon: "cat-home", title: "Хозтовары" },
@@ -60,16 +81,38 @@ function TruckIcon() {
 }
 
 export default async function HomePage() {
-  // Тянем категории, чтобы плитки вели в конкретный раздел каталога, а не в общий список.
-  let categories: { id: string; name: string }[] = [];
-  try {
-    categories = await getCategories();
-  } catch {
-    categories = [];
+  // Настройки сайта (один запрос — и для брендов, и для живого переключателя блока «Топ категорий»).
+  const store = await getStoreInfo().catch(() => null);
+
+  // Живой переключатель из админки (кнопка «Настройка сайта → Топ категорий»); если настройка
+  // не задана / store-info недоступен — берём дефолт из константы.
+  const useAdminTopCategories = store?.top_categories_admin ?? DEFAULT_USE_ADMIN_TOP_CATEGORIES;
+
+  // Данные блока «Популярные разделы» — тянем ТОЛЬКО для активного варианта, без лишнего запроса.
+  //
+  // НОВЫЙ вариант: 8 слотов управляются из админки (Настройка сайта → «Топ категорий»).
+  // Пусто или ошибка — блок просто не показываем (см. рендер ниже).
+  let topCategories: Awaited<ReturnType<typeof getTopCategories>> = [];
+  if (useAdminTopCategories) {
+    try {
+      topCategories = await getTopCategories();
+    } catch {
+      topCategories = [];
+    }
   }
 
-  // Логотипы брендов для слайдера над футером (из настроек сайта).
-  const brands = parseBrands((await getStoreInfo().catch(() => null))?.brands);
+  // [LEGACY] СТАРЫЙ вариант: категории каталога, чтобы захардкоженные плитки вели в свой раздел.
+  let categories: { id: string; name: string }[] = [];
+  if (!useAdminTopCategories) {
+    try {
+      categories = await getCategories();
+    } catch {
+      categories = [];
+    }
+  }
+
+  // Логотипы брендов для слайдера над футером (из тех же настроек сайта).
+  const brands = parseBrands(store?.brands);
 
   // Промо-ленты на главной строятся из конфигурируемых промо-категорий (show_on_home),
   // по порядку display_order. Новые категории появляются здесь автоматически — без правок кода.
@@ -85,12 +128,10 @@ export default async function HomePage() {
       .filter((s) => s.items.length > 0);
   } catch { /* без товаров секции просто не покажем */ }
 
-  // Ссылка плитки → каталог, отфильтрованный сразу по группе категорий (CATEGORY_GROUPS).
-  // Имена группы резолвим в реальные category_id и склеиваем через запятую (бэкенд понимает
-  // список). Если ни одна категория группы не нашлась — fallback на поиск по названию плитки.
+  // [LEGACY] Ссылка захардкоженной плитки → каталог по группе категорий (CATEGORY_GROUPS →
+  // реальные category_id, тот же набор, что распознаёт заголовок раздела в каталоге). Если ни
+  // одна категория группы не нашлась — fallback на поиск по названию плитки.
   function tileHref(title: string): string {
-    // Единая нормализация имён (см. categoryGroups.normCatName) — тот же набор id, что и
-    // распознаёт каталог в заголовок раздела.
     const names = new Set((CATEGORY_GROUPS[title] ?? []).map(normCatName));
     const ids = categories.filter((c) => names.has(normCatName(c.name))).map((c) => c.id);
     if (ids.length) return `/catalog?category_id=${ids.join(",")}`;
@@ -168,33 +209,72 @@ export default async function HomePage() {
         </div>
       ))}
 
-      {/* Категории */}
-      <div className="container section section--cats">
-        <div className="section-head section-head--line">
-          <div>
-            <h2 className="section-title section-title--caps section-title--line">Популярные разделы</h2>
-            <p className="lead">Полный ассортимент для дома, дачи и магазина — выберите раздел и оформите заказ онлайн.</p>
+      {/* ═══ Популярные разделы (Топ категорий) ═══ Вариант выбирается переключателем из админки
+          (top_categories_admin через store-info): true → новый (из админки), false → legacy. */}
+      {useAdminTopCategories ? (
+        /* НОВЫЙ: плитки из админки (Настройка сайта → «Топ категорий»). Слот ведёт в свой раздел
+           каталога по category_id; иконка своя или монограмма. Не настроено — блок скрыт. */
+        topCategories.length > 0 && (
+        <div className="container section section--cats">
+          <div className="section-head section-head--line">
+            <div>
+              <h2 className="section-title section-title--caps section-title--line">Популярные разделы</h2>
+              <p className="lead">Полный ассортимент для дома, дачи и магазина — выберите раздел и оформите заказ онлайн.</p>
+            </div>
+            <Link href="/catalog" className="see-all">
+              Все категории
+              <ArrowIcon size={16} />
+            </Link>
           </div>
-          <Link href="/catalog" className="see-all">
-            Все категории
-            <ArrowIcon size={16} />
-          </Link>
+          <div className="cat-grid">
+            {topCategories.map((t, i) => (
+              <Reveal key={t.category_id} delay={i * 70}>
+                <Link href={`/catalog?category_id=${t.category_id}`} className="cat-tile">
+                  {/* Тот же полнокадровый квадратный блок, что у захардкоженных плиток: загруженное
+                      фото категории заполняет блок (cover). Без своей иконки — нейтральная монограмма. */}
+                  <span className="cat-tile__media cat-tile__media--cover">
+                    <CategoryImage icon={t.icon} name={t.name} letterSize={56} />
+                  </span>
+                  <span className="cat-tile__body">
+                    <span className="cat-tile__name">{t.name}</span>
+                  </span>
+                </Link>
+              </Reveal>
+            ))}
+          </div>
         </div>
-        <div className="cat-grid">
-          {TILES.map((t, i) => (
-            <Reveal key={t.icon} delay={i * 70}>
-              <Link href={tileHref(t.title)} className="cat-tile">
-                <span className="cat-tile__media">
-                  <img src={`/categories/${t.icon}.png`} alt={t.title} />
-                </span>
-                <span className="cat-tile__body">
-                  <span className="cat-tile__name">{t.title}</span>
-                </span>
-              </Link>
-            </Reveal>
-          ))}
+        )
+      ) : (
+        /* [LEGACY] СТАРЫЙ: захардкоженные плитки TILES (иконки /public/categories/*.jpg,
+           ссылка через tileHref/CATEGORY_GROUPS). Показывается всегда. */
+        <div className="container section section--cats">
+          <div className="section-head section-head--line">
+            <div>
+              <h2 className="section-title section-title--caps section-title--line">Популярные разделы</h2>
+              <p className="lead">Полный ассортимент для дома, дачи и магазина — выберите раздел и оформите заказ онлайн.</p>
+            </div>
+            <Link href="/catalog" className="see-all">
+              Все категории
+              <ArrowIcon size={16} />
+            </Link>
+          </div>
+          <div className="cat-grid">
+            {TILES.map((t, i) => (
+              <Reveal key={t.icon} delay={i * 70}>
+                <Link href={tileHref(t.title)} className="cat-tile">
+                  {/* Полнокадровое фото раздела — заполняет весь медиа-блок (cover). */}
+                  <span className="cat-tile__media cat-tile__media--cover">
+                    <img src={`/categories/${t.icon}.jpg`} alt={t.title} />
+                  </span>
+                  <span className="cat-tile__body">
+                    <span className="cat-tile__name">{t.title}</span>
+                  </span>
+                </Link>
+              </Reveal>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Слайдер брендов — над футером (футер в layout.tsx) */}
       <BrandsSlider brands={brands} />

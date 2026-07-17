@@ -14,6 +14,12 @@ class Category(Base):
     moysklad_id: Mapped[str] = mapped_column(String(36), unique=True, index=True)
     name: Mapped[str] = mapped_column(String(255))
     parent_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("categories.id"), nullable=True)
+    # Иконка категории — свойство САМОЙ категории (задаётся в админке «Настройка сайта → Категории»),
+    # имя файла в media_storage (upload_<uuid>.<ext>); отдаётся публично через GET /admin/media/{name}.
+    # NULL — категория без иконки. Обмен эту колонку НЕ трогает (upsert правит только name/parent_id),
+    # категории не удаляются, id стабилен — иконка переживает синхронизацию. Единственный экземпляр:
+    # везде, где показывается категория (главная «Топ категорий» и др.), берётся отсюда по category_id.
+    icon: Mapped[str | None] = mapped_column(String(255), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     products: Mapped[list["Product"]] = relationship("Product", back_populates="category")
