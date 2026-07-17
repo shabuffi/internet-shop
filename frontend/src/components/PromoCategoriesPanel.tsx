@@ -3,15 +3,15 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import AdminToggle from "@/components/AdminToggle";
 import HelpHint from "@/components/HelpHint";
+import PromoBadge from "@/components/PromoBadge";
 import PromoIconPicker, { type PromoIconLibraryItem } from "@/components/PromoIconPicker";
 import { IconInfo, IconPencil, IconPlus, IconTrash } from "@/components/icons";
 import { adminFetch, adminUpload } from "@/lib/adminApi";
-import { parsePromoIcon, promoGlyphTransform, promoIconUrl } from "@/lib/promo";
-import PromoLucideIcon from "@/lib/promoIcons";
 
-/** Промо-категория в админке. slug сюда не приходит — это техническая деталь. */
+/** Промо-категория в админке. slug в UI не показывается — нужен только для вида бейджа. */
 interface PromoCategoryAdmin {
   id: string;
+  slug: string;
   title: string;
   subtitle: string | null;
   icon: string | null;
@@ -54,13 +54,6 @@ const card: React.CSSProperties = {
   border: "1px solid var(--hairline-soft)", padding: "20px 22px",
 };
 
-function fmtDate(iso: string | null): string {
-  if (!iso) return "не приходило в обмене";
-  return new Date(iso).toLocaleDateString("ru-RU", {
-    day: "2-digit", month: "2-digit", year: "numeric",
-  });
-}
-
 /** Русское склонение после числа — иначе счётчики читаются как машинный вывод. */
 function plural2(n: number, one: string, few: string, many: string): string {
   const d = n % 10, h = n % 100;
@@ -88,37 +81,11 @@ function Chip({ text, tone }: { text: string; tone: "ok" | "off" | "warn" | "pla
   );
 }
 
-/** Бейдж раздела в админке. Настроенная иконка рисуется теми же классами, что и на витрине.
- *  Легаси-иконка (имя файла без цвета) на витрине лежит на цвете своего слага, а здесь — на
- *  нейтральном круге: slug в админку не отдаётся, так что цвет тут просто неоткуда взять. */
-function IconPreview({ icon, size = 34 }: { icon: string | null; size?: number }) {
-  const spec = parsePromoIcon(icon);
-  if (!spec) {
-    return (
-      <span style={{
-        display: "inline-flex", alignItems: "center", justifyContent: "center",
-        width: size, height: size, borderRadius: "50%", flexShrink: 0,
-        border: "1.5px dashed var(--steel)", color: "var(--ink-tertiary)", fontSize: 10,
-      }}>
-        нет
-      </span>
-    );
-  }
-  return (
-    <span
-      className="pcard__promo pcard__promo--icon"
-      style={{
-        position: "static", width: size, height: size, minWidth: size,
-        background: spec.color ? `#${spec.color}` : "var(--steel)",
-      }}
-    >
-      {spec.kind === "lucide"
-        ? <PromoLucideIcon name={spec.name} className="pcard__promo__glyph"
-            style={{ transform: promoGlyphTransform(spec.scale) }} />
-        : <img src={promoIconUrl(spec.file)} alt="" className="pcard__promo__glyph"
-            style={{ transform: promoGlyphTransform(spec.scale) }} />}
-    </span>
-  );
+/** Бейдж раздела в админке — тот же компонент, что и на витрине (`inline`).
+ *  Пока своя иконка не выбрана, показывается исторический вид раздела по слагу (пламя/NEW/%),
+ *  а не заглушка: в настройках владелец должен видеть ровно то, что стоит на сайте. */
+function IconPreview({ category }: { category: PromoCategoryAdmin }) {
+  return <PromoBadge category={{ slug: category.slug, title: category.title, icon: category.icon }} inline />;
 }
 
 /**
@@ -153,7 +120,6 @@ function FieldSelect({
         >
           {p.name} ({p.product_count})
           {p.taken_by && p.id !== value ? ` — занято: ${p.taken_by}` : ""}
-          {!p.looks_like_flag ? " · не похоже на галочку" : ""}
         </option>
       ))}
     </select>
@@ -273,12 +239,6 @@ export default function PromoCategoriesPanel() {
     setLibrary(lib.items);
   }
 
-  const lastSeen = props
-    .map((p) => p.last_seen_at)
-    .filter(Boolean)
-    .sort()
-    .pop() as string | undefined;
-
   if (loading) {
     return <div style={card}>Загрузка…</div>;
   }
@@ -290,22 +250,13 @@ export default function PromoCategoriesPanel() {
       <div style={{ maxWidth: 1180, display: "flex", flexDirection: "column", gap: 16 }}>
 
         {/* ─── Шапка ─── */}
-        {/* Заголовка нет намеренно: имя раздела уже написано на вкладке. */}
-        {/* wrap: кнопка не сжимается, поэтому на узком экране без переноса пояснению
-            оставалось бы по одному слову в строке — уводим кнопку на свою строку. */}
-        <header style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
-          <div style={{ flex: "1 1 260px", minWidth: 0 }}>
-            <p style={{ margin: 0, fontSize: 13.5, color: "var(--ink-secondary)", maxWidth: 640 }}>
-              Разделы вроде «Убойные цены» или «Новинки». Товар попадает в раздел, если в МойСклад
-              у него заполнено выбранное здесь доп-поле.
-              {cats.length > 0 && (
-                <> Сейчас: {cats.length} {plural2(cats.length, "раздел", "раздела", "разделов")},
-                  из них на сайте — {cats.filter((c) => c.is_active).length}. Карточки идут в том же
-                  порядке, что и пункты меню.</>
-              )}
-            </p>
-          </div>
-          <button className="btn btn-primary" onClick={() => setCreating((v) => !v)} style={{ flexShrink: 0 }}>
+        {/* Ни заголовка, ни пояснения: имя раздела написано на вкладке, а сами карточки
+            рассказывают о себе лучше абзаца-преамбулы. */}
+        {/* Кнопка на всю ширину: без абзаца-пояснения строка пустует, и прижатая к краю
+            кнопка висела в воздухе. */}
+        <header>
+          <button className="btn btn-primary" onClick={() => setCreating((v) => !v)}
+            style={{ width: "100%" }}>
             <IconPlus width={16} height={16} style={{ marginRight: 6 }} /> Новый раздел
           </button>
         </header>
@@ -321,10 +272,11 @@ export default function PromoCategoriesPanel() {
           </div>
         )}
 
-        {/* ─── Свежесть списка полей ───
+        {/* ─── Как читать список полей ───
             Кнопки «обновить из МойСклад» здесь нет и быть не может: обмен работает только на
             приём — инициатор всегда МойСклад, магазин сам к нему не ходит. Список и так
-            пополняется на каждом обмене. */}
+            пополняется на каждом обмене, поэтому про «свежесть» рассказывать нечего — полезнее
+            объяснить число рядом с полем. */}
         <div style={{
           display: "flex", alignItems: "flex-start", gap: 10, padding: "12px 16px",
           borderRadius: "var(--radius-lg)", background: "var(--cloud)",
@@ -332,17 +284,12 @@ export default function PromoCategoriesPanel() {
         }}>
           <IconInfo width={16} height={16} style={{ flexShrink: 0, marginTop: 2, color: "var(--ink-tertiary)" }} />
           <div style={{ fontSize: 12.5, color: "var(--ink-secondary)", lineHeight: 1.6 }}>
-            {lastSeen ? (
-              <>
-                <strong style={{ color: "var(--ink)" }}>Список полей МойСклад обновлён {fmtDate(lastSeen)}</strong>
-                {" — "}доступно полей: {props.length}. Новые поля появляются здесь сами после
-                очередного обмена.
-              </>
-            ) : props.length > 0 ? (
-              <>Список полей восстановлен из характеристик товаров ({props.length}). После ближайшего
-              обмена он обновится сам.</>
+            {props.length > 0 ? (
+              <>Поля берутся из МойСклад — новые появляются в списках сами после обмена.
+              Число рядом с полем и на карточке — сколько товаров с галочкой в этом поле,
+              то есть сколько попадёт в раздел.</>
             ) : (
-              <>Поля МойСклад появятся в списке после первого обмена.</>
+              <>Поля МойСклад появятся в списках после первого обмена.</>
             )}
           </div>
         </div>
@@ -436,7 +383,7 @@ export default function PromoCategoriesPanel() {
                       aria-label={`Изменить иконку раздела «${c.title}»`}
                       style={{ border: "none", background: "none", padding: 0, cursor: "pointer", lineHeight: 0 }}
                     >
-                      <IconPreview icon={c.icon} />
+                      <IconPreview category={c} />
                     </button>
 
                     <div style={{ flex: 1, minWidth: 0 }}>

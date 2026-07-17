@@ -950,12 +950,14 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .
 /* «Убойные цены» — тёплый красно-оранжевый; иконка-огонёк крупнее (размер по font-size),
    бейдж чуть выше и почти квадратный, чтобы огонёк было хорошо видно */
 .pcard__promo--hot { background: color-mix(in srgb, #E4572E 92%, transparent); font-size: 19px; height: 26px; padding: 0 6px; }
-/* Иконка раздела: ровный круг, цвет — инлайном из настройки категории */
-.pcard__promo--icon { width: 26px; height: 26px; min-width: 26px; padding: 0; border-radius: 999px; }
+/* Иконка раздела: та же овальная плашка, что у бейджей по умолчанию (высота как у --hot,
+   ширина — от боковых отступов), а НЕ ровный круг: круг выбивался из ряда «NEW»/«%»/огонька.
+   Цвет — инлайном из настройки категории */
+.pcard__promo--icon { width: auto; min-width: 0; height: 26px; padding: 0 8px; border-radius: 999px; }
 /* Белый штрих для набора Lucide; своя картинка обесцвечивается в белый силуэт —
    бейджи остаются одностилевыми, чем бы ни была загруженная иконка */
 .pcard__promo__glyph { width: 15px; height: 15px; object-fit: contain; color: #fff; filter: brightness(0) invert(1); }
-/* Иконка-надпись (NEW) — контуру хватает 15px, слову нужен почти весь круг */
+/* Иконка-надпись (NEW) — контуру хватает 15px, слову нужна почти вся плашка */
 .pcard__promo__glyph--text { width: 22px; height: 22px; }
 .pagination { display: flex; align-items: center; justify-content: center; gap: var(--s-2); margin-top: var(--s-12); }
 .page-dot { min-width: 42px; height: 42px; padding: 0 var(--s-3); border-radius: var(--r-md); border: 1px solid var(--hairline); background: var(--paper); color: var(--ink); font-size: var(--t-sm); font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; text-decoration: none; }

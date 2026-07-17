@@ -63,7 +63,10 @@ def icon_file_name(icon: str | None) -> str | None:
     return icon   # легаси — голое имя файла
 
 # Значения-галочки, которые считаем «выключено» (иначе — «включено»).
-_FLAG_FALSE = {"", "false", "нет", "0", "no", "off", "ложь", "none", "-"}
+# Публично (без подчёркивания) — этим же списком считает товары property_registry.product_counts,
+# и число в админке обязано совпадать с тем, что импорт положит в раздел.
+FLAG_FALSE_VALUES = frozenset({"", "false", "нет", "0", "no", "off", "ложь", "none", "-"})
+_FLAG_FALSE = FLAG_FALSE_VALUES
 
 # Явно «включённые» значения галочки.
 _FLAG_TRUE = {"да", "true", "1", "yes", "on", "истина", "+", "есть", "y", "t"}

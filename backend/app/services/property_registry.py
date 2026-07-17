@@ -82,10 +82,12 @@ def upsert_from_exchange(db: Session, prop_map: dict[str, str]) -> None:
 
 
 def product_counts(db: Session) -> dict[str, int]:
-    """{имя доп-поля: сколько товаров его заполняют} — одним запросом.
+    """{имя доп-поля: сколько товаров попадут в раздел по этому полю} — одним запросом.
 
-    Считаем товары с НЕПУСТЫМ значением, не «с галочкой»: счётчик отвечает на вопрос «сколько
-    товаров это поле вообще заполняют», не навязывая интерпретацию.
+    Считаем ровно то же, что считает членством импорт (``promo_service.is_flag_on``): значение
+    непустое и не «выключено» (0/нет/false/…). Раньше здесь была «заполненность» — число в
+    выпадающем списке не совпадало с бейджем на карточке раздела и обещало владельцу больше
+    товаров, чем раздел получит.
 
     Не денормализуем: на копии прода (12 590 товаров) запрос занимает ~12 мс, а колонка-счётчик
     стоила бы бэкфилла и риска разойтись с данными.
@@ -93,16 +95,20 @@ def product_counts(db: Session) -> dict[str, int]:
     ⚠️ Имена доп-полей в JSON хранятся юникод-эскейпами → только ``jsonb_array_elements``;
     ``attributes::text ILIKE '%кириллица%'`` даёт ложный ноль.
     """
-    rows = db.execute(text(
-        """
-        SELECT e->>'name' AS name, count(*) AS cnt
-        FROM products, LATERAL jsonb_array_elements(attributes::jsonb) e
-        WHERE attributes IS NOT NULL
-          AND jsonb_typeof(attributes::jsonb) = 'array'
-          AND coalesce(e->>'value', '') <> ''
-        GROUP BY e->>'name'
-        """
-    )).all()
+    rows = db.execute(
+        text(
+            """
+            SELECT e->>'name' AS name, count(*) AS cnt
+            FROM products, LATERAL jsonb_array_elements(attributes::jsonb) e
+            WHERE attributes IS NOT NULL
+              AND jsonb_typeof(attributes::jsonb) = 'array'
+              AND lower(btrim(coalesce(e->>'value', ''))) <> ALL(:off)
+            GROUP BY e->>'name'
+            """
+        ),
+        # Список «выключенных» значений берём из promo_service, чтобы SQL и импорт не разъехались.
+        {"off": list(promo_service.FLAG_FALSE_VALUES)},
+    ).all()
     return {name: cnt for name, cnt in rows if name}
 
 

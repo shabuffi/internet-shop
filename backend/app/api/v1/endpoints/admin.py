@@ -1588,22 +1588,33 @@ def list_moysklad_properties(db: Session = Depends(get_db), _=Depends(_get_curre
 def list_promo_categories_admin(db: Session = Depends(get_db), _=Depends(_get_current_admin)):
     """Все промо-категории для админки (с числом товаров и подписью выбранного доп-поля).
 
-    slug не отдаём — техническая деталь, пользователю не показывается.
+    ``product_count`` считаем ПО ВЫБРАННОМУ ДОП-ПОЛЮ (товары с включённой галочкой), а не по
+    таблице членства: членство пересобирает только обмен, поэтому сразу после смены поля бейдж
+    показывал бы состав по старому полю, а рядом, в выпадающем списке, стояло бы число по
+    новому — те самые «непонятные числа». Теперь оба числа считаются одинаково и совпадают,
+    а витрина догоняет их на ближайшем обмене.
+
+    У категории без поля (``source_field_id`` NULL) считать по полю нечего — там членство
+    заморожено, и его размер и есть честное число.
     """
     from app.schemas.promo import PromoCategoryAdmin
-    counts = dict(
+    membership = dict(
         db.execute(
             select(product_promo_categories.c.promo_category_id, func.count())
             .group_by(product_promo_categories.c.promo_category_id)
         ).all()
     )
+    by_field = property_registry.product_counts(db)
     cats = db.query(PromoCategory).order_by(
         PromoCategory.display_order.asc(), PromoCategory.title.asc()
     ).all()
     out = []
     for c in cats:
         item = PromoCategoryAdmin.model_validate(c)
-        item.product_count = counts.get(c.id, 0)
+        item.product_count = (
+            by_field.get(c.source_field_name or "", 0) if c.source_field_id
+            else membership.get(c.id, 0)
+        )
         out.append(item)
     return out
 

@@ -18,10 +18,13 @@ class PromoCategoryPublic(BaseModel):
 
 
 class PromoCategoryAdmin(BaseModel):
-    """Промо-категория для админки — бизнес-настройки. slug не отдаём (техническая деталь)."""
+    """Промо-категория для админки — бизнес-настройки."""
     model_config = ConfigDict(from_attributes=True)
 
     id: str
+    # Только чтобы админка нарисовала бейдж ровно как витрина: пока своя иконка не выбрана,
+    # вид бейджа задаёт слаг (пламя/NEW/%). В UI слаг не показывается и не редактируется.
+    slug: str
     title: str
     subtitle: str | None = None
     icon: str | None = None
