@@ -846,7 +846,11 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .
 .pcard__cat { font-size: var(--t-xs); color: var(--graphite); letter-spacing: .04em; }
 /* Название: на десктопе — полное имя, обычная ссылка на товар. */
 .pcard__namewrap { position: relative; display: flex; align-items: flex-start; gap: 6px; }
-.pcard__name { font-size: var(--t-body); font-weight: 600; line-height: 1.3; color: var(--ink); }
+/* min-width:0 — как флекс-элемент .pcard__namewrap имя должно уметь сжиматься ниже
+   ширины контента; overflow-wrap:anywhere — длинные неразрывные строки без пробелов
+   (напр. «полотенце+шапка+косметичка+…») переносятся, а не вылезают за карточку. */
+.pcard__name { font-size: var(--t-body); font-weight: 600; line-height: 1.3; color: var(--ink);
+  min-width: 0; overflow-wrap: anywhere; }
 /* Компактная карточка (только главная): максимум 2 строки — ровная высота */
 .pcard--compact .pcard__name {
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
