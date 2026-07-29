@@ -21,7 +21,7 @@ export default function AddToCartCard({ product }: { product: Product }) {
 
   const item = {
     id: product.id, name: product.name, article: product.article,
-    price: product.price, chestnyZnak: product.chestnyZnak,
+    price: product.price, chestnyZnak: product.chestnyZnak, stock: product.stock,
   };
   // Приводим к кратному партии (минимум — одна партия); 0 или меньше — убираем из корзины.
   const commit = (n: number) => {

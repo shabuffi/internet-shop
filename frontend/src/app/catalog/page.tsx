@@ -6,6 +6,7 @@ import { primaryPromo } from "@/lib/promo";
 import { CATEGORY_GROUPS, normCatName } from "@/lib/categoryGroups";
 import type { Category } from "@/types/product";
 import AddToCartCard from "@/components/AddToCartCard";
+import ProductStockHint from "@/components/ProductStockHint";
 import ChestnyZnakBadge from "@/components/ChestnyZnakBadge";
 import PromoBadge from "@/components/PromoBadge";
 import ProductName from "@/components/ProductName";
@@ -270,7 +271,10 @@ export default async function CatalogPage({ searchParams }: Props) {
                       </div>
                       <div className="pcard__sku">{p.article ? `Арт. ${p.article}` : " "}</div>
                       <div className="pcard__foot">
-                        <ProductPrice p={p} />
+                        <span style={{ display: "inline-flex", alignItems: "center", gap: 6, minWidth: 0 }}>
+                          <ProductPrice p={p} />
+                          <ProductStockHint product={p} />
+                        </span>
                         <AddToCartCard product={p} />
                       </div>
                     </div>

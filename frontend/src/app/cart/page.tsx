@@ -8,6 +8,7 @@ import { IconCart, IconMinus, IconPlus } from "@/components/icons";
 import NoPhoto from "@/components/NoPhoto";
 import ChestnyZnakBadge from "@/components/ChestnyZnakBadge";
 import QtyField from "@/components/QtyField";
+import StockWarningHint from "@/components/StockWarningHint";
 
 export default function CartPage() {
   const { items, totalItems, totalAmount, removeItem, updateQuantity, clearCart } = useCart();
@@ -40,7 +41,11 @@ export default function CartPage() {
 
       <div className="cart">
         <div className="cart__list">
-          {items.map((item) => (
+          {items.map((item) => {
+            // Подсказка «заказываете больше, чем в наличии» — если количество превышает
+            // остаток, снятый на момент добавления (undefined/0 — остаток неизвестен, не показываем).
+            const over = item.stock != null && item.stock > 0 && item.quantity > item.stock;
+            return (
             <div className="lineitem" key={item.id}>
               <Link href={`/products/${item.id}`} className="lineitem__media">
                 <div className="photo" style={{ position: "relative" }}>
@@ -63,6 +68,7 @@ export default function CartPage() {
                     <QtyField value={item.quantity} onCommit={(n) => updateQuantity(item.id, n)} />
                     <button onClick={() => updateQuantity(item.id, item.quantity + 1)} aria-label="Больше"><IconPlus /></button>
                   </div>
+                  <StockWarningHint over={over} />
                   <button className="linkbtn" onClick={() => removeItem(item.id)}>Удалить</button>
                 </div>
               </div>
@@ -71,7 +77,8 @@ export default function CartPage() {
                 <div className="lineitem__price">{formatPrice(Number(item.price) * item.quantity)}</div>
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
 
         <aside className="summary">

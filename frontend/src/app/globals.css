@@ -80,6 +80,10 @@ button, input, textarea, select { font-family: inherit; }
 .price { font-size: var(--t-price); font-weight: 600; letter-spacing: -.01em; font-variant-numeric: tabular-nums; }
 /* Единый показ цены: текущая (заметная) + зачёркнутая старая рядом. */
 .price-box { display: inline-flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+/* Правое выравнивание цены в табличных списках: при переносе старой цены на вторую строку
+   flex-контейнер сохраняет широкую ширину (max-content), а строки внутри прижимаются влево —
+   из-за этого цена «съезжала» левее заголовка колонки. Прижимаем строки к правому краю. */
+.price-box--right { justify-content: flex-end; }
 .price--old { font-size: .82em; font-weight: 500; color: var(--ink-tertiary, #9aa0a6); text-decoration: line-through; }
 .only-mobile { display: none !important; }
 .clist-mobile { display: none; }

@@ -8,7 +8,6 @@ import AddToCartButton from "@/components/AddToCartButton";
 import CartBar from "@/components/CartBar";
 import BackButton from "@/components/BackButton";
 import ProductGallery from "@/components/ProductGallery";
-import ProductPrice from "@/components/ProductPrice";
 import ChestnyZnakBadge from "@/components/ChestnyZnakBadge";
 import { chatConfigFromStore, buildChatUrl, isChatReady } from "@/lib/chat";
 import { IconChat } from "@/components/icons";
@@ -117,8 +116,8 @@ export default async function ProductPage({ params }: Props) {
               {showQty && inStock && <span className="pdp__sku">Остаток: {stockLabel}</span>}
             </div>
 
-            <div className="pdp__price"><ProductPrice p={product} priceClassName="" /></div>
-
+            {/* Цена рендерится внутри AddToCartButton: значок «заказываете больше, чем в наличии»
+                стоит рядом с ценой и должен реагировать на степпер (клиентское состояние). */}
             <AddToCartButton product={product} />
 
             {chatUrl && (

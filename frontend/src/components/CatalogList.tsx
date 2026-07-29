@@ -7,7 +7,16 @@ import { minOrderQty } from "@/lib/format";
 import NoPhoto from "@/components/NoPhoto";
 import ProductPrice from "@/components/ProductPrice";
 import ChestnyZnakBadge from "@/components/ChestnyZnakBadge";
+import StockWarningHint from "@/components/StockWarningHint";
+import type { CartItem } from "@/context/CartContext";
 import type { Product } from "@/types/product";
+
+// Заказано ли больше остатка (для предупреждающей плашки). Количество — из корзины.
+// Хук useCart вызывается ОДИН раз на уровне списка; сюда прокидываем уже готовый items.
+function isOverStock(product: Product, items: CartItem[]): boolean {
+  const qty = items.find((i) => i.id === product.id)?.quantity ?? 0;
+  return product.available && product.stock > 0 && qty > product.stock;
+}
 
 // Мини-фото с превью по наведению (большое фото рядом, не обрезанное).
 function ProductThumb({ product }: { product: Product }) {
@@ -53,7 +62,7 @@ function QtyCell({ product }: { product: Product }) {
   useEffect(() => { setVal(qty ? String(qty) : ""); }, [qty]);
 
   const disabled = !product.available;
-  const item = { id: product.id, name: product.name, article: product.article, price: product.price };
+  const item = { id: product.id, name: product.name, article: product.article, price: product.price, stock: product.stock };
   const commit = (n: number) => {
     if (!Number.isFinite(n) || n <= 0) { setItemQuantity(item, 0); return; }
     setItemQuantity(item, Math.max(step, Math.round(n / step) * step));
@@ -90,6 +99,7 @@ function QtyCell({ product }: { product: Product }) {
 // Липкая панель корзины вынесена на уровень страницы (общая для «Плитки» и «Списка»).
 // showQty=false — показываем только «В наличии» без числа (настройка «Показ остатка»).
 export default function CatalogList({ products, showQty = true }: { products: Product[]; showQty?: boolean }) {
+  const { items } = useCart();   // один вызов хука на список; предикат isOverStock — без хука
   const th: React.CSSProperties = { textAlign: "left", padding: "10px 14px", fontSize: 12, fontWeight: 600,
     color: "var(--ink-secondary)", textTransform: "uppercase", letterSpacing: ".03em", whiteSpace: "nowrap" };
   const td: React.CSSProperties = { padding: "10px 14px", borderTop: "1px solid var(--hairline-soft)", verticalAlign: "middle" };
@@ -107,6 +117,10 @@ export default function CatalogList({ products, showQty = true }: { products: Pr
               <th style={th}>Остаток</th>
               <th style={{ ...th, textAlign: "right" }}>Цена</th>
               <th style={{ ...th, textAlign: "center", width: 150 }}>Количество</th>
+              {/* Узкая колонка справа — зарезервированное место под значок «!» (предупреждение
+                  о заказе сверх остатка). Пустая, чтобы цена/количество не съезжали из-под своих
+                  заголовков, когда значок появляется. */}
+              <th style={{ ...th, width: 40 }}></th>
             </tr>
           </thead>
           <tbody>
@@ -126,8 +140,9 @@ export default function CatalogList({ products, showQty = true }: { products: Pr
                     ? <span style={{ fontSize: 13, fontWeight: 600, color: "var(--stock)" }}>{showQty ? `${p.stock} шт.` : "В наличии"}</span>
                     : <span style={{ fontSize: 13, fontWeight: 600, color: "var(--ink-tertiary)" }}>Нет</span>}
                 </td>
-                <td style={{ ...td, textAlign: "right", fontWeight: 700, whiteSpace: "nowrap" }}><ProductPrice p={p} priceClassName="" /></td>
+                <td style={{ ...td, textAlign: "right", fontWeight: 700, whiteSpace: "nowrap" }}><ProductPrice p={p} className="price-box--right" priceClassName="" /></td>
                 <td style={{ ...td, textAlign: "center" }}><QtyCell product={p} /></td>
+                <td style={{ ...td, textAlign: "center", width: 40 }}><StockWarningHint over={isOverStock(p, items)} /></td>
               </tr>
             ))}
           </tbody>
@@ -148,7 +163,7 @@ export default function CatalogList({ products, showQty = true }: { products: Pr
                   fontSize: 14, lineHeight: 1.35 }}>{p.name}</Link>
               </span>
               <span style={{ fontWeight: 700, whiteSpace: "nowrap", fontSize: 14 }}>
-                <ProductPrice p={p} priceClassName="" />
+                <ProductPrice p={p} className="price-box--right" priceClassName="" />
               </span>
             </div>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
@@ -159,7 +174,10 @@ export default function CatalogList({ products, showQty = true }: { products: Pr
                   {p.available && p.stock > 0 ? (showQty ? `${p.stock} шт.` : "В наличии") : "Нет"}
                 </span>
               </div>
-              <QtyCell product={p} />
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+                <QtyCell product={p} />
+                <StockWarningHint over={isOverStock(p, items)} />
+              </span>
             </div>
           </div>
         ))}

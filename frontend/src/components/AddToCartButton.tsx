@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { useCart } from "@/context/CartContext";
 import QtyField from "@/components/QtyField";
+import ProductPrice from "@/components/ProductPrice";
+import StockWarningHint from "@/components/StockWarningHint";
 import { IconMinus, IconPlus } from "@/components/icons";
 import { minOrderQty } from "@/lib/format";
 import type { Product } from "@/types/product";
@@ -16,13 +18,17 @@ export default function AddToCartButton({ product }: { product: Product }) {
   const [added, setAdded] = useState(false);
   const outOfStock = !product.is_active || !product.available;
   const inCart = items.find((i) => i.id === product.id)?.quantity ?? 0;
+  // Подсказка о заказе сверх остатка. Считаем ИТОГ: что уже лежит в корзине + что набрано
+  // в степпере (кнопка добавляет к имеющемуся) — иначе при полной корзине и маленьком
+  // значении степпера предупреждение не показывалось бы.
+  const overStock = product.available && product.stock > 0 && inCart + qty > product.stock;
 
   const setQtyRounded = (n: number) => setQty(Math.max(step, Math.round(n / step) * step));
 
   function handleAdd() {
     for (let i = 0; i < qty; i++) {
       addItem({ id: product.id, name: product.name, article: product.article, price: product.price,
-        chestnyZnak: product.chestnyZnak });
+        chestnyZnak: product.chestnyZnak, stock: product.stock });
     }
     setAdded(true);
     setTimeout(() => setAdded(false), 1500);
@@ -30,6 +36,11 @@ export default function AddToCartButton({ product }: { product: Product }) {
 
   return (
     <div>
+      {/* Цена и значок-предупреждение — в одной строке (значок рядом с ценой, не под ней). */}
+      <div className="pdp__price" style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+        <ProductPrice p={product} priceClassName="" />
+        <StockWarningHint over={overStock} />
+      </div>
       <div className="pdp__buy">
         <div className="qty">
           <button onClick={() => setQty((q) => Math.max(step, q - step))} disabled={qty <= step || outOfStock} aria-label="Меньше"><IconMinus /></button>
