@@ -34,6 +34,8 @@ export default function CategoryPicker({
   const [query, setQuery] = useState("");
   const wrapRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
+  const activeRef = useRef<HTMLButtonElement>(null);
 
   const currentName = value
     ? options.find((o) => o.id === value)?.name ?? "Категория"
@@ -67,6 +69,17 @@ export default function CategoryPicker({
       document.removeEventListener("mousedown", onDoc);
       document.removeEventListener("keydown", onKey);
     };
+  }, [open]);
+
+  // Как в CategorySelect: при открытии выбранная категория сама оказывается в поле зрения
+  // (примерно по центру области прокрутки), без ручного листания длинного списка.
+  useEffect(() => {
+    if (!open) return;
+    const box = listRef.current;
+    const el = activeRef.current;
+    if (!box || !el) return;
+    const delta = el.getBoundingClientRect().top - box.getBoundingClientRect().top;
+    box.scrollTop += delta - (box.clientHeight - el.offsetHeight) / 2;
   }, [open]);
 
   function pick(id: string) {
@@ -124,7 +137,7 @@ export default function CategoryPicker({
             />
           </div>
 
-          <div style={{ maxHeight: 320, overflowY: "auto", padding: 4 }}>
+          <div ref={listRef} style={{ maxHeight: 320, overflowY: "auto", padding: 4 }}>
             {/* Сброс слота */}
             <button type="button" onClick={() => pick("")}
               style={{ ...rowBase, fontWeight: value ? 400 : 700, color: "var(--ink-secondary)",
@@ -141,6 +154,7 @@ export default function CategoryPicker({
                 const active = o.id === value;
                 return (
                   <button key={o.id} type="button" onClick={() => pick(o.id)} role="option" aria-selected={active}
+                    ref={active ? activeRef : undefined}
                     style={{ ...rowBase, fontWeight: active ? 700 : 400,
                       background: active ? "var(--cloud, var(--surface))" : "transparent" }}>
                     {o.name}

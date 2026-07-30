@@ -19,6 +19,8 @@ export default function CategorySelect({ categories, current, search, view, sort
   const [query, setQuery] = useState("");
   const wrapRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
+  const activeRef = useRef<HTMLButtonElement>(null);
 
   const currentName = current
     ? categories.find((c) => c.id === current)?.name ?? "Категория"
@@ -48,6 +50,18 @@ export default function CategorySelect({ categories, current, search, view, sort
       document.removeEventListener("mousedown", onDoc);
       document.removeEventListener("keydown", onKey);
     };
+  }, [open]);
+
+  // При открытии подкручиваем список к выбранной категории и ставим её примерно по центру
+  // области прокрутки: при сотнях категорий выбранная иначе оказывается далеко за экраном.
+  // scrollIntoView не используем — он прокручивает и предков (страница «уехала» бы под попапом).
+  useEffect(() => {
+    if (!open) return;
+    const box = listRef.current;
+    const el = activeRef.current;
+    if (!box || !el) return;
+    const delta = el.getBoundingClientRect().top - box.getBoundingClientRect().top;
+    box.scrollTop += delta - (box.clientHeight - el.offsetHeight) / 2;   // браузер сам зажмёт в границы
   }, [open]);
 
   function select(cid: string) {
@@ -115,7 +129,7 @@ export default function CategorySelect({ categories, current, search, view, sort
             />
           </div>
 
-          <div style={{ maxHeight: 320, overflowY: "auto", padding: 4 }}>
+          <div ref={listRef} style={{ maxHeight: 320, overflowY: "auto", padding: 4 }}>
             {/* «Все категории» всегда доступны для сброса */}
             <button type="button" onClick={() => select("")}
               style={{ ...rowBase, fontWeight: current ? 500 : 700,
@@ -134,6 +148,7 @@ export default function CategorySelect({ categories, current, search, view, sort
                 const pad = !query.trim() && (c.depth ?? 0) > 0 ? "    ".repeat(c.depth ?? 0) + "└ " : "";
                 return (
                   <button key={c.id} type="button" onClick={() => select(c.id)} role="option" aria-selected={active}
+                    ref={active ? activeRef : undefined}
                     style={{ ...rowBase, fontWeight: active ? 700 : 400,
                       background: active ? "var(--cloud)" : "transparent" }}>
                     {pad}{c.name}

@@ -90,7 +90,11 @@ export default async function ProductPage({ params }: Props) {
         </div>
         <div className="breadcrumb">
           <Link href="/catalog">Каталог</Link>
-          {product.category && <><span>›</span><span>{product.category.name}</span></>}
+          {/* Категория кликабельна — ведёт в каталог с этим фильтром (тот же URL, что у
+              CategorySelect и плиток на главной: /catalog?category_id=<id>) */}
+          {product.category && (
+            <><span>›</span><Link href={`/catalog?category_id=${product.category.id}`}>{product.category.name}</Link></>
+          )}
           <span>›</span>
           <span style={{ color: "var(--charcoal)" }}>{product.name}</span>
         </div>
