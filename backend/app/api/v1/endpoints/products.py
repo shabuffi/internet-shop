@@ -11,7 +11,7 @@ from app.db.models.promo import PromoCategory, MoySkladProperty, product_promo_c
 from app.db.models.admin import ShopSettings
 from app.schemas.product import ProductOut, ProductListOut, CategoryOut, TopCategoryOut
 from app.services.media_storage import read_image
-from app.services.pricing import adjusted_price
+from app.services.pricing import adjusted_price, percent_for as _percent_for
 from app.services import promo_service, top_categories
 from app.api.v1.endpoints.auth import get_optional_user
 from app.db.models.user import User
@@ -236,11 +236,6 @@ def list_top_categories(db: Session = Depends(get_db)):
     ``None``. Пусто → главная просто не покажет блок. См. :mod:`app.services.top_categories`.
     """
     return top_categories.resolve_public(db)
-
-
-def _percent_for(user: User | None):
-    """Процент корректировки цены: персональная скидка вошедшего, иначе наценка гостя."""
-    return user.discount_percent if user is not None else None
 
 
 def _old_price_field(db: Session) -> str | None:

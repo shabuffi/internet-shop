@@ -43,6 +43,23 @@ export default function CheckoutPage() {
     );
   }
 
+  // Регистрация начата, но сотрудник ТД аккаунт ещё не проверил — оформить заказ нельзя
+  // (бэкенд вернёт 403). Корзину не трогаем: после активации клиент вернётся и дооформит.
+  if (user && !user.is_active) {
+    return (
+      <div className="container" style={{ maxWidth: 520, margin: "0 auto", padding: "var(--s-12) var(--s-4)", textAlign: "center" }}>
+        <h1 style={{ fontFamily: "var(--font-display)", fontSize: "var(--t-h1)", margin: "0 0 var(--s-3)" }}>
+          Ожидайте активации учётной записи
+        </h1>
+        <p style={{ color: "var(--charcoal)", lineHeight: 1.6, margin: "0 0 var(--s-6)" }}>
+          Оформить заказ можно будет сразу после того, как ваш аккаунт проверит сотрудник
+          ТД «Инженер». Товары останутся в корзине — возвращайтесь и завершите оформление.
+        </p>
+        <Link href="/cart" className="btn btn--ghost">Вернуться в корзину</Link>
+      </div>
+    );
+  }
+
   function handleChange(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) {
     setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
   }

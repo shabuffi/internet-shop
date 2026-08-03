@@ -11,7 +11,7 @@ from app.db.models.order import Order, OrderItem
 from app.db.models.product import Product
 from app.db.models.user import User
 from app.schemas.order import OrderIn, OrderOut
-from app.services.pricing import adjusted_price
+from app.services.pricing import adjusted_price, percent_for
 from app.api.v1.endpoints.auth import get_optional_user
 
 router = APIRouter(prefix="/orders", tags=["Orders"])
@@ -65,6 +65,17 @@ def create_order(payload: OrderIn, request: Request, db: Session = Depends(get_d
     # Защита от спама заказами: не более 10 оформлений за 10 минут с одного IP.
     rate_limit(f"rl:order:{client_ip(request)}", limit=10, window_sec=600)
 
+    # Регистрация начата, но сотрудник ТД аккаунт ещё не проверил — заказывать нельзя.
+    # Гостевой заказ (``user is None``) при этом остаётся открытым: гость платит цену с
+    # наценкой и контрагента в МойСклад не плодит. Без этой проверки неактивированный
+    # клиент оформлял заказ из кабинета по клиентской цене (ORD-0034 от 03.08.2026).
+    if user is not None and not user.is_active:
+        raise HTTPException(
+            status_code=403,
+            detail="Ваша учётная запись ещё не активирована. "
+                   "Дождитесь проверки сотрудником ТД «Инженер».",
+        )
+
     # Загружаем товары одним запросом
     product_ids = [i.product_id for i in payload.items]
     products = {
@@ -83,8 +94,9 @@ def create_order(payload: OrderIn, request: Request, db: Session = Depends(get_d
     # Считаем сумму и собираем позиции. Цена — витринная (с наценкой/скидкой), а не
     # базовая из МойСклад: в заказ и в выгрузку идёт фактическая цена, которую платит
     # клиент. Считается на бэке из БД (клиент её не передаёт и не может подделать).
-    # Цена по корректировке покупателя: вошедший — его персональная скидка, гость — наценка.
-    percent = user.discount_percent if user is not None else None
+    # Цена по корректировке покупателя: активированный — его персональная скидка,
+    # гость — наценка (см. pricing.percent_for; неактивированный сюда уже не доходит).
+    percent = percent_for(user)
     order_items = []
     total = Decimal("0")
     for item_in in payload.items:

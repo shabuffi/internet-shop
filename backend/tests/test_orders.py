@@ -4,14 +4,22 @@ from decimal import Decimal
 
 import pytest
 
+from app.api.v1.endpoints.auth import _hash_password
 from app.db.models.product import Product
+from app.db.models.user import User
+from app.services.pricing import percent_for
 
 
 @pytest.fixture(autouse=True)
 def _no_rate_limit(monkeypatch):
-    """Отключаем rate-limit в HTTP-тестах (иначе TestClient упрётся в лимит по IP)."""
+    """Отключаем rate-limit в HTTP-тестах (иначе TestClient упрётся в лимит по IP).
+
+    И в orders, и в auth: тесты активации логинятся покупателем перед заказом.
+    """
     from app.api.v1.endpoints import orders as orders_mod
+    from app.api.v1.endpoints import auth as auth_mod
     monkeypatch.setattr(orders_mod, "rate_limit", lambda *a, **k: None)
+    monkeypatch.setattr(auth_mod, "rate_limit", lambda *a, **k: None)
 
 
 @pytest.fixture
@@ -184,6 +192,82 @@ def test_create_order_negative_quantity_rejected(client, db_session, no_celery):
         "items": [{"product_id": "p-1", "quantity": -3}],
     })
     assert resp.status_code == 422
+
+
+# ─── активация аккаунта ──────────────────────────────────────────────────────
+# Инцидент 03.08.2026: клиент зарегистрировался и оформил заказ за 15 минут ДО того,
+# как сотрудник ТД активировал аккаунт, — и получил клиентскую цену вместо гостевой.
+
+def _make_customer(db, is_active=True, discount=Decimal("0"), **kw):
+    defaults = dict(
+        email="client@yandex.ru", phone="+79005554433", customer_type="individual",
+        customer_name="Пётр Петров", password_hash=_hash_password("Parol123"),
+        is_active=is_active, discount_percent=discount,
+    )
+    defaults.update(kw)
+    u = User(**defaults)
+    db.add(u)
+    db.commit()
+    return u
+
+
+def test_create_order_rejected_for_inactive_user(client, db_session, no_celery):
+    """Вошедший неактивированный покупатель заказ оформить НЕ может (403)."""
+    _make_product(db_session, id="p-1", price=Decimal("6000.00"))
+    _make_customer(db_session, is_active=False)
+    assert client.post("/api/v1/auth/login",
+                       json={"email": "client@yandex.ru", "password": "Parol123"}).status_code == 200
+
+    resp = client.post("/api/v1/orders", json={
+        "customer_name": "Пётр Петров", "customer_phone": "+79005554433",
+        "customer_email": "client@yandex.ru", "delivery_method": "pickup",
+        "items": [{"product_id": "p-1", "quantity": 1}],
+    })
+    assert resp.status_code == 403
+    assert "активирована" in resp.json()["detail"]
+    from app.db.models.order import Order
+    assert db_session.query(Order).count() == 0     # заказ не создан
+
+
+def test_create_order_allowed_for_active_user(client, db_session, no_celery):
+    """Активированный покупатель заказывает по своей персональной цене."""
+    _make_product(db_session, id="p-1", price=Decimal("6000.00"))
+    user = _make_customer(db_session, is_active=True, discount=Decimal("-10"))
+    assert client.post("/api/v1/auth/login",
+                       json={"email": "client@yandex.ru", "password": "Parol123"}).status_code == 200
+
+    resp = client.post("/api/v1/orders", json={
+        "customer_name": "Пётр Петров", "customer_phone": "+79005554433",
+        "customer_email": "client@yandex.ru", "delivery_method": "pickup",
+        "items": [{"product_id": "p-1", "quantity": 1}],
+    })
+    assert resp.status_code == 201
+    assert float(resp.json()["total_amount"]) == 5400.0     # 6000 − 10%
+    from app.db.models.order import Order
+    assert db_session.query(Order).one().user_id == user.id
+
+
+def test_create_order_still_open_for_guest(client, db_session, no_celery):
+    """Гостя (без входа) блокировка не касается — гостевой заказ проходит как раньше."""
+    _make_product(db_session, id="p-1", price=Decimal("6000.00"))
+    _make_customer(db_session, is_active=False)             # чей-то неактивный аккаунт в БД
+    resp = client.post("/api/v1/orders", json={
+        "customer_name": "Иван", "customer_phone": "+79001234567",
+        "customer_email": "buyer@example.ru", "delivery_method": "pickup",
+        "items": [{"product_id": "p-1", "quantity": 1}],
+    })
+    assert resp.status_code == 201
+    assert resp.json()["number"].startswith("ORD-")
+
+
+def test_percent_for_treats_inactive_as_guest(db_session):
+    """Цена: неактивированный считается гостем — свою скидку он не получает."""
+    inactive = _make_customer(db_session, is_active=False, discount=Decimal("-10"))
+    active = _make_customer(db_session, is_active=True, discount=Decimal("-10"),
+                            email="a@yandex.ru", phone="+79001110022")
+    assert percent_for(None) is None            # гость → наценка по умолчанию
+    assert percent_for(inactive) is None        # неактивированный → тоже гость
+    assert percent_for(active) == Decimal("-10")
 
 
 def test_create_order_queues_notification(client, db_session, monkeypatch):
