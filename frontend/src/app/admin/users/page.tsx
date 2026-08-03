@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import AdminShell from "@/components/AdminShell";
 import HelpHint from "@/components/HelpHint";
+import ScrollableTable from "@/components/ScrollableTable";
 import { adminFetch } from "@/lib/adminApi";
 import { formatMsk } from "@/lib/format";
 import { useIsMobile } from "@/lib/useIsMobile";
@@ -482,7 +483,7 @@ export default function AdminUsersPage() {
           ))}
         </div>
       ) : (
-        <div style={{ background: "var(--canvas)", borderRadius: "var(--radius-lg)", border: "1px solid var(--hairline-soft)", overflowX: "auto" }}>
+        <ScrollableTable label="Таблица покупателей">
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
             <thead>
               <tr style={{ borderBottom: "1px solid var(--hairline-soft)" }}>
@@ -509,7 +510,7 @@ export default function AdminUsersPage() {
               ))}
             </tbody>
           </table>
-        </div>
+        </ScrollableTable>
       )}
     </AdminShell>
   );

@@ -1423,3 +1423,56 @@ textarea.form-input { height: auto; min-height: 90px; padding: var(--s-3) var(--
 
 /* Мелочь: убрать серую подсветку тапа на мобильных (заодно меняет хеш CSS-файла). */
 html { -webkit-tap-highlight-color: transparent; }
+
+/* ============================================================
+   Таблица-грид админки: горизонтальная полоса НАД таблицей
+   + липкая шапка (компонент ScrollableTable)
+   ============================================================ */
+.dgrid {
+  display: flex; flex-direction: column; overflow: hidden;
+  background: var(--canvas); border: 1px solid var(--hairline-soft); border-radius: var(--r-lg);
+  /* Карточка — «окно» грида: не выше экрана, точную высоту («до низа окна») ставит компонент,
+     здесь — запасное значение до гидрации. Строки листаются ВНУТРИ окна, поэтому полоса и шапка
+     всегда на виду и незачем возвращаться вверх или вниз. */
+  max-height: calc(100dvh - 32px);
+}
+/* flex-цепочка до вьюпорта: `flex: 1 1 auto` + `min-height: 0` даёт ему ОПРЕДЕЛЁННУЮ высоту
+   (процент от max-height родителя не резолвится — вьюпорт вырастал по контенту и не скроллился),
+   а базис `auto` оставляет короткой таблице её натуральную высоту. */
+.dgrid__viewport {
+  flex: 1 1 auto; min-height: 0; overflow: auto; overscroll-behavior-x: contain;
+  scrollbar-width: none; -ms-overflow-style: none;   /* системные полосы прячем — сверху своя */
+}
+.dgrid__viewport::-webkit-scrollbar { display: none; }
+.dgrid__viewport:focus { outline: none; }
+.dgrid__viewport:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+
+/* Липкая шапка: таблица одна и скролл-контейнер один → строки и заголовки не разъезжаются. */
+.dgrid__viewport thead th {
+  position: sticky; top: 0; z-index: 2; background: var(--canvas);
+  /* у sticky-ячейки при border-collapse рамка не рисуется — линию даём тенью */
+  box-shadow: inset 0 -1px 0 var(--hairline-soft);
+  transition: box-shadow .16s ease;
+}
+/* строки уехали под шапку — приподнимаем её тенью */
+.dgrid--scrolled .dgrid__viewport thead th {
+  box-shadow: inset 0 -1px 0 var(--hairline-soft), 0 8px 16px -12px rgba(20, 20, 20, .6);
+}
+
+/* ── горизонтальная полоса над таблицей (системные скрыты: на macOS/Safari они overlay) ── */
+.dgrid__bar {
+  display: block; padding: 9px 12px 8px;
+  background: var(--canvas); border-bottom: 1px solid var(--hairline-soft);
+  cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none;
+}
+.dgrid__bar[hidden] { display: none; }
+.dgrid__bar:has(.dgrid__thumb--drag) { cursor: grabbing; }
+
+.dgrid__track { position: relative; height: 8px; border-radius: var(--r-pill); background: var(--fog); }
+.dgrid__thumb {
+  position: absolute; top: 0; left: 0; height: 8px; border-radius: var(--r-pill);
+  background: var(--accent);                      /* фирменный синий, как на витрине */
+  transition: background .15s ease;
+}
+.dgrid__bar:hover .dgrid__thumb, .dgrid__thumb--drag { background: var(--accent-deep); }
+@media (prefers-reduced-motion: reduce) { .dgrid__thumb, .dgrid__viewport thead th { transition: none; } }
