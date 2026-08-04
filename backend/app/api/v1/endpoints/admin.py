@@ -23,7 +23,8 @@ from app.db.models.promo import PromoCategory, MoySkladProperty, product_promo_c
 from app.db.models.order import Order, OrderItem
 from app.db.models.user import User as Customer
 from app.schemas.auth import UserOut
-from app.services import media_storage, promo_service, property_registry, top_categories
+from app.services import (media_storage, promo_service, property_registry,
+                          search as search_service, top_categories)
 from decimal import Decimal, InvalidOperation
 
 router = APIRouter(prefix="/admin", tags=["Admin"])
@@ -848,8 +849,11 @@ def list_products_admin(
     PAGE = 50
     stmt = select(Product)
     if q and q.strip():
-        like = f"%{q.strip()}%"
-        stmt = stmt.where(or_(Product.name.ilike(like), Product.article.ilike(like)))
+        # Те же правила, что на витрине (е ≡ ё, раскладка, слова в любом порядке), но
+        # подстрокой: в админке ищут по обрывку названия, лишние совпадения не мешают.
+        cond = search_service.build_filter(q, Product.name, Product.article, substring=True)
+        if cond is not None:
+            stmt = stmt.where(cond)
 
     _has_image = Product.image_url.isnot(None) & (Product.image_url != "")
     if photo == "with":

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { Category } from "@/types/product";
+import { matchesSearch, searchWords } from "@/lib/search";
 
 // Выпадающий выбор категории С ПОИСКОМ (при сотнях категорий листать неудобно).
 // Триггер выглядит как поле; по клику открывается панель с поиском и списком.
@@ -26,11 +27,12 @@ export default function CategorySelect({ categories, current, search, view, sort
     ? categories.find((c) => c.id === current)?.name ?? "Категория"
     : "Все категории";
 
-  // Фильтрация по названию (регистронезависимо). «Все категории» всегда доступны сверху.
+  // Фильтрация по названию: регистр не важен, е ≡ ё, слова в любом порядке («бумага туалетная»
+  // находит «Туалетная бумага»). «Все категории» всегда доступны сверху.
   const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return categories;
-    return categories.filter((c) => c.name.toLowerCase().includes(q));
+    const words = searchWords(query);
+    if (!words.length) return categories;
+    return categories.filter((c) => matchesSearch(c.name, words));
   }, [categories, query]);
 
   // Клик вне панели / Escape — закрыть.

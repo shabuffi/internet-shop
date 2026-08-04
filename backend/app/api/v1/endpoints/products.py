@@ -3,7 +3,7 @@ import re
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import Response
 from sqlalchemy.orm import Session, joinedload, selectinload
-from sqlalchemy import select, func, or_, and_, case
+from sqlalchemy import select, func, case
 
 from app.db.session import get_db
 from app.db.models.product import Product, Category
@@ -12,7 +12,7 @@ from app.db.models.admin import ShopSettings
 from app.schemas.product import ProductOut, ProductListOut, CategoryOut, TopCategoryOut
 from app.services.media_storage import read_image
 from app.services.pricing import adjusted_price, percent_for as _percent_for
-from app.services import promo_service, top_categories
+from app.services import promo_service, search as search_service, top_categories
 from app.api.v1.endpoints.auth import get_optional_user
 from app.db.models.user import User
 
@@ -24,30 +24,6 @@ router = APIRouter(prefix="/products", tags=["Products"])
 # кэш мгновенно и обновляет в фоне.
 _IMG_TTL = 600                # 10 минут «свежо без вопросов»
 _IMG_SWR = 86400             # сутки фонового обновления
-
-# Раскладка клавиатуры: один и тот же физический ряд клавиш в EN (QWERTY) и RU (ЙЦУКЕН).
-# Нужно для поиска при «неправильной раскладке»: ввёл "vjq" → ищем ещё и "мой", и наоборот.
-_EN_KEYS = "`qwertyuiop[]asdfghjkl;'zxcvbnm,./"
-_RU_KEYS = "ёйцукенгшщзхъфывапролджэячсмитьбю."
-_EN2RU = {e: r for e, r in zip(_EN_KEYS, _RU_KEYS)}
-_RU2EN = {r: e for e, r in zip(_EN_KEYS, _RU_KEYS)}
-
-
-def _layout_variants(s: str) -> list[str]:
-    """Возвращает варианты запроса с учётом неправильной раскладки: исходный + EN→RU + RU→EN.
-
-    Только реально отличающиеся непустые варианты (без дублей).
-    """
-    s = s.strip()
-    if not s:
-        return []
-    low = s.lower()
-    variants: list[str] = []
-    for v in (s, "".join(_EN2RU.get(c, c) for c in low), "".join(_RU2EN.get(c, c) for c in low)):
-        if v and v not in variants:
-            variants.append(v)
-    return variants
-
 
 # --- Порядок категорий (единый источник правды для фильтра и сортировки «По категориям») ---
 # Иерархия у этого каталога зашита в числовом код-префиксе имени («001», «001.02»), а не в
@@ -351,17 +327,11 @@ def list_products(
         query = query.where(Product.category_id.in_(ids))
 
     if search:
-        # Точный поиск: совпадение по НАЧАЛУ слова, а не подстрока внутри слова — чтобы
-        # «тёрка» не находила «стёрка», а «сорти» — «ассорти». Граница слова = начало строки
-        # или не-буква/цифра (а-яё включены явно, чтобы не зависеть от locale БД). Учитываем
-        # неправильную раскладку (EN↔RU). Артикул — короткий код: ищем с начала.
-        conds = []
-        for variant in _layout_variants(search):
-            v = re.escape(variant)
-            conds.append(Product.name.op("~*")(rf"(^|[^[:alnum:]а-яё]){v}"))
-            conds.append(Product.article.ilike(f"{variant}%"))
-        if conds:
-            query = query.where(or_(*conds))
+        # Правила поиска (совпадение по началу слова, е ≡ ё, раскладка, слова в любом
+        # порядке) — в app.services.search, общие с админкой.
+        cond = search_service.build_filter(search, Product.name, Product.article)
+        if cond is not None:
+            query = query.where(cond)
 
     if with_photo:
         query = query.where(Product.image_url.isnot(None), Product.image_url != "")
@@ -410,13 +380,7 @@ def list_products(
             order_cols = [clean_name.asc()]
     elif search:
         # Релевантность: точное совпадение названия → название начинается с запроса → прочее.
-        q = search.strip()
-        relevance = case(
-            (func.lower(clean_name) == q.lower(), 0),
-            (clean_name.op("~*")(rf"^{re.escape(q)}"), 1),
-            else_=2,
-        )
-        order_cols = [relevance, clean_name.asc()]
+        order_cols = [search_service.relevance_case(search, clean_name), clean_name.asc()]
     else:
         order_cols = [clean_name.asc()]
     # По умолчанию сверху — товары «сильнейших» промо-категорий (меньший priority),
