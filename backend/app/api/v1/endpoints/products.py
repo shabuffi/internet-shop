@@ -387,13 +387,13 @@ def list_products(
         order_cols = [search_service.relevance_case(search, clean_name), clean_name.asc()]
     else:
         order_cols = [clean_name.asc()]
-    # При ПРОСМОТРЕ каталога сверху идут товары «сильнейших» промо-категорий (меньший priority),
-    # затем остальные. Ранг = минимальный priority среди активных категорий товара.
-    # НЕ применяем промо-ранг в двух случаях:
-    #   * явная сортировка по цене — пользователь хочет чистый порядок по цене;
-    #   * ПОИСК — там порядок задаёт качество совпадения. Иначе промо-товар, подходящий под
-    #     запрос хуже, оказывался бы выше того, что человек искал.
-    if sort not in ("price_asc", "price_desc") and not search:
+    # Сверху — товары «сильнейших» промо-категорий (меньший priority), затем остальные.
+    # Ранг = минимальный priority среди активных категорий товара. При явной сортировке по цене —
+    # не вмешиваемся (пользователь хочет чистый порядок по цене). Во всех остальных режимах,
+    # ВКЛЮЧАЯ ПОИСК, промо-товары идут СВЕРХУ: сначала промо-блок, внутри него — тот же порядок
+    # (релевантность / категории / алфавит). Это осознанное решение владельца магазина.
+    featured_rank = None
+    if sort not in ("price_asc", "price_desc"):
         rank_subq = (
             select(func.min(PromoCategory.priority))
             .select_from(product_promo_categories)
@@ -418,12 +418,14 @@ def list_products(
         if loose_cond is not None:
             # Порядок — по качеству совпадения: сначала ранг (целиком → с начала названия →
             # с начала слова → внутри слова), затем позиция вхождения («Обложка для тетрадей»
-            # выше «Дневника (мягкая обложка)»). Промо-ранга здесь нет — как и в обычном поиске.
+            # выше «Дневника (мягкая обложка)»). Промо-ранг — впереди, как и в обычной выдаче.
             loose_order = [
                 search_service.relevance_case(search, clean_name),
                 search_service.match_position(search, clean_name),
                 clean_name.asc(),
             ]
+            if featured_rank is not None:
+                loose_order = [featured_rank, *loose_order]
             loose_query = unsearched.where(loose_cond).order_by(*loose_order)
             loose_total = _count(loose_query)
             if loose_total:
