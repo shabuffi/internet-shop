@@ -139,6 +139,38 @@ class ChangePasswordIn(BaseModel):
         return validate_password_strength(v)
 
 
+class ChangeEmailIn(BaseModel):
+    """Заявка на смену email в ЛК.
+
+    Текущий пароль обязателен: email — это логин, поэтому его подмена равносильна захвату
+    аккаунта (украденной куки было бы достаточно, чтобы потом «восстановить» пароль на свой
+    адрес). Проверка пароля — та же, что при смене пароля (``ChangePasswordIn``).
+    """
+    new_email: str
+    current_password: str
+
+    @field_validator("new_email")
+    @classmethod
+    def _email(cls, v: str) -> str:
+        return validate_email_format(v)
+
+
+class ConfirmEmailChangeIn(BaseModel):
+    """Подтверждение смены email по токену из письма (ссылка ушла на НОВЫЙ адрес)."""
+    token: str
+
+
+class EmailCheckIn(BaseModel):
+    """Проверка адреса на опечатку в домене. Формат намеренно НЕ валидируем: адрес могут
+    прислать недописанным (проверка идёт при выходе из поля), а ответ носит характер подсказки."""
+    email: str
+
+
+class EmailSuggestionOut(BaseModel):
+    """Подсказка об опечатке: полный исправленный адрес или ``None``, если всё в порядке."""
+    suggestion: str | None = None
+
+
 class ForgotPasswordIn(BaseModel):
     """Запрос восстановления пароля — только email. Ответ всегда одинаковый (не раскрываем аккаунт)."""
     email: str
@@ -165,6 +197,8 @@ class UserOut(BaseModel):
 
     id: str
     email: str
+    # Заявленный, но ещё не подтверждённый адрес — ЛК показывает «ждём подтверждения».
+    pending_email: str | None = None
     phone: str
     customer_type: str
     customer_name: str

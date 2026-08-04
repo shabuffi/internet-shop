@@ -4,11 +4,12 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
-  getMe, logoutUser, getMyOrders, changePassword, CUSTOMER_TYPE_LABEL,
-  type UserProfile, type OrderHistory,
+  getMe, logoutUser, getMyOrders, changePassword, changeEmail, cancelEmailChange,
+  CUSTOMER_TYPE_LABEL, type UserProfile, type OrderHistory,
 } from "@/lib/authApi";
 import { formatPrice, formatMsk, cleanProductName } from "@/lib/format";
 import PasswordField from "@/components/PasswordField";
+import EmailTypoHint, { useEmailTypo } from "@/components/EmailTypoHint";
 
 // Надёжность пароля — совпадает с бэкендом (validate_password_strength).
 function passwordIssue(p: string): string | null {
@@ -76,9 +77,9 @@ export default function AccountPage() {
 
   // Персональную скидку/наценку не показываем: клиент просто видит свои цены в каталоге
   // (процент не совпадает с бытовым понятием «скидка», поэтому не выводим цифру вовсе).
-  // Контакты (без наименования — оно в шапке; без типа — он чипом).
+  // Контакты (без наименования — оно в шапке; без типа — он чипом). Email вынесен из
+  // сетки в отдельный блок — он же логин, и рядом с ним живёт смена адреса.
   const infoItems: [string, string][] = [
-    ["Email", user.email],
     ["Телефон", user.phone],
     ...(user.inn ? [["ИНН", user.inn] as [string, string]] : []),
   ];
@@ -122,6 +123,10 @@ export default function AccountPage() {
         </div>
       </div>
 
+      {/* Email — он же логин: отдельным блоком со сменой адреса */}
+      <h2 style={sectionTitle}>Email для входа</h2>
+      <ChangeEmailForm user={user} onUpdated={setUser} />
+
       {/* Безопасность */}
       <h2 style={sectionTitle}>Безопасность</h2>
       <ChangePasswordForm />
@@ -142,6 +147,126 @@ export default function AccountPage() {
             <OrderCard key={o.id} order={o} />
           ))}
         </div>
+      )}
+    </div>
+  );
+}
+
+// Email = логин, поэтому меняется в два шага: заявка (с текущим паролем) → письмо на новый
+// адрес → подтверждение по ссылке. Пока заявка висит, карточка показывает ожидаемый адрес
+// и даёт её отменить; сам вход всё это время идёт по старому адресу.
+function ChangeEmailForm({ user, onUpdated }: { user: UserProfile; onUpdated: (u: UserProfile) => void }) {
+  const [open, setOpen] = useState(false);
+  const [email, setEmail] = useState("");
+  const [pw, setPw] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const typo = useEmailTypo();
+
+  const card: React.CSSProperties = {
+    background: "var(--paper)", border: "1px solid var(--hairline, #eee)",
+    borderRadius: "var(--r-xl)", padding: "var(--s-6)", boxShadow: "var(--shadow-1)",
+  };
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    setMsg(null);
+    // Опечатка в домене — предупреждаем один раз; решение остаётся за покупателем.
+    if (!(await typo.check(email))) return;
+    setSaving(true);
+    try {
+      const res = await changeEmail({ new_email: email, current_password: pw });
+      setMsg({ ok: true, text: res.message });
+      setEmail(""); setPw("");
+      const fresh = await getMe();
+      if (fresh) onUpdated(fresh);
+    } catch (err) {
+      setMsg({ ok: false, text: err instanceof Error ? err.message : "Не удалось изменить email" });
+    } finally { setSaving(false); }
+  }
+
+  async function cancel() {
+    setMsg(null);
+    setSaving(true);
+    try {
+      onUpdated(await cancelEmailChange());
+      setMsg({ ok: true, text: "Смена email отменена — адрес остался прежним" });
+    } catch (err) {
+      setMsg({ ok: false, text: err instanceof Error ? err.message : "Не удалось отменить" });
+    } finally { setSaving(false); }
+  }
+
+  return (
+    <div style={card}>
+      <div style={{ fontSize: "var(--t-xs)", color: "var(--charcoal)", textTransform: "uppercase", letterSpacing: ".04em", marginBottom: 4 }}>
+        Текущий адрес
+      </div>
+      <div style={{ fontWeight: 600, wordBreak: "break-word" }}>{user.email}</div>
+
+      {/* Заявка ждёт подтверждения — показываем, куда ушло письмо, и даём отменить */}
+      {user.pending_email && (
+        <div style={{ marginTop: "var(--s-4)", padding: "var(--s-3)", borderRadius: "var(--r-lg, 12px)",
+          background: "#fff8e6", border: "1px solid #f0d089", fontSize: "var(--t-sm)" }}>
+          <p style={{ margin: 0 }}>
+            Ожидает подтверждения: <b style={{ wordBreak: "break-word" }}>{user.pending_email}</b>
+          </p>
+          <p style={{ margin: "var(--s-1) 0 0", color: "var(--charcoal)" }}>
+            Мы отправили письмо со ссылкой на новый адрес (действует 24 часа). Пока вы не перейдёте
+            по ссылке, вход выполняется по прежнему адресу. Не пришло письмо? Проверьте папку «Спам».
+          </p>
+          <button type="button" onClick={cancel} disabled={saving}
+            style={{ marginTop: "var(--s-2)", background: "none", border: "none", padding: 0,
+              cursor: "pointer", color: "var(--charcoal)", textDecoration: "underline", fontSize: "var(--t-sm)" }}>
+            Отменить смену email
+          </button>
+        </div>
+      )}
+
+      <button type="button" onClick={() => { setOpen((o) => !o); setMsg(null); }} className="link"
+        style={{ display: "block", marginTop: "var(--s-4)", background: "none", border: "none", padding: 0,
+          cursor: "pointer", color: "var(--primary, #003399)", fontSize: "var(--t-sm)", fontWeight: 600 }}>
+        {open ? "Скрыть смену email" : user.pending_email ? "Указать другой адрес" : "Изменить email"}
+      </button>
+
+      {open && (
+        <form onSubmit={submit} style={{ marginTop: "var(--s-4)", maxWidth: 420 }}>
+          <div className="field" style={{ marginBottom: "var(--s-3)" }}>
+            <label>Новый email <span className="req">*</span></label>
+            <input className="input" type="email" required value={email}
+              onChange={(e) => { setEmail(e.target.value); typo.reset(); }}
+              onBlur={() => typo.check(email)}
+              placeholder="you@example.ru" autoComplete="email" />
+            <EmailTypoHint suggestion={typo.suggestion}
+              onFix={(fixed) => { setEmail(fixed); typo.reset(); }}
+              onKeep={() => typo.keep(email)} />
+          </div>
+          <div className="field" style={{ marginBottom: "var(--s-4)" }}>
+            <label>Текущий пароль <span className="req">*</span></label>
+            <PasswordField required value={pw} onChange={(e) => setPw(e.target.value)} autoComplete="current-password" />
+            <p style={{ margin: "var(--s-1) 0 0", fontSize: "var(--t-xs)", color: "var(--graphite)" }}>
+              Пароль нужен, чтобы адресом для входа не мог подменить посторонний.
+            </p>
+          </div>
+
+          {msg && (
+            <p style={{ marginBottom: "var(--s-3)", fontSize: "var(--t-sm)", fontWeight: 600,
+              color: msg.ok ? "var(--stock, #16794a)" : "var(--accent-2, #E02424)" }}>
+              {msg.ok ? "✓ " : ""}{msg.text}
+            </p>
+          )}
+
+          <button type="submit" className="btn btn--primary" disabled={saving || !email || !pw}>
+            {saving ? "Отправляем…" : "Отправить подтверждение"}
+          </button>
+        </form>
+      )}
+
+      {/* Сообщение об отмене показываем и при свёрнутой форме */}
+      {!open && msg && (
+        <p style={{ marginTop: "var(--s-3)", marginBottom: 0, fontSize: "var(--t-sm)", fontWeight: 600,
+          color: msg.ok ? "var(--stock, #16794a)" : "var(--accent-2, #E02424)" }}>
+          {msg.ok ? "✓ " : ""}{msg.text}
+        </p>
       )}
     </div>
   );

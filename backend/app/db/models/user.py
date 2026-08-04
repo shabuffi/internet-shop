@@ -21,6 +21,13 @@ class User(Base):
 
     id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     email: Mapped[str] = mapped_column(String, unique=True, index=True, nullable=False)
+    # Заявка на смену email: новый адрес живёт здесь, пока не подтверждён письмом, и только
+    # потом заменяет ``email`` (он же логин) — см. auth.request_email_change/confirm_email_change.
+    # Уникальность на pending НЕ ставим сознательно: два клиента вправе заявить один и тот же
+    # адрес, победит первый подтвердивший (второй получит понятный 409), а unique-индекс
+    # отказал бы второму ещё на заявке.
+    pending_email: Mapped[str | None] = mapped_column(String, nullable=True)
+    pending_email_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     # Один номер = один аккаунт: уникальность на уровне БД (не только проверкой в коде,
     # которая подвержена гонке при одновременной регистрации).
     phone: Mapped[str] = mapped_column(String, unique=True, index=True, nullable=False)

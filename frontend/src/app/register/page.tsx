@@ -6,6 +6,7 @@ import Link from "next/link";
 import { ApiError, registerUser, type CustomerType } from "@/lib/authApi";
 import PasswordField from "@/components/PasswordField";
 import { FieldError, useFormErrors } from "@/components/FormErrors";
+import EmailTypoHint, { useEmailTypo } from "@/components/EmailTypoHint";
 
 const TYPES: { value: CustomerType; label: string }[] = [
   { value: "individual", label: "Физическое лицо" },
@@ -39,6 +40,8 @@ export default function RegisterPage() {
   });
   const { message: error, fields, clear, setErrors, setLocal, invalidClass } = useFormErrors();
   const [loading, setLoading] = useState(false);
+  // Подсказка про опечатку в домене (gmial.com) — предупреждение, а не запрет
+  const typo = useEmailTypo();
 
   const setField = (k: keyof typeof form) =>
     (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
@@ -62,6 +65,9 @@ export default function RegisterPage() {
       setLocal(pwIssue, ["password"]);
       return;
     }
+    // Похоже на опечатку в домене — показываем подсказку и ждём решения покупателя
+    // (исправить или «оставить как есть»); повторная отправка уже проходит.
+    if (!(await typo.check(form.email))) return;
     setLoading(true);
     try {
       await registerUser({
@@ -94,8 +100,14 @@ export default function RegisterPage() {
       <form onSubmit={submit}>
         <div className="field" style={{ marginBottom: "var(--s-3)" }}>
           <label>Email <span className="req">*</span></label>
-          <input className={"input" + invalidClass("email")} type="email" required value={form.email} onChange={setField("email")} placeholder="you@example.ru" autoFocus />
+          <input className={"input" + invalidClass("email")} type="email" required value={form.email}
+            onChange={(e) => { setField("email")(e); typo.reset(); }}
+            onBlur={() => typo.check(form.email)}
+            placeholder="you@example.ru" autoFocus />
           <FieldError>{fields.email}</FieldError>
+          <EmailTypoHint suggestion={typo.suggestion}
+            onFix={(fixed) => { setForm((p) => ({ ...p, email: fixed })); typo.reset(); }}
+            onKeep={() => typo.keep(form.email)} />
         </div>
         <div className="field" style={{ marginBottom: "var(--s-3)" }}>
           <label>Телефон <span className="req">*</span></label>

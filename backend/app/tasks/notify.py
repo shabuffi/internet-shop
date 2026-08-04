@@ -268,6 +268,12 @@ def _shop_name(db) -> str:
     return row.value if row and row.value else "Магазин"
 
 
+def _site_base() -> str:
+    """База для ссылок в письмах — домен фронта (первый ALLOWED_ORIGINS), без хвостового слэша."""
+    from app.core.config import settings
+    return (settings.ALLOWED_ORIGINS[0] if settings.ALLOWED_ORIGINS else "https://td-engineer.ru").rstrip("/")
+
+
 @celery_app.task(name="app.tasks.notify.notify_order_confirmation")
 def notify_order_confirmation(order_id: str):
     """Письмо ПОКУПАТЕЛЮ с подтверждением заказа (номер, состав, сумма, контакты магазина).
@@ -389,15 +395,13 @@ def send_password_reset(user_id: str, token: str):
     from app.db.session import SessionLocal
     from app.db.models.user import User
     from app.integrations.email import send_email
-    from app.core.config import settings
 
     db = SessionLocal()
     try:
         user = db.get(User, user_id)
         if not user or not user.email:
             return {"sent": False}
-        base = (settings.ALLOWED_ORIGINS[0] if settings.ALLOWED_ORIGINS else "https://td-engineer.ru").rstrip("/")
-        link = f"{base}/reset?token={token}"
+        link = f"{_site_base()}/reset?token={token}"
         shop_name = _shop_name(db)
         text = (
             f"Здравствуйте!\n\n"
@@ -409,6 +413,74 @@ def send_password_reset(user_id: str, token: str):
         )
         ok = send_email(user.email, f"Восстановление пароля — {shop_name}", text, from_name=shop_name)
         print(f"send_password_reset: {user.email} → {'отправлено' if ok else 'НЕ отправлено'}", flush=True)
+        return {"sent": bool(ok)}
+    finally:
+        db.close()
+
+
+@celery_app.task(name="app.tasks.notify.send_email_change_confirm")
+def send_email_change_confirm(user_id: str, token: str):
+    """Письмо на НОВЫЙ адрес со ссылкой подтверждения смены email (действует 24 часа).
+
+    Адресат — ``user.pending_email``, а не ``user.email``: смысл письма как раз в том, чтобы
+    подтвердить владение заявленным ящиком. Если заявку успели отменить — тихо выходим.
+    """
+    from app.db.session import SessionLocal
+    from app.db.models.user import User
+    from app.integrations.email import send_email
+
+    db = SessionLocal()
+    try:
+        user = db.get(User, user_id)
+        if not user or not user.pending_email:
+            return {"sent": False}
+        link = f"{_site_base()}/email-confirm?token={token}"
+        shop_name = _shop_name(db)
+        text = (
+            f"Здравствуйте!\n\n"
+            f"Для аккаунта {user.email} на сайте «{shop_name}» запрошена смена адреса "
+            f"электронной почты на {user.pending_email}.\n"
+            f"Чтобы новый адрес вступил в силу, перейдите по ссылке (действует 24 часа):\n\n"
+            f"{link}\n\n"
+            f"До подтверждения вход в личный кабинет выполняется по прежнему адресу.\n"
+            f"Если вы не запрашивали смену — просто проигнорируйте это письмо."
+        )
+        ok = send_email(user.pending_email, f"Подтверждение нового адреса — {shop_name}",
+                        text, from_name=shop_name)
+        print(f"send_email_change_confirm: {user.pending_email} → "
+              f"{'отправлено' if ok else 'НЕ отправлено'}", flush=True)
+        return {"sent": bool(ok)}
+    finally:
+        db.close()
+
+
+@celery_app.task(name="app.tasks.notify.notify_email_changed")
+def notify_email_changed(user_id: str, old_email: str):
+    """Письмо на СТАРЫЙ адрес: логин аккаунта изменён.
+
+    Единственный канал, по которому владелец узнает о подмене, если смену затеял не он
+    (новым адресом злоумышленник уже владеет). Ошибки отправки не пробрасываем.
+    """
+    from app.db.session import SessionLocal
+    from app.db.models.user import User
+    from app.integrations.email import send_email
+
+    db = SessionLocal()
+    try:
+        user = db.get(User, user_id)
+        if not user or not old_email:
+            return {"sent": False}
+        shop_name = _shop_name(db)
+        text = (
+            f"Здравствуйте!\n\n"
+            f"Адрес электронной почты вашего аккаунта на сайте «{shop_name}» изменён "
+            f"с {old_email} на {user.email}.\n"
+            f"Вход в личный кабинет теперь выполняется по новому адресу.\n\n"
+            f"Если вы этого не делали — срочно свяжитесь с нами: смену мог инициировать "
+            f"посторонний, получивший доступ к вашему аккаунту."
+        )
+        ok = send_email(old_email, f"Адрес аккаунта изменён — {shop_name}", text, from_name=shop_name)
+        print(f"notify_email_changed: {old_email} → {'отправлено' if ok else 'НЕ отправлено'}", flush=True)
         return {"sent": bool(ok)}
     finally:
         db.close()

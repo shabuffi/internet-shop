@@ -8,6 +8,8 @@ export type CustomerType = "individual" | "ip" | "ooo";
 export interface UserProfile {
   id: string;
   email: string;
+  /** Заявленный, но ещё не подтверждённый адрес (смена email ждёт перехода по ссылке). */
+  pending_email: string | null;
   phone: string;
   customer_type: CustomerType;
   customer_name: string;
@@ -69,6 +71,45 @@ export function loginUser(body: { email: string; password: string }): Promise<Us
 
 export function changePassword(body: { current_password: string; new_password: string }): Promise<{ message: string }> {
   return postJson<{ message: string }>("/change-password", body, "Не удалось изменить пароль");
+}
+
+// ─── Смена email (двухшаговая: заявка → подтверждение по ссылке из письма) ───
+
+/** Заявка на смену email. Логин НЕ меняется — адрес попадёт в `pending_email` до подтверждения. */
+export function changeEmail(body: { new_email: string; current_password: string }):
+  Promise<{ message: string; pending_email: string }> {
+  return postJson("/change-email", body, "Не удалось изменить email");
+}
+
+/** Подтверждение нового адреса по токену из письма (после успеха покупатель авторизован). */
+export function confirmEmailChange(token: string): Promise<UserProfile> {
+  return postJson<UserProfile>("/change-email/confirm", { token }, "Не удалось подтвердить email");
+}
+
+/** Отмена заявки — ссылка из отправленного письма перестаёт работать. */
+export function cancelEmailChange(): Promise<UserProfile> {
+  return postJson<UserProfile>("/change-email/cancel", {}, "Не удалось отменить смену email");
+}
+
+/** Подсказка об опечатке в домене: полный исправленный адрес или `null`.
+ *
+ *  Словарь опечаток живёт на бэкенде (services/email_typos.py) и здесь НЕ дублируется.
+ *  Сетевой сбой = молчание: подсказка вспомогательная и ничего не блокирует.
+ */
+export async function suggestEmailFix(email: string): Promise<string | null> {
+  try {
+    const res = await fetch(`${API}/check-email`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "same-origin",
+      body: JSON.stringify({ email }),
+    });
+    if (!res.ok) return null;
+    const data: { suggestion: string | null } = await res.json();
+    return data.suggestion ?? null;
+  } catch {
+    return null;
+  }
 }
 
 // Запрос восстановления пароля — бэкенд всегда отвечает ok (не раскрывает, есть ли аккаунт).
