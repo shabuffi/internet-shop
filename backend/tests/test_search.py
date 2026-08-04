@@ -36,6 +36,14 @@ def _matches(query: str, name: str) -> bool:
     )
 
 
+def _matches_loose(query: str, name: str) -> bool:
+    """Нашёлся бы товар «мягким» поиском — подстрокой (фолбэк витрины и режим админки)."""
+    return any(
+        all(_pg_to_py(search.escape_token(w)).search(name) for w in search.tokens(v))
+        for v in search.layout_variants(query)
+    )
+
+
 def _sql(cond) -> str:
     # %% — удвоение для paramstyle драйвера, к смыслу условия отношения не имеет
     sql = str(cond.compile(dialect=postgresql.dialect(),
@@ -136,6 +144,24 @@ def test_build_filter_checks_name_and_article():
     assert "'мыло%'" in sql                       # витрина: артикул ищем с начала
 
 
+# --- «мягкий» режим (фолбэк на пустой выдаче + админка) ----------------------------------
+
+@pytest.mark.parametrize("query, name", [
+    ("бложка", "Обложка для тетрадей ПИФАГОР"),   # обрывок с середины слова
+    ("лочка", "Ёлочка настольная"),               # + е ≡ ё работает и здесь
+])
+def test_loose_finds_what_strict_misses(query, name):
+    assert not _matches(query, name)               # строгий поиск (витрина) — мимо
+    assert _matches_loose(query, name)             # мягкий — находит
+
+
+def test_loose_is_a_superset_of_strict():
+    # всё, что находил строгий поиск, мягкий находит тоже — фолбэк не «теряет» товары
+    for query, name in [("мыло", "Мыло детское"), ("елка", "Ёлка СКАЗКА"),
+                        ("мыло детское", "Детское мыло 90 г"), ("vskj", "Мыло")]:
+        assert _matches(query, name) and _matches_loose(query, name)
+
+
 def test_build_filter_substring_mode_for_admin():
     sql = _sql(search.build_filter("мыло", _T.name, _T.article, substring=True))
     assert "'%мыло%'" in sql
@@ -172,3 +198,17 @@ def test_relevance_case_folds_yo():
 def test_relevance_case_covers_layout_variants():
     sql = _sql(search.relevance_case("vskj", _T.name))
     assert "'мыло'" in sql
+
+
+def test_relevance_case_ranks_word_start_above_inside_word():
+    # 0 — имя целиком, 1 — с начала имени, 2 — с начала слова, 3 — только внутри слова
+    sql = _sql(search.relevance_case("ложка", _T.name))
+    assert "'^ложка'" in sql                                  # ранг 1
+    assert "'(^|[^[:alnum:]а-яё])ложка'" in sql               # ранг 2
+    assert "ELSE 3" in sql                                    # ранг 3 — подстрока
+
+
+def test_match_position_sorts_early_matches_first():
+    sql = _sql(search.match_position("Бложка", _T.name))
+    assert "strpos(translate(lower(t.name), 'ё', 'е'), 'бложка')" in sql
+    assert "9999" in sql                                      # не нашлось → в конец

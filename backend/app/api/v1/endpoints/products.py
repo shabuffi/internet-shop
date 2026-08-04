@@ -302,7 +302,9 @@ def list_products(
         page: Номер страницы (с 1).
         page_size: Размер страницы (1–100).
         category_id: Если задан — фильтр по категории.
-        search: Если задан — поиск без учёта регистра по названию или артикулу.
+        search: Если задан — поиск по названию или артикулу (правила — в
+            :mod:`app.services.search`). Если точных совпадений нет, выдача добирается
+            «мягким» поиском (подстрокой) и сортируется по качеству совпадения.
         sort: Порядок: ``price_asc`` / ``price_desc`` / ``category`` / ``name`` (по умолчанию —
             name). При сортировке по имени отбрасываем код склада в начале («с1/с2 …»).
             ``category`` — блоками в порядке показа категорий, внутри блока по алфавиту.
@@ -325,13 +327,6 @@ def list_products(
         # выпадающего фильтра — это просто список из одного id.
         ids = [c for c in category_id.split(",") if c]
         query = query.where(Product.category_id.in_(ids))
-
-    if search:
-        # Правила поиска (совпадение по началу слова, е ≡ ё, раскладка, слова в любом
-        # порядке) — в app.services.search, общие с админкой.
-        cond = search_service.build_filter(search, Product.name, Product.article)
-        if cond is not None:
-            query = query.where(cond)
 
     if with_photo:
         query = query.where(Product.image_url.isnot(None), Product.image_url != "")
@@ -356,6 +351,15 @@ def list_products(
                    PromoCategory.priority < target.priority)
         )
         query = query.where(Product.id.in_(members), Product.id.notin_(stronger))
+
+    # Поиск применяем ПОСЛЕДНИМ и запоминаем выборку без него (`unsearched`): если строгий поиск
+    # (по началу слова) не найдёт НИЧЕГО, переспросим мягче — подстрокой. Так в обычной выдаче
+    # нет мусора («ель» — это ёлки, а не гель с наполнителем), но и тупика «ничего не найдено»
+    # почти нет: «бложка» найдёт «Обложка».
+    unsearched = query
+    strict_cond = search_service.build_filter(search, Product.name, Product.article) if search else None
+    if strict_cond is not None:
+        query = query.where(strict_cond)
 
     # Имя без кода склада «с1/с2 …» и без префикса «ЧЗ» (Честный знак) —
     # для сортировки и оценки релевантности (товар «ЧЗ Апельсины» сортируется под «А»).
@@ -383,12 +387,13 @@ def list_products(
         order_cols = [search_service.relevance_case(search, clean_name), clean_name.asc()]
     else:
         order_cols = [clean_name.asc()]
-    # По умолчанию сверху — товары «сильнейших» промо-категорий (меньший priority),
+    # При ПРОСМОТРЕ каталога сверху идут товары «сильнейших» промо-категорий (меньший priority),
     # затем остальные. Ранг = минимальный priority среди активных категорий товара.
-    # При явной сортировке по цене — не вмешиваемся (пользователь хочет чистый порядок по цене).
-    # Во всех остальных режимах (в т.ч. «По категориям», дефолт витрины) промо-товары идут СВЕРХУ,
-    # независимо от порядка: сначала промо-блок, внутри него — тот же порядок (категории/алфавит).
-    if sort not in ("price_asc", "price_desc"):
+    # НЕ применяем промо-ранг в двух случаях:
+    #   * явная сортировка по цене — пользователь хочет чистый порядок по цене;
+    #   * ПОИСК — там порядок задаёт качество совпадения. Иначе промо-товар, подходящий под
+    #     запрос хуже, оказывался бы выше того, что человек искал.
+    if sort not in ("price_asc", "price_desc") and not search:
         rank_subq = (
             select(func.min(PromoCategory.priority))
             .select_from(product_promo_categories)
@@ -401,7 +406,28 @@ def list_products(
         order_cols = [featured_rank, *order_cols]
     query = query.order_by(*order_cols)
 
-    total = db.scalar(select(func.count()).select_from(query.order_by(None).subquery()))
+    def _count(q) -> int:
+        return db.scalar(select(func.count()).select_from(q.order_by(None).subquery()))
+
+    total = _count(query)
+    # Подстраховка от пустой выдачи: строгий поиск ничего не дал → ищем подстрокой (см. выше).
+    # Второй запрос платим ТОЛЬКО когда иначе показали бы «ничего не найдено».
+    if total == 0 and strict_cond is not None:
+        loose_cond = search_service.build_filter(
+            search, Product.name, Product.article, substring=True)
+        if loose_cond is not None:
+            # Порядок — по качеству совпадения: сначала ранг (целиком → с начала названия →
+            # с начала слова → внутри слова), затем позиция вхождения («Обложка для тетрадей»
+            # выше «Дневника (мягкая обложка)»). Промо-ранга здесь нет — как и в обычном поиске.
+            loose_order = [
+                search_service.relevance_case(search, clean_name),
+                search_service.match_position(search, clean_name),
+                clean_name.asc(),
+            ]
+            loose_query = unsearched.where(loose_cond).order_by(*loose_order)
+            loose_total = _count(loose_query)
+            if loose_total:
+                query, total = loose_query, loose_total
     items = db.scalars(query.offset((page - 1) * page_size).limit(page_size)).all()
 
     percent = _percent_for(user)

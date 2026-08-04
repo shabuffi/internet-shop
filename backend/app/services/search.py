@@ -15,7 +15,7 @@
 
 import re
 
-from sqlalchemy import and_, case, func, or_
+from sqlalchemy import and_, case, func, literal, or_
 
 # Раскладка клавиатуры: один и тот же физический ряд клавиш в EN (QWERTY) и RU (ЙЦУКЕН).
 _EN_KEYS = "`qwertyuiop[]asdfghjkl;'zxcvbnm,./"
@@ -130,7 +130,12 @@ def build_filter(text: str, name_col, article_col=None, *, substring: bool = Fal
 
 
 def relevance_case(text: str, name_col):
-    """Ранг релевантности для ORDER BY: 0 — точное совпадение, 1 — начинается с запроса, 2 — прочее.
+    """Ранг качества совпадения для ORDER BY — чем меньше, тем лучше:
+
+    * ``0`` — название целиком равно запросу;
+    * ``1`` — название начинается с запроса;
+    * ``2`` — запрос стоит в начале какого-то слова названия (правило витрины);
+    * ``3`` — запрос нашёлся только ВНУТРИ слова (так выглядит «мягкая» выдача).
 
     Сравнение с учётом е ≡ ё и неправильной раскладки; ``name_col`` передаётся уже очищенным
     от служебных префиксов (код склада, «ЧЗ»), чтобы «Апельсины» находились точным совпадением.
@@ -141,4 +146,21 @@ def relevance_case(text: str, name_col):
     folded = func.translate(func.lower(name_col), "ё", "е")
     exact = [folded == fold_yo(v) for v in variants]
     starts = [name_col.op("~*")(prefix_regex(v)) for v in variants]
-    return case((or_(*exact), 0), (or_(*starts), 1), else_=2)
+    # Начало слова проверяем по запросу ЦЕЛИКОМ: у многословного запроса это отдельный,
+    # более сильный сигнал, чем «каждое слово нашлось где-то» (по нему выдача и отобрана).
+    in_word = [name_col.op("~*")(word_start_regex(v)) for v in variants]
+    return case((or_(*exact), 0), (or_(*starts), 1), (or_(*in_word), 2), else_=3)
+
+
+def match_position(text: str, name_col):
+    """Позиция первого вхождения запроса в названии — «чем ближе к началу, тем релевантнее».
+
+    Тонкая сортировка внутри одного ранга :func:`relevance_case`: по запросу «бложка»
+    «Обложка для тетрадей» (позиция 2) обгоняет «Блокнот … твёрдая обложка» (позиция 40).
+    Не нашлось (например, слова запроса разбросаны по названию) → в конец.
+    """
+    q = fold_yo(normalize(text))
+    if not q:
+        return literal(0)
+    pos = func.strpos(func.translate(func.lower(name_col), "ё", "е"), q)
+    return case((pos == 0, 9999), else_=pos)
