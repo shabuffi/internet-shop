@@ -4,11 +4,29 @@
 уведомлений в Telegram/ВК. Ошибки не пробрасываются (письмо не должно ронять заказ).
 """
 
+import re
 import smtplib
 from email.mime.text import MIMEText
 from email.utils import formataddr, formatdate, make_msgid
 
 from app.core.config import settings
+
+
+def _recipients(to: str) -> list[str]:
+    """Список адресов из строки: допускаем несколько через запятую или «;».
+
+    Нужно для дублирования уведомлений владельцу. Письмо на внешний ящик может пропасть
+    без следа: принимающая сторона отвечает «занят, попробуй позже» (SMTP 4xx), а релей
+    Beget повторных попыток не делает и сразу возвращает письмо. Вторым адресом ставим
+    ящик на своём домене — эта копия дальше релея не идёт и потеряться там не может.
+
+    Args:
+        to: Один адрес или несколько через запятую/точку с запятой.
+
+    Returns:
+        Адреса без пустых значений и лишних пробелов.
+    """
+    return [addr.strip() for addr in re.split(r"[,;]", to or "") if addr.strip()]
 
 
 def get_smtp_config() -> dict:
@@ -53,7 +71,7 @@ def send_email_detail(to: str, subject: str, body: str, from_name: str = "Маг
     берём логин — большинство почт (Яндекс/Mail/Gmail) разрешают слать лишь со своего адреса.
 
     Args:
-        to: Email получателя.
+        to: Email получателя; можно несколько через запятую (см. :func:`_recipients`).
         subject: Тема.
         body: Текст (plain).
         from_name: Отображаемое имя отправителя.
@@ -62,7 +80,8 @@ def send_email_detail(to: str, subject: str, body: str, from_name: str = "Маг
         Кортеж ``(успех, причина_ошибки|None)``.
     """
     cfg = get_smtp_config()
-    if not (cfg["host"] and cfg["user"] and cfg["password"] and to):
+    recipients = _recipients(to)
+    if not (cfg["host"] and cfg["user"] and cfg["password"] and recipients):
         return False, "не заполнены данные SMTP (сервер / логин / пароль)"
     # «От кого» должен быть email и (для Яндекса и пр.) совпадать с логином — иначе берём логин
     from_addr = cfg["from_email"] if "@" in (cfg["from_email"] or "") else cfg["user"]
@@ -70,7 +89,7 @@ def send_email_detail(to: str, subject: str, body: str, from_name: str = "Маг
         msg = MIMEText(body, "plain", "utf-8")
         msg["Subject"] = subject
         msg["From"] = formataddr((from_name, from_addr))
-        msg["To"] = to
+        msg["To"] = ", ".join(recipients)
         # Date и Message-ID обязательны по RFC 5322: без них многие провайдеры (mail.ru,
         # gmail, yandex) режут письмо в спам/отклоняют. Message-ID — в домене отправителя.
         msg["Date"] = formatdate(localtime=True)
@@ -79,7 +98,11 @@ def send_email_detail(to: str, subject: str, body: str, from_name: str = "Маг
         with smtplib.SMTP(cfg["host"], port, timeout=15) as server:
             server.starttls()
             server.login(cfg["user"], cfg["password"])
-            server.sendmail(from_addr, [to], msg.as_string())
+            refused = server.sendmail(from_addr, recipients, msg.as_string())
+        # sendmail бросает исключение, только если отказали ВСЕ адреса; частичный отказ
+        # возвращается словарём. Хотя бы один получатель принят — письмо ушло, но след в лог.
+        if refused:
+            print(f"Email-уведомление: адреса отклонены — {', '.join(refused)}", flush=True)
         return True, None
     except Exception as exc:
         print(f"Email-уведомление не отправлено: {exc}", flush=True)

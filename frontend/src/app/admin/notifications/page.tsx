@@ -168,11 +168,12 @@ export default function NotificationsPage() {
       <form style={cardStyle} onSubmit={e => saveSection(e, "email", ["notify_email"])}>
         <p style={{ fontWeight: 600, fontSize: 16, marginBottom: 6 }}>Email</p>
         <p style={{ fontSize: 13, color: "var(--ink-secondary)", marginBottom: 12 }}>
-          Куда слать письма о новых заказах.
+          Куда слать письма о новых заказах. Можно указать несколько адресов через запятую —
+          письмо уйдёт на каждый.
         </p>
         <div style={inputStyle}>
           <label className="form-label">Email владельца</label>
-          <input className="form-input" type="email" value={form.notify_email} onChange={set("notify_email")} placeholder="вы получите письмо на этот адрес" autoComplete="off" />
+          <input className="form-input" type="email" multiple value={form.notify_email} onChange={set("notify_email")} placeholder="вы получите письмо на этот адрес" autoComplete="off" />
         </div>
         {readyNote(emailReady, "Почтовый сервер")}
         {saveRow("email")}
