@@ -289,6 +289,7 @@ def list_products(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     category_id: str | None = Query(None),
+    exclude_category_id: str | None = Query(None),
     search: str | None = Query(None),
     sort: str | None = Query(None),
     with_photo: bool = Query(False),
@@ -302,6 +303,8 @@ def list_products(
         page: Номер страницы (с 1).
         page_size: Размер страницы (1–100).
         category_id: Если задан — фильтр по категории.
+        exclude_category_id: Если задан — наоборот, ИСКЛЮЧАЕТ эти категории из выдачи
+            (витрина: «то же самое по запросу, но в других категориях»).
         search: Если задан — поиск по названию или артикулу (правила — в
             :mod:`app.services.search`). Если точных совпадений нет, выдача добирается
             «мягким» поиском (подстрокой) и сортируется по качеству совпадения.
@@ -327,6 +330,17 @@ def list_products(
         # выпадающего фильтра — это просто список из одного id.
         ids = [c for c in category_id.split(",") if c]
         query = query.where(Product.category_id.in_(ids))
+
+    if exclude_category_id:
+        # Обратный фильтр для блока «Ещё N по запросу … в других категориях» на витрине:
+        # та же самая выдача, но БЕЗ уже показанного раздела. Считать «остальные» вычитанием
+        # (`общий total` − `total категории`) нельзя: при пустом строгом поиске выдача
+        # добирается мягким (см. ниже), и внутри категории она уже не подмножество общей.
+        ids = [c for c in exclude_category_id.split(",") if c]
+        # Товары без категории — тоже «другие»; NOT IN по NULL сам по себе их отбросил бы.
+        query = query.where(
+            (Product.category_id.is_(None)) | (Product.category_id.notin_(ids))
+        )
 
     if with_photo:
         query = query.where(Product.image_url.isnot(None), Product.image_url != "")

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { getProducts, getCategories, getStoreInfo, getPromoCategories } from "@/lib/api";
 import { primaryPromo } from "@/lib/promo";
 import { CATEGORY_GROUPS, normCatName } from "@/lib/categoryGroups";
-import type { Category } from "@/types/product";
+import type { Category, Product } from "@/types/product";
 import AddToCartCard from "@/components/AddToCartCard";
 import ProductStockHint from "@/components/ProductStockHint";
 import ChestnyZnakBadge from "@/components/ChestnyZnakBadge";
@@ -83,6 +83,19 @@ function pageNumbers(current: number, total: number): number[] {
   return out;
 }
 
+// Сколько находок из остального каталога показываем под разделителем (плиткой). Это витрина
+// блока, а не вся выдача: за остальным — ссылка «Показать все результаты».
+const OTHERS_PREVIEW = 12;
+
+// «1 товар / 2 товара / 5 товаров» — русские окончания для счётчиков в тексте.
+function plural(n: number, one: string, few: string, many: string): string {
+  const m10 = n % 10;
+  const m100 = n % 100;
+  if (m10 === 1 && m100 !== 11) return one;
+  if (m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14)) return few;
+  return many;
+}
+
 export default async function CatalogPage({ searchParams }: Props) {
   const params = await searchParams;
   const categoryId = params.category_id;
@@ -116,13 +129,24 @@ export default async function CatalogPage({ searchParams }: Props) {
   const categoryLabel = resolveCategoryLabel(categoryId, categories);
   const categoryPath = resolveCategoryPath(categoryId, categories);
 
-  // Искали внутри категории и ничего не нашли? Проверим, есть ли товар по этому запросу
-  // вообще — чтобы предложить кнопку «искать во всех категориях» с числом находок.
+  // Поиск внутри категории показываем ОДНОЙ страницей: сверху находки раздела, под
+  // разделителем — остальной каталог. Покупатель не упирается в пустой экран и не теряет
+  // товар только потому, что тот лежит в соседнем разделе.
   const searchedInCategory = Boolean(search && categoryId);
-  const totalWithoutCategory =
-    searchedInCategory && data.items.length === 0
-      ? (await getProducts({ search, page_size: 1 })).total
-      : 0;
+  // (1) В разделе нет НИЧЕГО → основной выдачей становится общая, со своей пагинацией.
+  const fallback =
+    searchedInCategory && data.total === 0
+      ? await getProducts({ search, page, sort, with_photo: withPhoto, page_size: listView ? 100 : undefined })
+      : null;
+  // (2) В разделе что-то есть → на ПОСЛЕДНЕЙ его странице дополняем выдачу находками из
+  // остального каталога (на промежуточных страницах это был бы один и тот же блок).
+  const others =
+    searchedInCategory && data.total > 0 && page >= data.pages
+      ? await getProducts({ search, sort, with_photo: withPhoto, exclude_category_id: categoryId,
+                            page_size: listView ? 100 : OTHERS_PREVIEW })
+      : null;
+  // Что показываем основной сеткой и по чему считаем пагинацию/счётчик.
+  const list = fallback ?? data;
   const toggle = (active: boolean): React.CSSProperties => ({
     display: "flex", alignItems: "center", justifyContent: "center", padding: "7px 12px", textDecoration: "none",
     background: active ? "var(--accent)" : "transparent", color: active ? "var(--on-accent)" : "var(--ink-secondary)",
@@ -139,6 +163,45 @@ export default async function CatalogPage({ searchParams }: Props) {
       <line x1="3.5" y1="6" x2="3.5" y2="6" /><line x1="3.5" y1="12" x2="3.5" y2="12" /><line x1="3.5" y1="18" x2="3.5" y2="18" />
     </svg>
   );
+
+  // Карточка товара — одна разметка для обеих сеток: «в категории» и «в других категориях».
+  const renderCard = (p: Product) => {
+    const badge = primaryPromo(p.promo_slugs, promoBySlug);
+    return (
+      <article className="pcard" key={p.id}>
+        <Link href={`/products/${p.id}`} className="pcard__media" aria-label={p.name}>
+          {badge && <PromoBadge category={badge} />}
+          <span className="pcard__badge">
+            {p.available && p.stock > 0
+              ? <span className="badge badge--stock"><span className="badge__dot" />{showQty ? `${p.stock} шт.` : "В наличии"}</span>
+              : p.available
+              ? <span className="badge badge--stock"><span className="badge__dot" />В наличии</span>
+              : <span className="badge badge--out"><span className="badge__dot" />Нет</span>}
+          </span>
+          <div className="photo photo--square">
+            {p.image_url
+              ? <img src={`/api/v1/products/${p.id}/image`} alt={p.name} />
+              : <NoPhoto />}
+          </div>
+        </Link>
+        <div className="pcard__body">
+          <div className="pcard__cat">{p.category?.name ?? " "}</div>
+          <div className="pcard__namewrap" style={{ display: "flex", alignItems: "flex-start", gap: 6 }}>
+            {p.chestnyZnak && <ChestnyZnakBadge size={15} />}
+            <ProductName id={p.id} name={p.name} />
+          </div>
+          <div className="pcard__sku">{p.article ? `Арт. ${p.article}` : " "}</div>
+          <div className="pcard__foot">
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 6, minWidth: 0 }}>
+              <ProductPrice p={p} />
+              <ProductStockHint product={p} />
+            </span>
+            <AddToCartCard product={p} />
+          </div>
+        </div>
+      </article>
+    );
+  };
 
   return (
     <div className="page">
@@ -208,95 +271,86 @@ export default async function CatalogPage({ searchParams }: Props) {
               <Link href={buildHref({ category_id: categoryId, search, sort: explicitSort, photo: withPhoto })} style={toggle(!listView)} title="Плиткой" aria-label="Плиткой">{IconGrid}</Link>
               <Link href={buildHref({ category_id: categoryId, search, sort: explicitSort, photo: withPhoto, view: "list" })} style={toggle(listView)} title="Списком (бланк заказа)" aria-label="Списком (бланк заказа)">{IconRows}</Link>
             </div>
-            <span className="result-count">{data.total} товаров</span>
+            {/* Считаем то, что реально показано основной сеткой: в режиме «в разделе пусто →
+                показываем весь каталог» это общая выдача, иначе — выдача раздела. */}
+            <span className="result-count">{list.total} товаров</span>
           </div>
         </div>
 
-        {data.items.length === 0 ? (
+        {list.items.length === 0 ? (
           <div className="empty">
             <div className="empty__icon"><IconSearch width="1em" height="1em" /></div>
             <h3>Ничего не найдено</h3>
-            {searchedInCategory ? (
-              <>
-                <p>
-                  По запросу «{search}» в категории «{categoryLabel}» ничего нет
-                  {totalWithoutCategory > 0 ? `, но в других категориях найдено: ${totalWithoutCategory}.` : "."}
-                </p>
-                {totalWithoutCategory > 0 ? (
-                  <Link className="btn btn--primary"
-                    href={buildHref({ search, sort: explicitSort, view: listView ? "list" : undefined, photo: withPhoto })}>
-                    Искать во всех категориях ({totalWithoutCategory})
-                  </Link>
-                ) : (
-                  <Link href="/catalog" className="btn btn--primary">Сбросить фильтры</Link>
-                )}
-              </>
-            ) : (
-              <>
-                <p>{search ? `По запросу «${search}» товаров нет.` : "В этой категории пока пусто."}</p>
-                <Link href="/catalog" className="btn btn--primary">Сбросить фильтры</Link>
-              </>
-            )}
+            <p>
+              {searchedInCategory
+                ? `По запросу «${search}» нет товаров ни в этом разделе, ни в остальном каталоге.`
+                : search ? `По запросу «${search}» товаров нет.` : "В этой категории пока пусто."}
+            </p>
+            <Link href="/catalog" className="btn btn--primary">Сбросить фильтры</Link>
           </div>
         ) : (
           <>
-            {listView ? (
-              <CatalogList products={data.items} showQty={showQty} />
-            ) : (
-              <div className="catalog-grid">
-                {data.items.map((p) => {
-                  const badge = primaryPromo(p.promo_slugs, promoBySlug);
-                  return (
-                  <article className="pcard" key={p.id}>
-                    <Link href={`/products/${p.id}`} className="pcard__media" aria-label={p.name}>
-                      {badge && <PromoBadge category={badge} />}
-                      <span className="pcard__badge">
-                        {p.available && p.stock > 0
-                          ? <span className="badge badge--stock"><span className="badge__dot" />{showQty ? `${p.stock} шт.` : "В наличии"}</span>
-                          : p.available
-                          ? <span className="badge badge--stock"><span className="badge__dot" />В наличии</span>
-                          : <span className="badge badge--out"><span className="badge__dot" />Нет</span>}
-                      </span>
-                      <div className="photo photo--square">
-                        {p.image_url
-                          ? <img src={`/api/v1/products/${p.id}/image`} alt={p.name} />
-                          : <NoPhoto />}
-                      </div>
-                    </Link>
-                    <div className="pcard__body">
-                      <div className="pcard__cat">{p.category?.name ?? " "}</div>
-                      <div className="pcard__namewrap" style={{ display: "flex", alignItems: "flex-start", gap: 6 }}>
-                        {p.chestnyZnak && <ChestnyZnakBadge size={15} />}
-                        <ProductName id={p.id} name={p.name} />
-                      </div>
-                      <div className="pcard__sku">{p.article ? `Арт. ${p.article}` : " "}</div>
-                      <div className="pcard__foot">
-                        <span style={{ display: "inline-flex", alignItems: "center", gap: 6, minWidth: 0 }}>
-                          <ProductPrice p={p} />
-                          <ProductStockHint product={p} />
-                        </span>
-                        <AddToCartCard product={p} />
-                      </div>
-                    </div>
-                  </article>
-                  );
-                })}
+            {/* В разделе пусто, но по каталогу есть — вместо пустого экрана сразу показываем
+                общую выдачу и объясняем, почему она общая. */}
+            {fallback && (
+              <div style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "12px 16px", marginBottom: "var(--s-8)",
+                border: "1px solid var(--hairline)", borderRadius: 10, background: "var(--cloud)" }}>
+                <IconSearch width="18" height="18" style={{ flexShrink: 0, marginTop: 2, color: "var(--accent)" }} />
+                <span style={{ fontSize: 14, lineHeight: 1.5 }}>
+                  {categoryLabel ? <>В категории «{categoryLabel}»</> : "В выбранном разделе"} по запросу «{search}» ничего нет.{" "}
+                  <b>Показываем {fallback.total} {plural(fallback.total, "товар", "товара", "товаров")} по всему каталогу.</b>
+                </span>
               </div>
             )}
 
-            {data.pages > 1 && (
+            {listView ? (
+              <CatalogList products={list.items} showQty={showQty} />
+            ) : (
+              <div className="catalog-grid">{list.items.map(renderCard)}</div>
+            )}
+
+            {list.pages > 1 && (
               <div className="pagination">
                 {page > 1
                   ? <Link href={buildHref({ category_id: categoryId, search, sort: explicitSort, photo: withPhoto, page: page - 1, view: listView ? "list" : undefined })} className="page-dot" aria-label="Назад">‹</Link>
                   : <span className="page-dot page-dot--disabled">‹</span>}
-                {pageNumbers(page, data.pages).map((n) => (
+                {pageNumbers(page, list.pages).map((n) => (
                   <Link key={n} href={buildHref({ category_id: categoryId, search, sort: explicitSort, photo: withPhoto, page: n, view: listView ? "list" : undefined })}
                     className={"page-dot " + (n === page ? "page-dot--active" : "")}>{n}</Link>
                 ))}
-                {page < data.pages
+                {page < list.pages
                   ? <Link href={buildHref({ category_id: categoryId, search, sort: explicitSort, photo: withPhoto, page: page + 1, view: listView ? "list" : undefined })} className="page-dot" aria-label="Вперёд">›</Link>
                   : <span className="page-dot page-dot--disabled">›</span>}
               </div>
+            )}
+
+            {/* Разделитель + находки из остального каталога. Только когда в разделе что-то
+                нашлось: если он пуст, выше уже стоит плашка и выдача и так общая. */}
+            {others && others.total > 0 && (
+              <>
+                <div style={{ display: "flex", alignItems: "center", gap: 14, margin: "var(--s-12) 0 var(--s-8)" }}>
+                  <span style={{ flex: 1, height: 0, borderTop: "1px solid var(--hairline)" }} />
+                  <span style={{ fontSize: 14, color: "var(--ink-secondary)", textAlign: "center" }}>
+                    Ещё {others.total} {plural(others.total, "товар", "товара", "товаров")} по запросу «{search}» в других категориях
+                  </span>
+                  <span style={{ flex: 1, height: 0, borderTop: "1px solid var(--hairline)" }} />
+                </div>
+
+                {listView ? (
+                  <CatalogList products={others.items} showQty={showQty} />
+                ) : (
+                  <div className="catalog-grid">{others.items.map(renderCard)}</div>
+                )}
+
+                {others.total > others.items.length && (
+                  <div style={{ display: "flex", justifyContent: "center", marginTop: "var(--s-8)" }}>
+                    <Link className="btn btn--primary"
+                      href={buildHref({ search, sort: explicitSort, view: listView ? "list" : undefined, photo: withPhoto })}>
+                      Показать все результаты по запросу «{search}»
+                    </Link>
+                  </div>
+                )}
+              </>
             )}
           </>
         )}

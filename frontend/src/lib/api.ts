@@ -63,6 +63,7 @@ export async function getProducts(params?: {
   page_size?: number;
   search?: string;
   category_id?: string;
+  exclude_category_id?: string;   // всё, КРОМЕ этих категорий («в других категориях»)
   sort?: string;          // name | price_asc | price_desc
   with_photo?: boolean;   // только товары с фото
   featured?: string;      // slug активной промо-категории (hot / novinki / special / …)
@@ -72,6 +73,7 @@ export async function getProducts(params?: {
   if (params?.page_size) query.set("page_size", String(params.page_size));
   if (params?.search) query.set("search", params.search);
   if (params?.category_id) query.set("category_id", params.category_id);
+  if (params?.exclude_category_id) query.set("exclude_category_id", params.exclude_category_id);
   if (params?.sort) query.set("sort", params.sort);
   if (params?.with_photo) query.set("with_photo", "1");
   if (params?.featured) query.set("featured", params.featured);
