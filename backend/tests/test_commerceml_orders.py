@@ -67,6 +67,29 @@ def test_build_orders_xml_structure():
     assert reqs["Комментарий"] == native        # дубль в реквизите совпадает со штатным тегом
 
 
+def test_order_datetime_converted_to_moscow_local():
+    """<Дата>/<Время> уходят в МойСклад в локальном времени магазина (Москва, UTC+3).
+
+    created_at в БД — наивный UTC. Заказ 12:00 UTC = 15:00 МСК → в выгрузке должно быть
+    15:00, а не 12:00 (иначе прежний сдвиг на 3 часа назад)."""
+    order = _order(created_at=datetime(2026, 6, 8, 12, 0, 0),   # 12:00 UTC
+                   items=[OrderItem(product_id="p-int", product_name="Т",
+                                    price=Decimal("10"), quantity=1)])
+    doc = etree.fromstring(build_orders_xml([order], {"p-int": "ms-1"})).find("Документ")
+    assert doc.find("Дата").text == "2026-06-08"
+    assert doc.find("Время").text == "15:00:00"    # 12:00 UTC + 3ч
+
+
+def test_order_datetime_crosses_midnight_to_next_day():
+    """Перевод UTC → МСК может сдвинуть и дату: 23:30 UTC = 02:30 МСК следующего дня."""
+    order = _order(created_at=datetime(2026, 6, 8, 23, 30, 0),   # 23:30 UTC
+                   items=[OrderItem(product_id="p-int", product_name="Т",
+                                    price=Decimal("10"), quantity=1)])
+    doc = etree.fromstring(build_orders_xml([order], {"p-int": "ms-1"})).find("Документ")
+    assert doc.find("Дата").text == "2026-06-09"    # уже следующий день
+    assert doc.find("Время").text == "02:30:00"
+
+
 def test_build_orders_xml_skips_unmapped_product():
     order = _order(items=[OrderItem(product_id="px", product_name="X", price=Decimal("10"), quantity=1)])
     root = etree.fromstring(build_orders_xml([order], {}))   # нет сопоставления

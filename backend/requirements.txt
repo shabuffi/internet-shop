@@ -31,3 +31,7 @@ sentry-sdk[fastapi]==2.62.0
 
 # Utils
 python-dotenv==1.0.1
+# База часовых поясов IANA для zoneinfo — python:3.12-slim (Debian) не содержит
+# /usr/share/zoneinfo. Нужна, чтобы ZoneInfo("Europe/Moscow") работал на любом хосте
+# (перевод времени заказа UTC → локальное время магазина при выгрузке в МойСклад).
+tzdata==2025.2

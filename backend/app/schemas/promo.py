@@ -1,6 +1,6 @@
-from datetime import datetime
-
 from pydantic import BaseModel, ConfigDict
+
+from app.core.timeutil import UtcDatetime
 
 
 class PromoCategoryPublic(BaseModel):
@@ -79,7 +79,7 @@ class MoySkladPropertyOut(BaseModel):
     id: str
     name: str
     origin: str = "classifier"
-    last_seen_at: datetime | None = None
+    last_seen_at: UtcDatetime | None = None
     # Сколько товаров заполняют это поле — считается на лету (~12 мс на 12.5k товаров).
     product_count: int = 0
     # Все непустые значения похожи на галочку (0/1, да/нет) — ПОДСКАЗКА для сортировки списка,

@@ -16,6 +16,7 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.exc import IntegrityError
 
 from app.core.config import settings
+from app.core.timeutil import iso_utc
 from app.db.session import get_db
 from app.db.models.admin import AdminUser, ShopSettings
 from app.db.models.product import Product, Category, SyncLog, SyncChange
@@ -735,7 +736,7 @@ def dashboard(db: Session = Depends(get_db), _=Depends(_get_current_admin)):
             "status":            last_sync.status if last_sync else None,
             "products_created":  last_sync.products_created if last_sync else 0,
             "products_updated":  last_sync.products_updated if last_sync else 0,
-            "finished_at":       last_sync.finished_at.isoformat() if last_sync and last_sync.finished_at else None,
+            "finished_at":       iso_utc(last_sync.finished_at) if last_sync else None,
         } if last_sync else None,
         # Последний контакт МойСклад (любой обмен) и последняя синхронизация заказов (orders.xml)
         "last_exchange_seen":  _redis_str("exchange:last_seen"),
@@ -794,8 +795,8 @@ def list_orders(
                 "customer_name": o.customer_name, "customer_phone": o.customer_phone,
                 "user_id": o.user_id, "is_guest": o.user_id is None,
                 "total_amount": str(o.total_amount),
-                "exported_at": o.exported_at.isoformat() if o.exported_at else None,
-                "created_at": o.created_at.isoformat(),
+                "exported_at": iso_utc(o.exported_at),
+                "created_at": iso_utc(o.created_at),
                 "items_count": len(o.items),
                 # Состав заказа — чтобы в админке было видно, что именно заказывали
                 "items": [
@@ -893,7 +894,7 @@ def list_products_admin(
                 "available": p.available,
                 "images": p.images or ([p.image_url] if p.image_url else []),
                 "images_manual": p.images_manual,
-                "is_active": p.is_active, "synced_at": p.synced_at.isoformat() if p.synced_at else None,
+                "is_active": p.is_active, "synced_at": iso_utc(p.synced_at),
             }
             for p in products
         ],
@@ -1379,8 +1380,8 @@ def sync_logs(db: Session = Depends(get_db), _=Depends(_get_current_admin)):
             "id": l.id, "source": l.source, "status": l.status,
             "products_created": l.products_created, "products_updated": l.products_updated,
             "error_message": l.error_message,
-            "started_at": l.started_at.isoformat(),
-            "finished_at": l.finished_at.isoformat() if l.finished_at else None,
+            "started_at": iso_utc(l.started_at),
+            "finished_at": iso_utc(l.finished_at),
             "changes_only": l.changes_only,
             "products_in_xml": l.products_in_xml,
             "has_xml": bool(l.xml_file),
@@ -1410,8 +1411,8 @@ def sync_log_detail(sync_id: int, db: Session = Depends(get_db), _=Depends(_get_
         "id": log.id, "source": log.source, "status": log.status,
         "products_created": log.products_created, "products_updated": log.products_updated,
         "error_message": log.error_message,
-        "started_at": log.started_at.isoformat(),
-        "finished_at": log.finished_at.isoformat() if log.finished_at else None,
+        "started_at": iso_utc(log.started_at),
+        "finished_at": iso_utc(log.finished_at),
         "changes_only": log.changes_only,
         "products_in_xml": log.products_in_xml,
         "has_xml": bool(log.xml_file),

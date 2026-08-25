@@ -7,11 +7,31 @@
 резерв вешается самим МойСклад (настройка «Резервировать товары»).
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
 
 from lxml import etree
 
+from app.core.config import settings
+
 SCHEMA_VERSION = "2.04"
+
+
+def _shop_local(dt: datetime, tz: ZoneInfo) -> datetime:
+    """Приводит таймстамп к локальному времени магазина.
+
+    Таймстампы (``Order.created_at`` и т.п.) хранятся в БД наивным UTC — их ставит
+    Postgres ``func.now()`` в UTC-сессии контейнера, как и весь остальной код трактует
+    наивные даты БД (см. ``_now_naive``). МойСклад же в CommerceML ждёт ``<Дата>``/
+    ``<Время>`` заказа в **локальном** времени аккаунта (Москва). Без перевода уходило
+    UTC-время, и заказ, оформленный в 15:00 МСК, приезжал как 12:00 (сдвиг на 3 часа).
+
+    Наивный ``dt`` считаем UTC и переводим в пояс магазина через ``astimezone`` — это
+    работает одинаково независимо от TZ сервера (не фиксированный сдвиг «+3»).
+    """
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(tz)
 
 # Способ получения заказа → человекочитаемая метка для МойСклад.
 DELIVERY_LABELS = {
@@ -42,15 +62,18 @@ def build_orders_xml(orders, ms_id_by_product: dict[str, str], guest_ext_code: s
     Returns:
         Байты XML (UTF-8, с XML-декларацией).
     """
+    tz = ZoneInfo(settings.SHOP_TIMEZONE)
+
     root = etree.Element("КоммерческаяИнформация")
     root.set("ВерсияСхемы", SCHEMA_VERSION)
-    root.set("ДатаФормирования", datetime.now().strftime("%Y-%m-%dT%H:%M:%S"))
+    root.set("ДатаФормирования", datetime.now(tz).strftime("%Y-%m-%dT%H:%M:%S"))
 
     for order in orders:
         doc = _sub(root, "Документ")
         _sub(doc, "Ид", order.number)
         _sub(doc, "Номер", order.number)
-        created = order.created_at or datetime.now()
+        # created_at в БД — наивный UTC; МойСклад ждёт локальное время магазина.
+        created = _shop_local(order.created_at or datetime.now(timezone.utc), tz)
         _sub(doc, "Дата", created.strftime("%Y-%m-%d"))
         _sub(doc, "Время", created.strftime("%H:%M:%S"))
         _sub(doc, "ХозОперация", "Заказ товара")

@@ -1,11 +1,12 @@
 """Схемы регистрации/входа покупателя и выдачи профиля."""
 
 import re
-from datetime import datetime
 from decimal import Decimal
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationInfo, field_validator
+
+from app.core.timeutil import UtcDatetime
 
 _EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 # Длина ИНН: ИП — 12 цифр, ООО (юрлицо) — 10 цифр
@@ -204,6 +205,6 @@ class UserOut(BaseModel):
     customer_name: str
     inn: str | None = None
     discount_percent: Decimal
-    created_at: datetime
+    created_at: UtcDatetime
     is_active: bool = True
     moysklad_ext_code: str | None = None

@@ -1,7 +1,7 @@
 from decimal import Decimal
-from datetime import datetime
 from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, field_validator
+from app.core.timeutil import UtcDatetime
 import re
 
 from app.schemas.auth import normalize_ru_phone, validate_email_format
@@ -73,4 +73,4 @@ class OrderOut(BaseModel):
     moysklad_status: str | None = None
     total_amount: Decimal
     items: list[OrderItemOut]
-    created_at: datetime
+    created_at: UtcDatetime

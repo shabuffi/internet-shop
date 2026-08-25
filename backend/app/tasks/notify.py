@@ -198,6 +198,7 @@ def check_exchange_health():
         Словарь со статусом проверки (``ok`` / ``stale`` / ``no_data``).
     """
     from datetime import datetime, timezone
+    from zoneinfo import ZoneInfo
     from app.core.config import settings
     from app.core.redis_client import redis_client
     from app.db.session import SessionLocal
@@ -236,8 +237,11 @@ def check_exchange_health():
     try:
         name_row = db.get(ShopSettings, "shop_name")
         shop_name = name_row.value if name_row and name_row.value else "Магазин"
+        # Время показываем в поясе магазина (не в TZ сервера — иначе зависит от того,
+        # где запущен контейнер, и уходит в UTC при дефолтной зоне).
+        last_local = last.astimezone(ZoneInfo(settings.SHOP_TIMEZONE))
         text = (f"⚠️ МойСклад: обмена не было ~{int(age_h)} ч "
-                f"(последний контакт {last.astimezone().strftime('%d.%m %H:%M')}).\n"
+                f"(последний контакт {last_local.strftime('%d.%m %H:%M')}).\n"
                 f"Проверьте выгрузку в МойСклад (Онлайн-торговля) и адрес магазина.")
 
         cfg = get_notify_config()

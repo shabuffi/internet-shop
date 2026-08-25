@@ -1,6 +1,6 @@
 from decimal import Decimal
-from datetime import datetime
 from pydantic import BaseModel, ConfigDict, model_validator
+from app.core.timeutil import UtcDatetime
 
 
 class CategoryOut(BaseModel):
@@ -48,7 +48,7 @@ class ProductOut(BaseModel):
     is_sale: bool = False       # = слаг «special»
     is_hot: bool = False        # = слаг «hot»
     category: CategoryOut | None = None
-    updated_at: datetime
+    updated_at: UtcDatetime
 
     @model_validator(mode="after")
     def _normalize_images(self):
