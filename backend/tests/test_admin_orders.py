@@ -167,3 +167,32 @@ def test_list_orders_returns_orders_with_items(client, token, db_session):
     # состав заказа виден в админке (что именно заказывали)
     line = data["items"][0]["items"][0]
     assert line["product_name"] == "Т" and line["quantity"] == 2
+    # размер страницы отдаётся — по нему фронт считает число страниц
+    assert data["page_size"] == 20
+
+
+def test_list_orders_pagination_shows_older_orders(client, token, db_session):
+    """Заказы старше последних 20 доступны через ?page=2 (без дублей, сортировка по дате)."""
+    from datetime import datetime, timedelta
+    from app.db.models.order import Order
+
+    base = datetime(2026, 1, 1)
+    for i in range(25):
+        db_session.add(Order(id=f"o{i:02d}", number=f"ORD-{i:02d}", customer_name="Иван",
+                             customer_phone="+70000000000", total_amount=Decimal("1"), status="new",
+                             created_at=base + timedelta(minutes=i)))
+    db_session.commit()
+
+    p1 = client.get("/api/v1/admin/orders?page=1", headers=_auth(token)).json()
+    p2 = client.get("/api/v1/admin/orders?page=2", headers=_auth(token)).json()
+
+    assert p1["total"] == 25 and p2["total"] == 25
+    assert len(p1["items"]) == 20 and len(p2["items"]) == 5
+    # сортировка по дате убывает: свежайший (ORD-24) — первый на стр.1, старейший (ORD-00) — последний на стр.2
+    assert p1["items"][0]["number"] == "ORD-24"
+    assert p2["items"][-1]["number"] == "ORD-00"
+    # страницы не пересекаются — нет дублей
+    ids1 = {o["id"] for o in p1["items"]}
+    ids2 = {o["id"] for o in p2["items"]}
+    assert ids1.isdisjoint(ids2)
+    assert len(ids1 | ids2) == 25

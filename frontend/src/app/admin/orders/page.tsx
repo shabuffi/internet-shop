@@ -22,6 +22,8 @@ const pill = (color: string, bg: string): React.CSSProperties => ({
 export default function AdminOrdersPage() {
   const [orders, setOrders] = useState<AdminOrder[]>([]);
   const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
   const [error, setError] = useState("");
   // Фильтр «история одного покупателя»: гость — по телефону. null → обычный постраничный список.
   const [phoneFilter, setPhoneFilter] = useState<string | null>(null);
@@ -29,12 +31,26 @@ export default function AdminOrdersPage() {
   const [openId, setOpenId] = useState<string | null>(null);
   const isMobile = useIsMobile();
 
+  // Число страниц. При фильтре по телефону бэк отдаёт все заказы одной страницей — тогда 1.
+  const pages = phoneFilter ? 1 : Math.max(1, Math.ceil(total / pageSize));
+
   function load() {
-    const qs = phoneFilter ? `?phone=${encodeURIComponent(phoneFilter)}` : "";
-    adminFetch<{ items: AdminOrder[]; total: number }>(`/orders${qs}`)
-      .then(d => { setOrders(d.items); setTotal(d.total); }).catch(() => {});
+    // При фильтре по телефону бэк возвращает всю историю без пагинации, page не нужен.
+    const qs = phoneFilter
+      ? `?phone=${encodeURIComponent(phoneFilter)}`
+      : `?page=${page}`;
+    adminFetch<{ items: AdminOrder[]; total: number; page_size: number }>(`/orders${qs}`)
+      .then(d => { setOrders(d.items); setTotal(d.total); if (d.page_size) setPageSize(d.page_size); })
+      .catch(() => {});
   }
-  useEffect(() => { load(); }, [phoneFilter]);  // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { load(); }, [phoneFilter, page]);  // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Вход/выход из фильтра по телефону — всегда с первой страницы (и без раскрытого заказа).
+  function setPhoneFilterReset(phone: string | null) {
+    setOpenId(null);
+    setPage(1);
+    setPhoneFilter(phone);
+  }
 
   // Общие элементы (переиспользуются в таблице и в мобильных карточках).
   // Статус — ТОЛЬКО показ (на сайте не меняется): приоритет статусу из МойСклад,
@@ -51,7 +67,7 @@ export default function AdminOrdersPage() {
     );
   };
   const phoneBtn = (o: AdminOrder) => (
-    <button type="button" onClick={() => setPhoneFilter(o.customer_phone)} title="Показать все заказы этого телефона"
+    <button type="button" onClick={() => setPhoneFilterReset(o.customer_phone)} title="Показать все заказы этого телефона"
       style={{ padding: 0, border: "none", background: "none", cursor: "pointer",
         color: "var(--accent, #003399)", fontSize: 14, textDecoration: "underline", textUnderlineOffset: 2 }}>
       {o.customer_phone}
@@ -110,7 +126,7 @@ export default function AdminOrdersPage() {
           <span style={{ fontSize: 14 }}>
             История покупателя по телефону <b style={{ fontFamily: "ui-monospace, monospace" }}>{phoneFilter}</b> — {total} заказ(ов)
           </span>
-          <button type="button" onClick={() => setPhoneFilter(null)}
+          <button type="button" onClick={() => setPhoneFilterReset(null)}
             style={{ marginLeft: "auto", padding: "6px 12px", borderRadius: 8, cursor: "pointer", fontSize: 13, fontWeight: 600,
               border: "1px solid var(--hairline-soft)", background: "var(--canvas)", color: "var(--ink)" }}>
             Показать все
@@ -191,6 +207,20 @@ export default function AdminOrdersPage() {
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {/* Пагинация: видеть все заказы, а не только последнюю страницу. При фильтре по
+          телефону бэк отдаёт всю историю одной страницей — там навигация не нужна. */}
+      {pages > 1 && (
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 12, marginTop: 24 }}>
+          <button className="btn btn--outline btn--sm" disabled={page <= 1}
+            onClick={() => { setOpenId(null); setPage(p => Math.max(1, p - 1)); }}>‹ Назад</button>
+          <span style={{ fontSize: 14, color: "var(--ink-secondary)" }}>
+            Страница {page} из {pages}
+          </span>
+          <button className="btn btn--outline btn--sm" disabled={page >= pages}
+            onClick={() => { setOpenId(null); setPage(p => Math.min(pages, p + 1)); }}>Вперёд ›</button>
         </div>
       )}
     </AdminShell>
