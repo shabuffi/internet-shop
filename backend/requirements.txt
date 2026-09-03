@@ -14,7 +14,7 @@ pydantic-settings==2.6.1
 
 # Background tasks
 celery==5.4.0
-redis==5.2.1
+redis==8.0.1
 
 # HTTP client (уведомления в Telegram/ВК)
 httpx==0.28.1
