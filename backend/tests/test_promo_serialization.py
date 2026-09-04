@@ -118,3 +118,28 @@ def test_promo_slugs_and_legacy_shims(db_session):
     out = _serialize(db_session, product)
     assert out.promo_slugs == ["hot"]
     assert out.is_hot is True and out.is_sale is False and out.is_new is False
+
+
+def test_catalog_mappers_not_poisoned_by_import_order():
+    """Регресс: связь Product↔PromoCategory двусторонняя (secondary-таблица).
+
+    Если маппер одной стороны сконфигурируется в реестре РАНЬШЕ, чем импортирована другая,
+    configure_mappers падает и отравляет реестр на весь процесс — как было у Order↔User.
+    В общем тест-процессе обе модели уже импортированы, поэтому проверяем в отдельном
+    интерпретаторе отравляющий порядок: импорт promo обязан подтянуть product (и наоборот).
+    """
+    import subprocess
+    import sys
+
+    code = (
+        "from app.db.models.promo import PromoCategory\n"
+        "from app.db.session import SessionLocal\n"
+        "db = SessionLocal()\n"
+        "db.get(PromoCategory, '00000000-0000-0000-0000-000000000000')\n"  # конфигурит мапперы
+        "from app.db.models.product import Product\n"
+        "db.get(Product, '00000000-0000-0000-0000-000000000000')\n"        # не должно упасть
+        "print('OK')\n"
+    )
+    res = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True)
+    assert res.returncode == 0, res.stderr
+    assert "OK" in res.stdout

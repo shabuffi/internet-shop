@@ -27,8 +27,12 @@ class Category(Base):
 
 
 # NB: связь Product ↔ PromoCategory объявлена ниже как relationship(secondary=...) по имени
-# таблицы связи из db/models/promo.py — импортировать сам модуль здесь не нужно (во избежание
-# циклического импорта); SQLAlchemy разрешает строковые ссылки через общий реестр Base.
+# таблицы связи из db/models/promo.py. Строковые ссылки резолвятся при configure_mappers через
+# общий реестр Base — но ТОЛЬКО если оба класса уже импортированы. Если маппер одной стороны
+# сконфигурируется раньше, чем импортирована другая, configure_mappers падает и отравляет реестр
+# на весь процесс (та же ловушка, что была у Order↔User). Чтобы «где загружен Product — там и
+# promo», модуль promo импортируется В КОНЦЕ файла (не сверху — иначе циклический импорт: promo
+# тоже тянет product; внизу цикл безопасен, классы уже определены).
 
 
 class Product(Base):
@@ -78,7 +82,7 @@ class Product(Base):
     synced_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
     # Промо-категории товара (many-to-many; см. db/models/promo.py). secondary задан по имени
-    # таблицы связи — модуль promo не импортируем здесь, чтобы избежать циклической зависимости.
+    # таблицы связи; сам модуль promo импортируется в конце файла (см. NB выше).
     promo_categories: Mapped[list["PromoCategory"]] = relationship(  # noqa: F821
         secondary="product_promo_categories", back_populates="products"
     )
@@ -130,3 +134,10 @@ class SyncChange(Base):
     # Имена файлов картинок в том порядке, в каком их прислал МойСклад
     images_in_xml: Mapped[list | None] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+
+# Регистрируем встречную сторону связи Product↔PromoCategory. Импорт здесь, ВНИЗУ (а не сверху),
+# намеренно: promo.py тоже импортирует product.py — наверху это дало бы циклический импорт, а к
+# концу файла классы Product/Category уже определены, поэтому цикл через sys.modules безопасен.
+# Гарантирует: как только загружен product, в реестре мапперов есть и PromoCategory/MoySkladProperty.
+from app.db.models import promo  # noqa: E402,F401

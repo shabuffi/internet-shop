@@ -102,3 +102,9 @@ class PromoCategory(Base):
     def source_field_name(self) -> str | None:
         """Актуальное имя доп-поля МойСклад (из реестра) или None, если поле не выбрано."""
         return self.source_field.name if self.source_field else None
+
+
+# Встречная сторона связи Product↔PromoCategory. Импорт ВНИЗУ (product.py тоже тянет promo — сверху
+# был бы циклический импорт; внизу классы уже определены, цикл через sys.modules безопасен). Так
+# реестр мапперов полон, какую бы сторону ни импортировали первой, и configure_mappers не падает.
+from app.db.models import product  # noqa: E402,F401
