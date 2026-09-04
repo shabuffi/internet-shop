@@ -4,6 +4,13 @@ from decimal import Decimal
 from sqlalchemy import String, Text, Numeric, Integer, DateTime, ForeignKey, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.session import Base
+# Класс User нужен здесь именно как импорт (не только строкой в relationship("User")):
+# relationship ссылается на User по имени, а имя резолвится при configure_mappers через
+# реестр Base. Если Order успеет сконфигурироваться РАНЬШЕ, чем User импортирован
+# (напр. воркер выполнил notify_new_order → db.get(Order) до любой задачи, тянущей User),
+# конфигурация мапперов падает и ОТРАВЛЯЕТ реестр на весь процесс — после этого даже
+# db.get(User) кидает ту же ошибку. Импорт гарантирует: где есть Order — там есть и User.
+from app.db.models.user import User  # noqa: F401
 
 
 class Order(Base):
@@ -54,7 +61,7 @@ class Order(Base):
 
     items: Mapped[list["OrderItem"]] = relationship("OrderItem", back_populates="order", cascade="all, delete-orphan")
     # Покупатель (для выгрузки «Внешнего кода» контрагента в МойСклад). Только ORM-связь.
-    user: Mapped["User | None"] = relationship("User")  # noqa: F821
+    user: Mapped["User | None"] = relationship("User")
 
 
 class OrderItem(Base):

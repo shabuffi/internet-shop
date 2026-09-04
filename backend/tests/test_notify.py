@@ -1,5 +1,7 @@
 """Тесты уведомлений о заказах: формат сообщения + отправка в ВК."""
 
+import subprocess
+import sys
 from decimal import Decimal
 
 import app.integrations.notify as notify
@@ -70,3 +72,27 @@ def test_send_vk_success(monkeypatch):
 def test_send_vk_api_error_returns_false(monkeypatch):
     monkeypatch.setattr(notify.httpx, "post", lambda *a, **k: _Resp({"error": {"error_code": 901}}))
     assert notify.send_vk("TOK", "42", "x") is False
+
+
+def test_order_first_configure_does_not_poison_user_mapper():
+    """Регресс: воркер сперва трогает Order (db.get(Order)), потом User (регистрация).
+
+    Order.user = relationship("User"); если Order сконфигурируется РАНЬШЕ, чем импортирован
+    User, configure_mappers падает и ОТРАВЛЯЕТ реестр на весь процесс — после этого даже
+    db.get(User) кидает ту же ошибку, и уведомление о регистрации не уходит НИКУДА
+    (реальный баг: notify_new_registration падал на каждой регистрации). В общем тест-процессе
+    все модели уже импортированы, поэтому проверяем в отдельном интерпретаторе тот самый
+    отравляющий порядок: импорт order.py обязан тянуть User, иначе тест упадёт.
+    """
+    code = (
+        "from app.db.models.order import Order\n"
+        "from app.db.session import SessionLocal\n"
+        "db = SessionLocal()\n"
+        "db.get(Order, '00000000-0000-0000-0000-000000000000')\n"  # конфигурит мапперы
+        "from app.db.models.user import User\n"
+        "db.get(User, '00000000-0000-0000-0000-000000000000')\n"    # не должно упасть
+        "print('OK')\n"
+    )
+    res = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True)
+    assert res.returncode == 0, res.stderr
+    assert "OK" in res.stdout
