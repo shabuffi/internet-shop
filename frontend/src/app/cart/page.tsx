@@ -7,12 +7,15 @@ import { MIN_ORDER_AMOUNT } from "@/lib/site";
 import { IconCart, IconMinus, IconPlus } from "@/components/icons";
 import NoPhoto from "@/components/NoPhoto";
 import ChestnyZnakBadge from "@/components/ChestnyZnakBadge";
+import ChestnyZnakNotice from "@/components/ChestnyZnakNotice";
 import QtyField from "@/components/QtyField";
 import StockWarningHint from "@/components/StockWarningHint";
 
 export default function CartPage() {
   const { items, totalItems, totalAmount, removeItem, updateQuantity, clearCart } = useCart();
   const belowMin = totalAmount < MIN_ORDER_AMOUNT;
+  // Уведомление о маркировке — только если в корзине есть хоть один маркированный товар.
+  const markedCount = items.filter((i) => i.chestnyZnak).length;
 
   if (items.length === 0) {
     return (
@@ -39,6 +42,12 @@ export default function CartPage() {
       </div>
       <div style={{ height: "var(--s-6)" }} />
 
+      {markedCount > 0 && (
+        <div style={{ marginBottom: "var(--s-6)" }}>
+          <ChestnyZnakNotice variant="cart" count={markedCount} />
+        </div>
+      )}
+
       <div className="cart">
         <div className="cart__list">
           {items.map((item) => {
@@ -57,9 +66,9 @@ export default function CartPage() {
               </Link>
 
               <div>
-                <div className="lineitem__name" style={{ display: "inline-flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-                  {item.chestnyZnak && <ChestnyZnakBadge size={14} />}
-                  {item.name}
+                <div className="lineitem__name" style={{ display: "flex", alignItems: "flex-start", gap: 7 }}>
+                  {item.chestnyZnak && <ChestnyZnakBadge variant="icon" size={20} />}
+                  <span style={{ minWidth: 0 }}>{item.name}</span>
                 </div>
                 {item.article && <div className="lineitem__sku">Арт. {item.article}</div>}
                 <div className="lineitem__controls">

@@ -1412,14 +1412,102 @@ textarea.form-input { height: auto; min-height: 90px; padding: var(--s-3) var(--
 .btn--pulse:hover { animation-play-state: paused; }
 @media (prefers-reduced-motion: reduce) { .btn--pulse { animation: none; } }
 
-/* Значок «Честный знак» (зелёный) + подсказка-карточка */
-:root { --cz-green:#1c8a4e; --cz-green-soft:#e7f6ec; }
-.cz-badge:hover, .cz-badge:focus-visible { background: color-mix(in srgb, var(--cz-green), #fff 84%); }
-.cz-tip {
-  background: #fff; border: 1px solid var(--hairline, #e7e9ee); border-radius: 10px;
-  padding: 12px 14px; box-shadow: 0 12px 32px rgba(0,0,0,.16); font-size: 13px; line-height: 1.5;
-  pointer-events: none;
+/* Маркировка «Честный знак» — официальный логотип (ярко-жёлтый #f6f42e + тёмный знак),
+   сильный контраст, тёмный текст. Официальные ассеты из набора «лого» (жёлтый + чёрный):
+   /chestny-znak-icon.svg — знак, /chestny-znak.svg — локап со словами. */
+:root {
+  --cz-y:#f6f42e;            /* ярко-жёлтый (логотип) */
+  --cz-ink:#1f2024;          /* тёмный текст/заголовок */
+  --cz-tint:#FEFBEA;         /* светло-жёлтый фон блока (не перегружает) */
+  --cz-tint-line:#F4DD74;    /* мягкая жёлтая граница блока */
 }
+.cz-tip {
+  background: #fff; border-radius: 10px; padding: 12px 14px;
+  box-shadow: 0 12px 32px rgba(0,0,0,.18); font-size: 13px; line-height: 1.5; pointer-events: none;
+}
+.cz-tip__more { display: block; margin-top: 6px; color: var(--cz-ink); font-weight: 700; }
+
+/* Единый официальный логотип-локап (знак + «ЧЕСТНЫЙ ЗНАК»); высота задаётся инлайном. */
+.cz-logo { display: block; width: auto; }
+
+/* GRID: плоский логотип-оверлей ПОВЕРХ самого фото, снизу слева (без тени/подложки). */
+.pcard__media .photo { position: relative; }
+.pcard__czs { position: absolute; left: 8px; bottom: 8px; z-index: 3; line-height: 0; }
+.cz-sticker { display: block; line-height: 0; cursor: help; outline: none; }
+.cz-sticker:focus-visible { outline: 2px solid var(--cz-ink); outline-offset: 2px; border-radius: 6px; }
+@media (max-width: 768px) { .pcard__czs .cz-logo { height: 24px !important; } }
+
+/* LIST / корзина: только знак (кликабельный → попап). */
+.cz-icon {
+  display: inline-flex; align-items: center; padding: 0; line-height: 0; flex: none;
+  border: none; background: none; cursor: pointer; outline: none; vertical-align: middle;
+}
+.cz-icon:focus-visible { outline: 2px solid var(--cz-ink); outline-offset: 2px; border-radius: 4px; }
+
+/* Статичный логотип (характеристики / рядом с наличием). */
+.cz-mark { display: inline-flex; align-items: center; line-height: 0; vertical-align: middle; }
+
+/* Один сильный блок маркировки (страница товара / корзина). */
+.cz-panel {
+  position: relative; display: flex; gap: 13px; align-items: flex-start;
+  padding: 14px 16px; border-radius: var(--r-lg, 12px);
+  background: var(--cz-tint); border: 1px solid var(--cz-tint-line);
+}
+.cz-panel__logo { flex: none; display: block; width: 40px; height: 40px; }
+.cz-panel__body { min-width: 0; font-size: 13.5px; line-height: 1.5; color: var(--charcoal); }
+.cz-panel__title { display: block; font-weight: 800; color: var(--cz-ink); margin-bottom: 3px; font-size: 14.5px; }
+.cz-panel__more {
+  margin-top: 8px; display: flex; align-items: center; gap: 5px; width: fit-content;
+  background: none; border: none; padding: 0; cursor: pointer;
+  color: var(--accent); font-weight: 700; font-size: 13px; text-decoration: none;
+}
+.cz-panel__more:hover { text-decoration: underline; }
+.cz-panel--dismissible { padding-right: 44px; }
+.cz-panel__close {
+  position: absolute; top: 10px; right: 10px; width: 26px; height: 26px;
+  display: flex; align-items: center; justify-content: center;
+  border: none; background: none; border-radius: 6px; cursor: pointer; color: var(--graphite);
+}
+.cz-panel__close:hover { background: #fff; color: var(--ink); }
+.cz-panel--compact { padding: 11px 13px; gap: 11px; }
+.cz-panel--compact .cz-panel__logo { width: 30px; height: 30px; }
+.cz-panel--compact .cz-panel__title { font-size: 13.5px; margin-bottom: 1px; }
+.cz-panel--compact .cz-panel__body { font-size: 12.5px; }
+
+/* Модальное окно «Подробнее о маркировке» */
+.cz-modal-backdrop {
+  position: fixed; inset: 0; z-index: 1100; padding: 16px;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(20,22,28,.55);
+}
+.cz-modal {
+  position: relative; width: 100%; max-width: 440px;
+  background: var(--paper, #fff); border-radius: var(--r-xl, 16px);
+  padding: 24px; box-shadow: 0 24px 60px rgba(0,0,0,.30);
+}
+.cz-modal__close {
+  position: absolute; top: 12px; right: 12px; width: 32px; height: 32px;
+  display: flex; align-items: center; justify-content: center;
+  border: none; background: none; border-radius: 8px; cursor: pointer; color: var(--graphite);
+}
+.cz-modal__close:hover { background: var(--cloud); color: var(--ink); }
+.cz-modal__logo { display: block; width: 84px; height: 84px; margin: 2px auto 16px; }
+.cz-modal__title { margin: 0 0 10px; font-size: 19px; font-weight: 700; color: var(--ink); text-align: center; }
+.cz-modal__lead { margin: 0 0 18px; font-size: 14px; line-height: 1.55; color: var(--charcoal); text-align: center; }
+.cz-modal__sub { margin: 0 0 8px; font-size: 13px; font-weight: 600; color: var(--ink); }
+.cz-modal__list { margin: 0 0 16px; padding: 0; list-style: none; }
+.cz-modal__list li {
+  position: relative; padding: 0 0 6px 20px; font-size: 13.5px; line-height: 1.5; color: var(--charcoal);
+}
+.cz-modal__list li::before {
+  content: ""; position: absolute; left: 4px; top: 8px; width: 6px; height: 6px;
+  border-radius: 2px; background: var(--cz-amber);
+}
+.cz-modal__link {
+  display: inline-flex; align-items: center; gap: 5px; margin-bottom: 18px;
+  color: var(--accent); font-weight: 600; font-size: 13.5px; text-decoration: none;
+}
+.cz-modal__link:hover { text-decoration: underline; }
 
 /* Мелочь: убрать серую подсветку тапа на мобильных (заодно меняет хеш CSS-файла). */
 html { -webkit-tap-highlight-color: transparent; }

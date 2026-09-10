@@ -9,6 +9,7 @@ import CartBar from "@/components/CartBar";
 import BackButton from "@/components/BackButton";
 import ProductGallery from "@/components/ProductGallery";
 import ChestnyZnakBadge from "@/components/ChestnyZnakBadge";
+import ChestnyZnakNotice from "@/components/ChestnyZnakNotice";
 import { chatConfigFromStore, buildChatUrl, isChatReady } from "@/lib/chat";
 import { IconChat } from "@/components/icons";
 import type { Metadata } from "next";
@@ -108,21 +109,25 @@ export default async function ProductPage({ params }: Props) {
 
           <div className="pdp__info">
             {product.category && <div className="pdp__cat">{product.category.name}</div>}
-            <h1 className="pdp__title">
-              {product.chestnyZnak && <><ChestnyZnakBadge size={20} /> </>}
-              {product.name}
-            </h1>
-            <div className="row" style={{ gap: "var(--s-4)" }}>
+            <h1 className="pdp__title">{product.name}</h1>
+            <div className="row" style={{ gap: "var(--s-4)", flexWrap: "wrap", rowGap: "var(--s-3)" }}>
               {product.article && <span className="pdp__sku">Арт. {product.article}</span>}
               {inStock
                 ? <span className="badge badge--stock"><span className="badge__dot" />В наличии</span>
                 : <span className="badge badge--out"><span className="badge__dot" />Нет в наличии</span>}
               {showQty && inStock && <span className="pdp__sku">Остаток: {stockLabel}</span>}
+              {product.chestnyZnak && <ChestnyZnakBadge variant="mark" size={34} />}
             </div>
 
             {/* Цена рендерится внутри AddToCartButton: значок «заказываете больше, чем в наличии»
                 стоит рядом с ценой и должен реагировать на степпер (клиентское состояние). */}
             <AddToCartButton product={product} />
+
+            {product.chestnyZnak && (
+              <div style={{ marginTop: "var(--s-4)" }}>
+                <ChestnyZnakNotice variant="product" />
+              </div>
+            )}
 
             {chatUrl && (
               <a href={chatUrl} target="_blank" rel="noopener noreferrer"

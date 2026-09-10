@@ -1,5 +1,5 @@
 import Link from "next/link";
-import NoPhoto from "@/components/NoPhoto";
+import ProductImage from "@/components/ProductImage";
 import AddToCartCard from "@/components/AddToCartCard";
 import ChestnyZnakBadge from "@/components/ChestnyZnakBadge";
 import ProductName from "@/components/ProductName";
@@ -20,9 +20,8 @@ export default function PromoCard({
   const badge = category ? <PromoBadge category={category} /> : null;
   const media = (
     <div className="photo photo--square">
-      {p.image_url
-        ? <img src={`/api/v1/products/${p.id}/image`} alt={p.name} />
-        : <NoPhoto />}
+      <ProductImage src={p.image_url ? `/api/v1/products/${p.id}/image` : null} alt={p.name} />
+      {p.chestnyZnak && <span className="pcard__czs"><ChestnyZnakBadge variant="sticker" /></span>}
     </div>
   );
   const price = <ProductPrice p={p} />;
@@ -32,10 +31,12 @@ export default function PromoCard({
     return (
       <article className="pcard pcard--compact">
         <Link href={`/products/${p.id}`} className="pcard__link" aria-label={p.name}>
-          <div className="pcard__media">{badge}{media}</div>
+          <div className="pcard__media">
+            {badge}
+            {media}
+          </div>
           <div className="pcard__body">
             <div className="pcard__namewrap">
-              {p.chestnyZnak && <ChestnyZnakBadge size={15} />}
               <span className="pcard__name">{p.name}</span>
             </div>
             <div className="pcard__sku">{p.article ? `Арт. ${p.article}` : " "}</div>
@@ -50,12 +51,12 @@ export default function PromoCard({
   return (
     <article className="pcard">
       <Link href={`/products/${p.id}`} className="pcard__media" aria-label={p.name}>
-        {badge}{media}
+        {badge}
+        {media}
       </Link>
       <div className="pcard__body">
         <div className="pcard__cat">{p.category?.name ?? " "}</div>
-        <div className="pcard__namewrap" style={{ display: "flex", alignItems: "flex-start", gap: 6 }}>
-          {p.chestnyZnak && <ChestnyZnakBadge size={15} />}
+        <div className="pcard__namewrap">
           <ProductName id={p.id} name={p.name} />
         </div>
         <div className="pcard__sku">{p.article ? `Арт. ${p.article}` : " "}</div>

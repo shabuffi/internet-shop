@@ -17,7 +17,7 @@ import CartBar from "@/components/CartBar";
 import CategorySelect from "@/components/CategorySelect";
 import SortSelect from "@/components/SortSelect";
 import { IconSearch } from "@/components/icons";
-import NoPhoto from "@/components/NoPhoto";
+import ProductImage from "@/components/ProductImage";
 
 interface Props {
   searchParams: Promise<{ category_id?: string; search?: string; page?: string; view?: string; sort?: string; photo?: string }>;
@@ -179,15 +179,13 @@ export default async function CatalogPage({ searchParams }: Props) {
               : <span className="badge badge--out"><span className="badge__dot" />Нет</span>}
           </span>
           <div className="photo photo--square">
-            {p.image_url
-              ? <img src={`/api/v1/products/${p.id}/image`} alt={p.name} />
-              : <NoPhoto />}
+            <ProductImage src={p.image_url ? `/api/v1/products/${p.id}/image` : null} alt={p.name} />
+            {p.chestnyZnak && <span className="pcard__czs"><ChestnyZnakBadge variant="sticker" /></span>}
           </div>
         </Link>
         <div className="pcard__body">
           <div className="pcard__cat">{p.category?.name ?? " "}</div>
-          <div className="pcard__namewrap" style={{ display: "flex", alignItems: "flex-start", gap: 6 }}>
-            {p.chestnyZnak && <ChestnyZnakBadge size={15} />}
+          <div className="pcard__namewrap">
             <ProductName id={p.id} name={p.name} />
           </div>
           <div className="pcard__sku">{p.article ? `Арт. ${p.article}` : " "}</div>

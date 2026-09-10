@@ -21,7 +21,9 @@ function isOverStock(product: Product, items: CartItem[]): boolean {
 // Мини-фото с превью по наведению (большое фото рядом, не обрезанное).
 function ProductThumb({ product }: { product: Product }) {
   const [box, setBox] = useState<{ left: number; top: number } | null>(null);
-  const hasImg = !!product.image_url;
+  // Если файла картинки нет на диске (битый url), не держим превью открытым.
+  const [broken, setBroken] = useState(false);
+  const hasImg = !!product.image_url && !broken;
   const SIZE = 260;
 
   function onEnter(e: React.MouseEvent) {
@@ -38,13 +40,14 @@ function ProductThumb({ product }: { product: Product }) {
       style={{ display: "block", width: 44, height: 44, borderRadius: 8, overflow: "hidden",
         background: "var(--paper)", border: "1px solid var(--hairline-soft)", position: "relative" }}>
       {hasImg
-        ? <img src={`/api/v1/products/${product.id}/image`} alt="" style={{ width: "100%", height: "100%", objectFit: "contain", display: "block" }} />
+        ? <img src={`/api/v1/products/${product.id}/image`} alt="" onError={() => setBroken(true)}
+            style={{ width: "100%", height: "100%", objectFit: "contain", display: "block" }} />
         : <NoPhoto />}
-      {box && (
+      {box && hasImg && (
         // Всплывашка ровно по размеру картинки: без подложки и полей — только само фото.
         <span style={{ position: "fixed", left: box.left, top: box.top, zIndex: 60, pointerEvents: "none",
           borderRadius: 12, overflow: "hidden", boxShadow: "0 12px 44px rgba(0,0,0,.22)", display: "block" }}>
-          <img src={`/api/v1/products/${product.id}/image`} alt={product.name}
+          <img src={`/api/v1/products/${product.id}/image`} alt={product.name} onError={() => setBox(null)}
             style={{ display: "block", maxWidth: SIZE, maxHeight: SIZE, width: "auto", height: "auto" }} />
         </span>
       )}
@@ -62,7 +65,8 @@ function QtyCell({ product }: { product: Product }) {
   useEffect(() => { setVal(qty ? String(qty) : ""); }, [qty]);
 
   const disabled = !product.available;
-  const item = { id: product.id, name: product.name, article: product.article, price: product.price, stock: product.stock };
+  const item = { id: product.id, name: product.name, article: product.article, price: product.price,
+    chestnyZnak: product.chestnyZnak, stock: product.stock };
   const commit = (n: number) => {
     if (!Number.isFinite(n) || n <= 0) { setItemQuantity(item, 0); return; }
     setItemQuantity(item, Math.max(step, Math.round(n / step) * step));
@@ -113,7 +117,8 @@ export default function CatalogList({ products, showQty = true }: { products: Pr
             <tr style={{ background: "var(--cloud)" }}>
               <th style={{ ...th, width: 56 }}></th>
               <th style={th}>Товар</th>
-              <th style={th}>Артикул</th>
+              {/* Колонка маркировки «ЧЕСТНЫЙ ЗНАК»: только знак у маркированных, без заголовка. */}
+              <th style={{ ...th, width: 44 }}></th>
               <th style={th}>Остаток</th>
               <th style={{ ...th, textAlign: "right" }}>Цена</th>
               <th style={{ ...th, textAlign: "center", width: 150 }}>Количество</th>
@@ -128,13 +133,14 @@ export default function CatalogList({ products, showQty = true }: { products: Pr
               <tr key={p.id}>
                 <td style={td}><ProductThumb product={p} /></td>
                 <td style={td}>
-                  <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-                    {p.chestnyZnak && <ChestnyZnakBadge size={15} />}
-                    <Link href={`/products/${p.id}`} style={{ fontWeight: 600, color: "var(--ink)", textDecoration: "none" }}>{p.name}</Link>
-                  </span>
-                  {p.category?.name && <div style={{ fontSize: 12, color: "var(--ink-tertiary)" }}>{p.category.name}</div>}
+                  <Link href={`/products/${p.id}`} style={{ fontWeight: 600, color: "var(--ink)", textDecoration: "none" }}>{p.name}</Link>
+                  {p.category?.name && (
+                    <div style={{ fontSize: 12, color: "var(--ink-tertiary)", marginTop: 4 }}>{p.category.name}</div>
+                  )}
                 </td>
-                <td style={{ ...td, color: "var(--ink-secondary)", fontVariantNumeric: "tabular-nums" }}>{p.article || "—"}</td>
+                <td style={{ ...td, textAlign: "center", width: 44 }}>
+                  {p.chestnyZnak && <ChestnyZnakBadge variant="icon" />}
+                </td>
                 <td style={td}>
                   {p.available && p.stock > 0
                     ? <span style={{ fontSize: 13, fontWeight: 600, color: "var(--stock)" }}>{showQty ? `${p.stock} шт.` : "В наличии"}</span>
@@ -157,18 +163,20 @@ export default function CatalogList({ products, showQty = true }: { products: Pr
           <div key={p.id} style={{ display: "flex", flexDirection: "column", gap: 10, padding: "12px 14px",
             borderTop: i === 0 ? "none" : "1px solid var(--hairline-soft)" }}>
             <div style={{ display: "flex", gap: 12, alignItems: "flex-start", justifyContent: "space-between" }}>
-              <span style={{ display: "inline-flex", alignItems: "center", gap: 6, minWidth: 0 }}>
-                {p.chestnyZnak && <ChestnyZnakBadge size={14} />}
+              <span style={{ display: "flex", alignItems: "flex-start", gap: 7, minWidth: 0 }}>
+                {p.chestnyZnak && <ChestnyZnakBadge variant="icon" size={20} />}
                 <Link href={`/products/${p.id}`} style={{ fontWeight: 600, color: "var(--ink)", textDecoration: "none",
-                  fontSize: 14, lineHeight: 1.35 }}>{p.name}</Link>
+                  fontSize: 14, lineHeight: 1.35, minWidth: 0 }}>{p.name}</Link>
               </span>
               <span style={{ fontWeight: 700, whiteSpace: "nowrap", fontSize: 14 }}>
                 <ProductPrice p={p} className="price-box--right" priceClassName="" />
               </span>
             </div>
+            {p.category?.name && (
+              <div style={{ fontSize: 12, color: "var(--ink-tertiary)", marginTop: -2 }}>{p.category.name}</div>
+            )}
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
               <div style={{ fontSize: 12, color: "var(--ink-tertiary)", display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap", minWidth: 0 }}>
-                {p.article && <span style={{ fontVariantNumeric: "tabular-nums" }}>Арт. {p.article}</span>}
                 <span style={{ display: "inline-flex", alignItems: "center", gap: 5, whiteSpace: "nowrap", color: p.available ? "var(--stock)" : "var(--ink-tertiary)" }}>
                   <span style={{ width: 6, height: 6, borderRadius: 999, background: "currentColor" }} />
                   {p.available && p.stock > 0 ? (showQty ? `${p.stock} шт.` : "В наличии") : "Нет"}

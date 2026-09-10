@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import NoPhoto from "@/components/NoPhoto";
 
 // Галерея фото товара на карточке: большое фото + миниатюры (если фото несколько).
@@ -10,6 +10,15 @@ export default function ProductGallery({ productId, images, name }: {
   name: string;
 }) {
   const [active, setActive] = useState(0);
+  // Индексы фото, файл которых не загрузился — показываем заглушку вместо «сломанной» картинки.
+  const [broken, setBroken] = useState<Set<number>>(new Set());
+  const markBroken = (i: number) => setBroken((s) => (s.has(i) ? s : new Set(s).add(i)));
+  const mainRef = useRef<HTMLImageElement>(null);
+  // SSR: картинка может «отвалиться» до гидрации (onError не сработает) — проверяем на монтировании.
+  useEffect(() => {
+    const img = mainRef.current;
+    if (img && img.complete && img.naturalWidth === 0) markBroken(active);
+  }, [active]);
 
   if (!images || images.length === 0) {
     return (
@@ -26,7 +35,9 @@ export default function ProductGallery({ productId, images, name }: {
   return (
     <div>
       <div className="photo">
-        <img src={`/api/v1/products/${productId}/image?n=${active}`} alt={name} />
+        {broken.has(active)
+          ? <NoPhoto />
+          : <img ref={mainRef} src={`/api/v1/products/${productId}/image?n=${active}`} alt={name} onError={() => markBroken(active)} />}
         {many && (
           <>
             <button type="button" className="gallery-arrow gallery-arrow--prev" onClick={prev} aria-label="Предыдущее фото">
@@ -48,7 +59,9 @@ export default function ProductGallery({ productId, images, name }: {
               aria-label={`Фото ${i + 1}`}
               className={"gallery-thumb" + (i === active ? " gallery-thumb--active" : "")}
             >
-              <img src={`/api/v1/products/${productId}/image?n=${i}`} alt="" />
+              {broken.has(i)
+                ? <NoPhoto />
+                : <img src={`/api/v1/products/${productId}/image?n=${i}`} alt="" onError={() => markBroken(i)} />}
             </button>
           ))}
         </div>
