@@ -665,6 +665,13 @@ button, input, textarea, select { font-family: inherit; }
 /* Невидимый слой «для сохранения» поверх главного фото (см. ProductGallery): та же геометрия,
    что у видимого img (contain по центру), под стрелками галереи (z-index 2). */
 .photo img.photo__save { position: absolute; inset: 0; z-index: 1; opacity: 0; background: transparent; }
+/* То же для превью (ProductImage saveSrc, список, корзина, оформление, миниатюры галереи):
+   копия thumb_save с логотипами поверх видимой, та же геометрия (contain), прозрачная.
+   z-index 2 — выше видимого img в корзине (там z-index 1), ниже значка ЧЗ (3). */
+img.img-save {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  object-fit: contain; object-position: center; z-index: 2; opacity: 0; background: transparent;
+}
 .photo__ph {
   position: relative; font-size: 40px; opacity: .5; color: var(--graphite);
   display: flex; align-items: center; justify-content: center;
@@ -678,6 +685,7 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .
 /* Галерея миниатюр под главным фото товара */
 .gallery-thumbs { display: flex; gap: var(--s-2); margin-top: var(--s-3); flex-wrap: wrap; }
 .gallery-thumb {
+  position: relative;               /* для невидимого слоя img.img-save */
   width: 64px; height: 64px; padding: 0; border-radius: var(--radius-md); overflow: hidden;
   border: 1px solid var(--hairline-soft); background: var(--paper); cursor: pointer;
   transition: border-color .15s; flex: none;

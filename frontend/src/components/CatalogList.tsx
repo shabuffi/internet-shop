@@ -41,8 +41,13 @@ function ProductThumb({ product }: { product: Product }) {
       style={{ display: "block", width: 44, height: 44, borderRadius: 8, overflow: "hidden",
         background: "var(--paper)", border: "1px solid var(--hairline-soft)", position: "relative" }}>
       {hasImg
-        ? <img src={productImageUrl(product.id, "thumb")} alt="" onError={() => setBroken(true)}
-            style={{ width: "100%", height: "100%", objectFit: "contain", display: "block" }} />
+        ? <>
+            <img src={productImageUrl(product.id, "thumb")} alt="" onError={() => setBroken(true)}
+              style={{ width: "100%", height: "100%", objectFit: "contain", display: "block" }} />
+            {/* Невидимый слой «для сохранения» (с логотипами) — его берёт «Сохранить картинку».
+                Всплывающее превью ниже — pointer-events: none, его сохранить нельзя. */}
+            <img className="img-save" src={productImageUrl(product.id, "thumb_save")} alt="" />
+          </>
         : <NoPhoto />}
       {box && hasImg && (
         // Всплывашка ровно по размеру картинки: без подложки и полей — только само фото.

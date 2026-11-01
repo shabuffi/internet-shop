@@ -460,7 +460,7 @@ def list_products(
 
 @router.get("/{product_id}/image")
 def get_product_image(request: Request, product_id: str, n: int = 0,
-                      size: Literal["thumb", "card", "og", "save"] | None = None,
+                      size: Literal["thumb", "card", "og", "save", "thumb_save"] | None = None,
                       db: Session = Depends(get_db)):
     """Отдаёт изображение товара из медиа-хранилища.
 
@@ -473,7 +473,8 @@ def get_product_image(request: Request, product_id: str, n: int = 0,
         product_id: Внутренний UUID товара.
         n: Индекс картинки в галерее (по умолчанию 0 — первая).
         size: ``thumb`` (каталог/корзина), ``card`` (карточка), ``og`` (соцсети),
-            ``save`` (невидимый слой «для сохранения» с крупным водяным знаком).
+            ``save`` (невидимый слой «для сохранения» с крупным водяным знаком),
+            ``thumb_save`` (то же для превью в каталоге/корзине, 500px).
         db: Сессия БД.
 
     Returns:

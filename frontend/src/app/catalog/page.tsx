@@ -180,7 +180,8 @@ export default async function CatalogPage({ searchParams }: Props) {
               : <span className="badge badge--out"><span className="badge__dot" />Нет</span>}
           </span>
           <div className="photo photo--square">
-            <ProductImage src={p.image_url ? productImageUrl(p.id, "thumb") : null} alt={p.name} />
+            <ProductImage src={p.image_url ? productImageUrl(p.id, "thumb") : null}
+            saveSrc={p.image_url ? productImageUrl(p.id, "thumb_save") : null} alt={p.name} />
             {p.chestnyZnak && <span className="pcard__czs"><ChestnyZnakBadge variant="sticker" /></span>}
           </div>
         </Link>

@@ -63,6 +63,8 @@ export default function CartPage() {
                   <img src={productImageUrl(item.id, "thumb")} alt={item.name}
                     style={{ position: "relative", zIndex: 1 }}
                     onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
+                  <img className="img-save" src={productImageUrl(item.id, "thumb_save")} alt={item.name}
+                    onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
                 </div>
               </Link>
 

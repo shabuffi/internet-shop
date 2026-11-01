@@ -72,7 +72,10 @@ export default function ProductGallery({ productId, images, name }: {
             >
               {broken.has(i)
                 ? <NoPhoto />
-                : <img src={productImageUrl(productId, "thumb", i)} alt="" onError={() => markBroken(i)} />}
+                : <>
+                    <img src={productImageUrl(productId, "thumb", i)} alt="" onError={() => markBroken(i)} />
+                    <img className="img-save" src={productImageUrl(productId, "thumb_save", i)} alt="" />
+                  </>}
             </button>
           ))}
         </div>

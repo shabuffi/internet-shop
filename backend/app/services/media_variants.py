@@ -55,11 +55,16 @@ VARIANTS: dict[str, tuple[int, str]] = {
     "card": (900, "WEBP"),     # большое фото на карточке товара
     "og": (1200, "JPEG"),      # превью ссылки в соцсетях/мессенджерах
     "save": (1200, "WEBP"),    # невидимый слой «для сохранения» поверх фото на карточке
+    # Невидимый слой поверх превью (каталог, «Новинки»/промо, список, корзина, миниатюры):
+    # того же размера, что thumb, — иначе каждая карточка тянула бы ещё и 1200px.
+    "thumb_save": (500, "WEBP"),
     "media": (1920, "WEBP"),   # баннеры/бренды/иконки (/admin/media/{name})
 }
 VARIANT_DIR = "_v"
 # Размеры фото товаров — на них ставится водяной знак (media — баннеры/бренды/иконки — без).
-WATERMARKED = {"thumb", "card", "og", "save"}
+WATERMARKED = {"thumb", "card", "og", "save", "thumb_save"}
+# Копии «для сохранения» — со знаком MEDIA_WATERMARK_SAVE (остальные — MEDIA_WATERMARK).
+SAVE_SIZES = {"save", "thumb_save"}
 # Версия оформления знака (обводка и т.п.): входит в имя копии — менять при смене рисования.
 _MARK_STYLE = 2
 _LOGO_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "assets", "watermark.png")
@@ -91,7 +96,7 @@ def _watermark_mode(size: str) -> tuple[str, float] | None:
     """Знак для этого размера: (``corner``/``center``, непрозрачность) или ``None``."""
     if size not in WATERMARKED:
         return None
-    if size == "save":
+    if size in SAVE_SIZES:
         mode, opacity = settings.MEDIA_WATERMARK_SAVE, settings.MEDIA_WATERMARK_SAVE_OPACITY
     else:
         mode, opacity = settings.MEDIA_WATERMARK, settings.MEDIA_WATERMARK_OPACITY
@@ -320,7 +325,7 @@ def serve_image(name: str, size: str | None, request: Request, cache_control: st
     return FileResponse(target, media_type=media_type, headers=headers)
 
 
-def prewarm(sizes: tuple[str, ...] = ("thumb", "card", "save")) -> dict[str, int]:
+def prewarm(sizes: tuple[str, ...] = ("thumb", "card", "save", "thumb_save")) -> dict[str, int]:
     """Заранее делает копии для всех фото активных товаров (последовательно, по одной).
 
     Запускать разово после включения ``MEDIA_VARIANTS``: иначе первые посетители после

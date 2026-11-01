@@ -3,9 +3,11 @@
 //   card  — большое фото на карточке товара (900px);
 //   og    — превью ссылки в соцсетях/мессенджерах (JPEG 1200px);
 //   save  — невидимый слой поверх большого фото: то, что уходит по «Сохранить картинку»
-//           (1200px, крупный водяной знак).
+//           (1200px, логотипы);
+//   thumb_save — то же поверх превью (каталог, «Новинки»/промо, список, корзина,
+//           миниатюры галереи), 500px — чтобы карточка не тянула ещё и 1200px.
 // n — индекс фото в галерее (0 — первое, оно же image_url).
-export type ProductImageSize = "thumb" | "card" | "og" | "save";
+export type ProductImageSize = "thumb" | "card" | "og" | "save" | "thumb_save";
 
 export function productImageUrl(id: string, size: ProductImageSize, n = 0): string {
   return `/api/v1/products/${id}/image?size=${size}${n ? `&n=${n}` : ""}`;

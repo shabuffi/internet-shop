@@ -21,7 +21,8 @@ export default function PromoCard({
   const badge = category ? <PromoBadge category={category} /> : null;
   const media = (
     <div className="photo photo--square">
-      <ProductImage src={p.image_url ? productImageUrl(p.id, "thumb") : null} alt={p.name} />
+      <ProductImage src={p.image_url ? productImageUrl(p.id, "thumb") : null}
+            saveSrc={p.image_url ? productImageUrl(p.id, "thumb_save") : null} alt={p.name} />
       {p.chestnyZnak && <span className="pcard__czs"><ChestnyZnakBadge variant="sticker" /></span>}
     </div>
   );

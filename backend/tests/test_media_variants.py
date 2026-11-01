@@ -550,3 +550,16 @@ def test_attach_orphan_rejects_gif(client, db_session):
     media.save_image("old.gif", b"GIF89a")
     r = client.post("/api/v1/admin/products/g2/images/attach", json={"filename": "old.gif"})
     assert r.status_code == 400
+
+
+def test_thumb_save_small_with_logos(client, db_session, variants_on, monkeypatch):
+    """Слой поверх превью (каталог, «Новинки», корзина): 500px, с логотипами; видимое
+    превью thumb — чистое."""
+    monkeypatch.setattr(settings, "MEDIA_WATERMARK_SAVE", "corners")
+    media.save_image("p.png", _white((2400, 1600)))
+    _product(db_session)
+    thumb = Image.open(io.BytesIO(client.get("/api/v1/products/v1/image?size=thumb").content))
+    ts = Image.open(io.BytesIO(client.get("/api/v1/products/v1/image?size=thumb_save").content))
+    assert thumb.size == ts.size == (500, 333)
+    assert not _region_changed(thumb, (0, 0, 500, 333))
+    assert _region_changed(ts, (5, 5, 140, 50))                # логотип в углу
