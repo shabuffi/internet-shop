@@ -392,15 +392,16 @@ def test_product_image_size_save_allowed(client, db_session, variants_on, monkey
 
 
 
-def test_watermark_triple_three_marks_on_diagonal(monkeypatch):
-    monkeypatch.setattr(settings, "MEDIA_WATERMARK_SAVE", "triple")
+def test_watermark_corners_four_corners_and_center(monkeypatch):
+    monkeypatch.setattr(settings, "MEDIA_WATERMARK_SAVE", "corners")
     media.save_image("w.png", _white())
     im = _open(mv.get_variant("w.png", "save"))
-    assert _region_changed(im, (40, 60, 400, 230))         # слева сверху
-    assert _region_changed(im, (450, 350, 750, 450))       # центр
-    assert _region_changed(im, (800, 580, 1160, 740))      # справа снизу
-    assert not _region_changed(im, (950, 0, 1200, 120))    # справа сверху — чисто
-    assert not _region_changed(im, (0, 680, 250, 800))     # слева снизу — чисто
+    for box in ((20, 20, 340, 110), (860, 20, 1180, 110),       # верхние углы
+                (20, 690, 340, 780), (860, 690, 1180, 780),     # нижние углы
+                (450, 360, 750, 440)):                          # центр
+        assert _region_changed(im, box), box
+    assert not _region_changed(im, (450, 0, 750, 120))          # середина верхнего края — чисто
+    assert not _region_changed(im, (0, 300, 200, 500))          # середина левого края — чисто
 
 
 def test_watermark_visible_on_black_photo(monkeypatch):

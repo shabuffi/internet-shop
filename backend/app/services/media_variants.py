@@ -92,7 +92,7 @@ def _watermark_mode(size: str) -> tuple[str, float] | None:
         mode, opacity = settings.MEDIA_WATERMARK_SAVE, settings.MEDIA_WATERMARK_SAVE_OPACITY
     else:
         mode, opacity = settings.MEDIA_WATERMARK, settings.MEDIA_WATERMARK_OPACITY
-    if mode not in ("corner", "center", "triple"):
+    if mode not in ("corner", "center", "corners"):
         return None
     return mode, min(max(opacity, 0.0), 1.0)
 
@@ -143,8 +143,8 @@ def _apply_watermark(img: Image.Image, mode: str, opacity: float) -> Image.Image
     """Накладывает логотип (с белой обводкой) на уже уменьшенную копию.
 
     ``corner`` — справа снизу, ~30% ширины; ``center`` — по центру, ~60% ширины;
-    ``triple`` — три логотипа ~32% ширины по диагонали (слева сверху → центр → справа снизу):
-    обрезкой одного угла знак не убрать. Если логотип не загрузился — копия без знака
+    ``corners`` — пять логотипов ~25% ширины: во всех четырёх углах и по центру — ни
+    обрезкой краёв, ни обрезкой центра знак не убрать. Если логотип не загрузился — копия без знака
     (в лог), но оригинал всё равно не отдаём. Слишком маленькая картинка — без знака.
     """
     try:
@@ -153,7 +153,7 @@ def _apply_watermark(img: Image.Image, mode: str, opacity: float) -> Image.Image
         log.error("media_variants: нет логотипа для водяного знака %s: %s", _LOGO_PATH, e)
         return img
     margin = max(4, round(min(img.size) * 0.03))
-    share = {"center": 0.6, "triple": 0.32}.get(mode, 0.3)
+    share = {"center": 0.6, "corners": 0.25}.get(mode, 0.3)
     w = min(max(90, round(img.width * share)), img.width - 2 * margin)
     h = round(logo.height * w / logo.width)
     if w < 20 or h > img.height - 2 * margin:
@@ -161,8 +161,9 @@ def _apply_watermark(img: Image.Image, mode: str, opacity: float) -> Image.Image
     mark, halo = _mark(logo, w)
     if mode == "center":
         spots = [(0.5, 0.5)]
-    elif mode == "triple":
-        spots = [(0.2, 0.18), (0.5, 0.5), (0.8, 0.82)]
+    elif mode == "corners":
+        # 0/1 — прижать к краю (с отступом), см. расчёт pos ниже.
+        spots = [(0, 0), (1, 0), (0, 1), (1, 1), (0.5, 0.5)]
     else:
         spots = [None]
     for spot in spots:
