@@ -34,7 +34,7 @@ from functools import lru_cache
 
 from fastapi import Request
 from fastapi.responses import FileResponse, Response
-from PIL import Image, ImageFilter
+from PIL import Image, ImageChops, ImageFilter
 
 from app.core.config import settings
 from app.services.media_storage import media_path
@@ -59,6 +59,9 @@ VARIANTS: dict[str, tuple[int, str]] = {
     # того же размера, что thumb, — иначе каждая карточка тянула бы ещё и 1200px.
     "thumb_save": (500, "WEBP"),
     "media": (1920, "WEBP"),   # баннеры/бренды/иконки (/admin/media/{name})
+    # Картинка раздела на плитке: как card, но без видимого знака (решение владельца —
+    # знак только на фото товаров). При сохранении — копия save с логотипами, как у товаров.
+    "cat": (900, "WEBP"),
 }
 VARIANT_DIR = "_v"
 # Размеры фото товаров — на них ставится водяной знак (media — баннеры/бренды/иконки — без).
@@ -107,7 +110,7 @@ def _watermark_mode(size: str) -> tuple[str, float, str] | None:
     else:
         mode, opacity = settings.MEDIA_WATERMARK, settings.MEDIA_WATERMARK_OPACITY
         kind = "logo" if settings.MEDIA_WATERMARK_MARK == "logo" else "icon"
-    if mode not in ("corner", "center", "corners"):
+    if mode not in ("corner", "center", "corners", "object"):
         return None
     return mode, min(max(opacity, 0.0), 1.0), kind
 
@@ -161,6 +164,33 @@ def _paste_mark(img: Image.Image, mark: Image.Image, halo: Image.Image | None,
     img.paste(mark.convert(img.mode), pos, mark.getchannel("A").point(lambda v: round(v * opacity)))
 
 
+def _object_box(img: Image.Image) -> tuple[int, int, int, int] | None:
+    """Границы самого товара на фото (всё, что отличается от фона по краям) или ``None``,
+    если однотонного фона нет (фото «в край»).
+
+    Прозрачный PNG — по альфе. Иначе фон = медиана четырёх углов, товар — пиксели, заметно
+    отличающиеся от него (мелкий шум/артефакты сжатия отсекаем MinFilter).
+    """
+    if "A" in img.getbands():
+        alpha = img.getchannel("A")
+        if max(alpha.getpixel(c) for c in ((0, 0), (img.width - 1, img.height - 1))) < 16:
+            return alpha.point(lambda v: 255 if v > 16 else 0).getbbox()
+    rgb = img.convert("RGB")
+    corners = [rgb.getpixel(c) for c in ((1, 1), (img.width - 2, 1),
+                                         (1, img.height - 2), (img.width - 2, img.height - 2))]
+    if max(max(abs(a - b) for a, b in zip(c, corners[0])) for c in corners) > 40:
+        return None                                    # углы разные — фона нет
+    bg = Image.new("RGB", rgb.size, tuple(sorted(ch)[1] for ch in zip(*corners)))
+    mask = ImageChops.difference(rgb, bg).convert("L").point(lambda v: 255 if v > 28 else 0)
+    box = mask.filter(ImageFilter.MinFilter(5)).getbbox()
+    if box is None:
+        return None
+    l, t, r, b = box
+    if (r - l) * (b - t) > 0.9 * img.width * img.height:
+        return None                                    # товар на всё фото — как «в край»
+    return box
+
+
 def _apply_watermark(img: Image.Image, mode: str, opacity: float, kind: str = "logo") -> Image.Image:
     """Накладывает знак на уже уменьшенную копию.
 
@@ -169,7 +199,9 @@ def _apply_watermark(img: Image.Image, mode: str, opacity: float, kind: str = "l
 
     ``corner`` — справа снизу, ~30% ширины; ``center`` — по центру, ~60% ширины;
     ``corners`` — пять логотипов ~25% ширины: во всех четырёх углах и по центру — ни
-    обрезкой краёв, ни обрезкой центра знак не убрать. Если логотип не загрузился — копия без знака
+    обрезкой краёв, ни обрезкой центра знак не убрать; ``object`` — ~28% ширины в правом
+    нижнем углу САМОГО ТОВАРА (не фото): обрезать знак можно только вместе с частью товара.
+    Фото без однотонного фона — отступ ~10% от краёв. Если логотип не загрузился — копия без знака
     (в лог), но оригинал всё равно не отдаём. Слишком маленькая картинка — без знака.
     """
     icon = kind == "icon"
@@ -183,7 +215,7 @@ def _apply_watermark(img: Image.Image, mode: str, opacity: float, kind: str = "l
     if icon:
         share, min_w = {"center": 0.25, "corners": 0.1}.get(mode, 0.12), 32
     else:
-        share, min_w = {"center": 0.6, "corners": 0.25}.get(mode, 0.3), 90
+        share, min_w = {"center": 0.6, "corners": 0.25, "object": 0.28}.get(mode, 0.3), 90
     w = min(max(min_w, round(img.width * share)), img.width - 2 * margin)
     h = round(logo.height * w / logo.width)
     if w < 20 or h > img.height - 2 * margin:
@@ -192,6 +224,19 @@ def _apply_watermark(img: Image.Image, mode: str, opacity: float, kind: str = "l
         mark, halo = logo.resize((w, h), Image.Resampling.LANCZOS), None
     else:
         mark, halo = _mark(logo, w)
+    if mode == "object":
+        box = _object_box(img)
+        if box is None:                               # фото «в край»: отступ ~10% от краёв
+            inset = round(min(img.size) * 0.10)
+            pos = (img.width - w - inset, img.height - h - inset)
+        else:                                         # правый нижний угол самого товара
+            l, t, r, b = box
+            inset = round(min(r - l, b - t) * 0.06)
+            pos = (r - inset - w, b - inset - h)
+        pos = (min(max(margin, pos[0]), img.width - w - margin),
+               min(max(margin, pos[1]), img.height - h - margin))
+        _paste_mark(img, mark, halo, pos, opacity)
+        return img
     if mode == "center":
         spots = [(0.5, 0.5)]
     elif mode == "corners":
@@ -364,10 +409,8 @@ def prewarm(sizes: tuple[str, ...] = ("thumb", "card", "save", "thumb_save")) ->
     import app.db.models.order  # noqa: F401
     import app.db.models.promo  # noqa: F401
     import app.db.models.user  # noqa: F401
-    from app.db.models.product import Product
+    from app.db.models.product import Category, Product
     from app.db.session import SessionLocal
-
-    from app.db.models.product import Category
 
     db = SessionLocal()
     try:
@@ -375,18 +418,18 @@ def prewarm(sizes: tuple[str, ...] = ("thumb", "card", "save", "thumb_save")) ->
         icons = db.scalars(select(Category.icon).where(Category.icon.is_not(None))).all()
     finally:
         db.close()
-    names = sorted({n for r in rows for n in (r.images or ([r.image_url] if r.image_url else []))})
-    # Картинки категорий — те же копии card (плитка) и save (с логотипами).
-    names += sorted(set(icons) - set(names))
+    products = sorted({n for r in rows for n in (r.images or ([r.image_url] if r.image_url else []))})
+    # Картинки разделов — свои копии: cat (плитка, без видимого знака) и save (с логотипами).
+    jobs = [(n, sizes) for n in products] + [(n, ("cat", "save")) for n in sorted(set(icons) - set(products))]
 
-    stats = {"files": len(names), "made": 0, "cached": 0, "fallback": 0, "missing": 0}
-    for i, name in enumerate(names, 1):
+    stats = {"files": len(jobs), "made": 0, "cached": 0, "fallback": 0, "missing": 0}
+    for i, (name, name_sizes) in enumerate(jobs, 1):
         try:
             st = os.stat(media_path(name))
         except OSError:
             stats["missing"] += 1
             continue
-        for size in sizes:
+        for size in name_sizes:
             existed = os.path.isfile(_variant_path(name, size, st))
             path = get_variant(name, size, st)
             if path is None:
@@ -396,7 +439,7 @@ def prewarm(sizes: tuple[str, ...] = ("thumb", "card", "save", "thumb_save")) ->
             else:
                 stats["made"] += 1
         if i % 200 == 0:
-            log.warning("prewarm: %s/%s %s", i, len(names), stats)
+            log.warning("prewarm: %s/%s %s", i, len(jobs), stats)
     return stats
 
 

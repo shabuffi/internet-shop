@@ -595,6 +595,8 @@ def _blueish(im, box) -> int:
 
 def test_visible_icon_small_bottom_right(monkeypatch):
     monkeypatch.setattr(settings, "MEDIA_WATERMARK", "corner")
+    monkeypatch.setattr(settings, "MEDIA_WATERMARK_MARK", "icon")
+    monkeypatch.setattr(settings, "MEDIA_WATERMARK_OPACITY", 0.85)
     media.save_image("w.png", _white())
     im = _open(mv.get_variant("w.png", "card"))               # 900x600, значок ~108px
     assert im.size == (900, 600)
@@ -615,9 +617,9 @@ def test_visible_logo_mode_still_available(monkeypatch):
 def test_mark_kind_in_variant_name(monkeypatch):
     monkeypatch.setattr(settings, "MEDIA_WATERMARK", "corner")
     media.save_image("w.png", _white())
-    icon_path = mv.get_variant("w.png", "card")
-    monkeypatch.setattr(settings, "MEDIA_WATERMARK_MARK", "logo")
-    assert mv.get_variant("w.png", "card") != icon_path
+    logo_path = mv.get_variant("w.png", "card")
+    monkeypatch.setattr(settings, "MEDIA_WATERMARK_MARK", "icon")
+    assert mv.get_variant("w.png", "card") != logo_path
 
 
 def test_save_copy_keeps_full_logos_with_icon_visible(monkeypatch):
@@ -627,3 +629,45 @@ def test_save_copy_keeps_full_logos_with_icon_visible(monkeypatch):
     media.save_image("w.png", _white())
     save = _open(mv.get_variant("w.png", "save"))
     assert _region_changed(save, (20, 20, 340, 110))             # логотип слева сверху
+
+
+# ─── размещение «на товаре» (object): обрезать знак можно только вместе с товаром ─
+
+def _product_on_white(size=(1200, 800), box=(100, 100, 700, 500), color=(40, 90, 160)) -> bytes:
+    img = Image.new("RGB", size, (255, 255, 255))
+    Image.Image.paste(img, color, box)
+    buf = io.BytesIO()
+    img.save(buf, "PNG")
+    return buf.getvalue()
+
+
+def _changed_box(a, b):
+    """Где картинки заметно различаются (порог отсекает шум повторного сжатия WebP)."""
+    from PIL import ImageChops
+    diff = ImageChops.difference(a.convert("RGB"), b.convert("RGB")).convert("L")
+    return diff.point(lambda v: 255 if v > 40 else 0).getbbox()
+
+
+def test_object_mode_puts_logo_on_the_product(monkeypatch):
+    media.save_image("p.png", _product_on_white())             # товар слева сверху
+    plain = _open(mv.get_variant("p.png", "card"))             # 900x600, товар (75,75)-(525,375)
+    monkeypatch.setattr(settings, "MEDIA_WATERMARK", "object")
+    im = _open(mv.get_variant("p.png", "card"))
+    l, t, r, b = _changed_box(plain, im)
+    assert l >= 75 and t >= 75 and r <= 526 and b <= 376        # знак целиком внутри товара
+    assert r > 400 and b > 300                                   # в его правом нижнем углу
+    assert not _region_changed(im, (560, 400, 900, 600))         # угол ФОТО (пустой фон) — чист
+
+
+def test_object_mode_full_bleed_photo_insets_from_edges(monkeypatch):
+    """Фото «в край» (фона нет) — знак с отступом ~10% от краёв, а не прижат к углу."""
+    img = Image.new("RGB", (1200, 800))
+    for x in range(1200):
+        Image.Image.paste(img, (x % 255, 120, 255 - x % 255), (x, 0, x + 1, 800))
+    buf = io.BytesIO(); img.save(buf, "PNG")
+    media.save_image("f.png", buf.getvalue())
+    plain = _open(mv.get_variant("f.png", "card"))
+    monkeypatch.setattr(settings, "MEDIA_WATERMARK", "object")
+    im = _open(mv.get_variant("f.png", "card"))
+    l, t, r, b = _changed_box(plain, im)
+    assert r <= 900 - 50 and b <= 600 - 50                       # не у самого края (10% от 600 = 60)

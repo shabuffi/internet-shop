@@ -265,8 +265,7 @@ export default async function HomePage() {
                 <Link href={tileHref(t.title)} className="cat-tile">
                   {/* Полнокадровое фото раздела — заполняет весь медиа-блок (cover). */}
                   <span className="cat-tile__media cat-tile__media--cover">
-                    {/* Видимая — с маленьким значком в углу (public/categories/wm), как фото товаров. */}
-                    <img src={`/categories/wm/${t.icon}.jpg`} alt={t.title} />
+                    <img src={`/categories/${t.icon}.jpg`} alt={t.title} />
                     {/* Невидимый слой «для сохранения» — та же картинка с логотипами
                         (public/categories/save, делается backend/scripts/make_static_save_copies.py). */}
                     <SaveLayer src={`/categories/save/${t.icon}.jpg`} alt={t.title} className="cat-save" />

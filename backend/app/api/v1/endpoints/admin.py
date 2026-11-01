@@ -1285,8 +1285,8 @@ def get_media(name: str, request: Request, size: Literal["card", "save"] | None 
     Эндпоинт без авторизации, а имена файлов фото товаров видны в публичном ``/products``
     (поле ``images``) — поэтому оригиналы отсюда тоже не отдаём: при ``MEDIA_VARIANTS``
     это копия до 1920px без EXIF, а если файл — фото товара, то копия ``save`` с крупным
-    водяным знаком (как при «Сохранить картинку» на витрине). Картинка категории — та же
-    защита, что у фото товара: ``size=card`` — видимая копия для плитки, всё остальное
+    водяным знаком (как при «Сохранить картинку» на витрине). Картинка категории:
+    ``size=card`` — видимая копия для плитки (900px, без видимого знака), всё остальное
     (в т.ч. прямой адрес без параметра) — ``save`` с логотипами. Только картинки —
     служебные файлы тома не отдаются.
     """
@@ -1311,7 +1311,7 @@ def get_media(name: str, request: Request, size: Literal["card", "save"] | None 
                 # Слой «для сохранения» на плитке, пока копии выключены: 404 вместо оригинала
                 # (иначе плитка грузила бы его дважды). См. get_product_image.
                 raise HTTPException(status_code=404, detail="Файл не найден")
-            variant = "card" if size == "card" else "save"
+            variant = "cat" if size == "card" else "save"   # на плитке — без видимого знака
         else:
             variant = "media"
         resp = media_variants.serve_image(name, variant, request, "public, max-age=300")
