@@ -22,7 +22,7 @@ from PIL import Image
 
 from app.services import media_variants as mv
 
-MODE, OPACITY = "corners", 0.45      # как MEDIA_WATERMARK_SAVE / _SAVE_OPACITY по умолчанию
+MODE, OPACITY = "corners", 0.65      # как MEDIA_WATERMARK_SAVE / _SAVE_OPACITY по умолчанию
 
 
 def main(src: str, dst: str) -> None:
@@ -33,7 +33,7 @@ def main(src: str, dst: str) -> None:
         with Image.open(os.path.join(src, name)) as im:
             has_alpha = "A" in im.getbands()
             img = im.convert("RGBA" if has_alpha else "RGB")   # EXIF дальше не пишем
-        img = mv._apply_watermark(img, MODE, OPACITY)
+        img = mv._apply_watermark(img, MODE, OPACITY, "brand")   # как копии «для сохранения»
         out = os.path.join(dst, name)
         if name.lower().endswith(".png"):
             img.save(out, "PNG", optimize=True)

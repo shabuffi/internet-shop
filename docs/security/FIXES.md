@@ -160,3 +160,9 @@ Email в проекте — логин, поэтому смена сделана
 - Разделы: вариант `cat` (900px, без знака) для `?size=card` картинок категорий; `public/categories/wm/` удалён, старые плитки — исходные файлы; `make_static_save_copies.py --visible` убран; prewarm для иконок — только `cat` и `save`.
 - Итог **340 зелёных**.
 
+### Дополнение 2026-11-01 — цветные скачанные копии, режим bottom
+- `kind="brand"` для `save`/`thumb_save`: полный `watermark.png`; `_tone_for` → на светлом участке логотип в цветах бренда (`_paste_mark`), на тёмном — белая заливка по `_brand_white_mask()` (альфа × (1 − белизна), подпись сохранена). `MEDIA_WATERMARK_SAVE_OPACITY` 0.45 → 0.65. `_MARK_STYLE` = 4.
+- `_apply_watermark` переписан: единый расчёт точек для corner/bottom/center/corners/object, затем вставка по виду знака (icon / brand / logo).
+- `make_static_save_copies.py`: `brand`, 0.65; `public/categories/save/` перегенерированы.
+- Тесты +2 (цветной на светлом / белый на тёмном; `bottom` — снизу по центру, угол чистый). Итог **342 зелёных**.
+

@@ -671,3 +671,27 @@ def test_object_mode_full_bleed_photo_insets_from_edges(monkeypatch):
     im = _open(mv.get_variant("f.png", "card"))
     l, t, r, b = _changed_box(plain, im)
     assert r <= 900 - 50 and b <= 600 - 50                       # не у самого края (10% от 600 = 60)
+
+
+# ─── копии «для сохранения» — цветной полный логотип; видимый «снизу по центру» ──
+
+def test_save_copy_colored_logo_on_light_white_on_dark(monkeypatch):
+    monkeypatch.setattr(settings, "MEDIA_WATERMARK_SAVE", "corners")
+    media.save_image("w.png", _white())
+    light = _open(mv.get_variant("w.png", "save"))
+    tinted = sum(1 for r, g, b in light.convert("RGB").crop((20, 20, 340, 120)).getdata() if b > r + 50)
+    assert tinted > 300                                             # на белом — синий бренд
+    media.save_image("b.png", _png((1200, 800), (10, 10, 10, 255)))
+    dark = _open(mv.get_variant("b.png", "save")).convert("RGB")
+    corner = dark.crop((20, 20, 340, 120))
+    assert sum(1 for r, g, b in corner.getdata() if b > r + 50) < 50  # на тёмном — не синий…
+    assert max(corner.convert("L").getdata()) > 120                 # …а белый
+
+
+def test_visible_bottom_center(monkeypatch):
+    monkeypatch.setattr(settings, "MEDIA_WATERMARK", "bottom")
+    media.save_image("w.png", _white())
+    im = _open(mv.get_variant("w.png", "card"))                    # 900x600
+    assert _region_changed(im, (380, 520, 520, 590))                # снизу по центру
+    assert not _region_changed(im, (0, 0, 900, 450))                # выше — чисто
+    assert not _region_changed(im, (700, 450, 900, 600))            # правый нижний угол — чист
