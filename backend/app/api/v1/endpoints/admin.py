@@ -5,6 +5,7 @@ import hmac
 import json
 import jwt
 import os
+import shutil
 import uuid
 from datetime import datetime, timedelta, timezone
 
@@ -24,7 +25,7 @@ from app.db.models.promo import PromoCategory, MoySkladProperty, product_promo_c
 from app.db.models.order import Order, OrderItem
 from app.db.models.user import User as Customer
 from app.schemas.auth import UserOut
-from app.services import (media_storage, promo_service, property_registry,
+from app.services import (media_storage, media_variants, promo_service, property_registry,
                           search as search_service, top_categories)
 from decimal import Decimal, InvalidOperation
 
@@ -415,6 +416,8 @@ def wipe_catalog(db: Session = Depends(get_db), _=Depends(_get_current_dev)):
                 pass
     except OSError:
         pass
+    # Копии картинок лежат в подпапке (os.remove её пропускает) — чистим целиком.
+    shutil.rmtree(os.path.join(settings.MEDIA_DIR, media_variants.VARIANT_DIR), ignore_errors=True)
     return {"products": n_products, "categories": n_categories, "files": removed_files}
 
 
@@ -1271,14 +1274,19 @@ async def dev_upload_image(file: UploadFile = File(...), _=Depends(_get_current_
 
 
 @router.get("/media/{name}")
-def get_media(name: str):
-    """Публичная отдача загруженного изображения по имени файла."""
-    result = media_storage.read_image(name)
-    if result is None:
+def get_media(name: str, request: Request):
+    """Публичная отдача загруженного изображения (баннеры, бренды, иконки) по имени файла.
+
+    Эндпоинт без авторизации, а имена файлов фото товаров видны в публичном ``/products``
+    (поле ``images``) — поэтому оригиналы отсюда тоже не отдаём: при ``MEDIA_VARIANTS``
+    это копия до 1920px без EXIF. Только картинки — служебные файлы тома не отдаются.
+    """
+    resp = None
+    if media_storage.is_image_filename(name):
+        resp = media_variants.serve_image(name, "media", request, "public, max-age=300")
+    if resp is None:
         raise HTTPException(status_code=404, detail="Файл не найден")
-    data, content_type = result
-    return Response(content=data, media_type=content_type,
-                    headers={"Cache-Control": "public, max-age=300"})
+    return resp
 
 
 # ─── Баннеры слайдера (управляет владелец из обычной админки) ───────

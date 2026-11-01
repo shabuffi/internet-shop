@@ -10,6 +10,7 @@ import ChestnyZnakBadge from "@/components/ChestnyZnakBadge";
 import ChestnyZnakNotice from "@/components/ChestnyZnakNotice";
 import QtyField from "@/components/QtyField";
 import StockWarningHint from "@/components/StockWarningHint";
+import { productImageUrl } from "@/lib/productImage";
 
 export default function CartPage() {
   const { items, totalItems, totalAmount, removeItem, updateQuantity, clearCart } = useCart();
@@ -59,7 +60,7 @@ export default function CartPage() {
               <Link href={`/products/${item.id}`} className="lineitem__media">
                 <div className="photo" style={{ position: "relative" }}>
                   <NoPhoto style={{ position: "absolute", inset: 0 }} />
-                  <img src={`/api/v1/products/${item.id}/image`} alt={item.name}
+                  <img src={productImageUrl(item.id, "thumb")} alt={item.name}
                     style={{ position: "relative", zIndex: 1 }}
                     onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
                 </div>

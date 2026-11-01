@@ -13,6 +13,7 @@ import ChestnyZnakNotice from "@/components/ChestnyZnakNotice";
 import { chatConfigFromStore, buildChatUrl, isChatReady } from "@/lib/chat";
 import { IconChat } from "@/components/icons";
 import type { Metadata } from "next";
+import { productImageUrl } from "@/lib/productImage";
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -26,7 +27,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     const product = await getProduct(id);
     const description = (product.description?.trim().slice(0, 160))
       || `${product.name} — купить с доставкой.`;
-    const image = product.image_url ? `/api/v1/products/${product.id}/image` : undefined;
+    const image = product.image_url ? productImageUrl(product.id, "og") : undefined;
     return {
       title: product.name,
       description,

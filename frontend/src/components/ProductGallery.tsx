@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import NoPhoto from "@/components/NoPhoto";
+import { productImageUrl } from "@/lib/productImage";
 
 // Галерея фото товара на карточке: большое фото + миниатюры (если фото несколько).
 export default function ProductGallery({ productId, images, name }: {
@@ -37,7 +38,7 @@ export default function ProductGallery({ productId, images, name }: {
       <div className="photo">
         {broken.has(active)
           ? <NoPhoto />
-          : <img ref={mainRef} src={`/api/v1/products/${productId}/image?n=${active}`} alt={name} onError={() => markBroken(active)} />}
+          : <img ref={mainRef} src={productImageUrl(productId, "card", active)} alt={name} onError={() => markBroken(active)} />}
         {many && (
           <>
             <button type="button" className="gallery-arrow gallery-arrow--prev" onClick={prev} aria-label="Предыдущее фото">
@@ -61,7 +62,7 @@ export default function ProductGallery({ productId, images, name }: {
             >
               {broken.has(i)
                 ? <NoPhoto />
-                : <img src={`/api/v1/products/${productId}/image?n=${i}`} alt="" onError={() => markBroken(i)} />}
+                : <img src={productImageUrl(productId, "thumb", i)} alt="" onError={() => markBroken(i)} />}
             </button>
           ))}
         </div>

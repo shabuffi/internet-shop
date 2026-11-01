@@ -1,7 +1,7 @@
 import re
+from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from fastapi.responses import Response
 from sqlalchemy.orm import Session, joinedload, selectinload
 from sqlalchemy import select, func, case
 
@@ -10,7 +10,7 @@ from app.db.models.product import Product, Category
 from app.db.models.promo import PromoCategory, MoySkladProperty, product_promo_categories
 from app.db.models.admin import ShopSettings
 from app.schemas.product import ProductOut, ProductListOut, CategoryOut, TopCategoryOut
-from app.services.media_storage import read_image
+from app.services import media_variants
 from app.services.pricing import adjusted_price, percent_for as _percent_for
 from app.services import promo_service, search as search_service, top_categories
 from app.api.v1.endpoints.auth import get_optional_user
@@ -19,7 +19,7 @@ from app.db.models.user import User
 router = APIRouter(prefix="/products", tags=["Products"])
 
 # Браузерный кэш картинки. max-age держим небольшим, а свежесть гарантируем ETag'ом по
-# имени файла: при замене фото в МойСклад имя файла меняется → ETag другой → браузер
+# имени файла + mtime/размеру: при замене фото в МойСклад ETag другой → браузер
 # подтягивает новое (не «залипает» на старом до суток). stale-while-revalidate отдаёт
 # кэш мгновенно и обновляет в фоне.
 _IMG_TTL = 600                # 10 минут «свежо без вопросов»
@@ -459,21 +459,24 @@ def list_products(
 
 
 @router.get("/{product_id}/image")
-def get_product_image(request: Request, product_id: str, n: int = 0, db: Session = Depends(get_db)):
+def get_product_image(request: Request, product_id: str, n: int = 0,
+                      size: Literal["thumb", "card", "og"] | None = None,
+                      db: Session = Depends(get_db)):
     """Отдаёт изображение товара из медиа-хранилища.
 
     Картинки приходят файлами в обмене CommerceML (см. exchange.py) и лежат в
     ``MEDIA_DIR``. У товара может быть несколько картинок (``Product.images``); ``n`` —
-    индекс нужной (0 — первая, она же ``image_url``). Отдаём байты напрямую с браузерным
-    кэшем, без обращения к МойСклад и без пароля аккаунта.
+    индекс нужной (0 — первая, она же ``image_url``). При ``MEDIA_VARIANTS`` отдаём не
+    оригинал, а уменьшенную копию без EXIF (см. ``media_variants``); без ``size`` — ``card``.
 
     Args:
         product_id: Внутренний UUID товара.
         n: Индекс картинки в галерее (по умолчанию 0 — первая).
+        size: ``thumb`` (каталог/корзина), ``card`` (карточка), ``og`` (соцсети).
         db: Сессия БД.
 
     Returns:
-        :class:`Response` с байтами картинки и заголовком кэша.
+        Ответ с файлом картинки (поток или X-Accel-Redirect) и заголовками кэша.
 
     Raises:
         HTTPException: 404, если товар/картинка не найдены или файла нет в хранилище.
@@ -498,21 +501,15 @@ def get_product_image(request: Request, product_id: str, n: int = 0, db: Session
     if not images or n < 0 or n >= len(images):
         raise HTTPException(status_code=404, detail="Изображение не найдено")
 
-    # ETag = имя файла картинки: меняется при замене фото в МойСклад. Если браузер
-    # прислал тот же If-None-Match — отдаём 304 без перекачки байтов.
-    etag = f'"{images[n]}"'
-    cache_headers = {
-        "Cache-Control": f"public, max-age={_IMG_TTL}, stale-while-revalidate={_IMG_SWR}",
-        "ETag": etag,
-    }
-    if request.headers.get("if-none-match") == etag:
-        return Response(status_code=304, headers=cache_headers)
-
-    result = read_image(images[n])
-    if result is None:
+    # ETag строится из имени файла + mtime/размера (см. serve_image): при замене фото — даже
+    # под тем же именем — он другой, браузер подтягивает новое. Совпал If-None-Match → 304.
+    resp = media_variants.serve_image(
+        images[n], size or "card", request,
+        f"public, max-age={_IMG_TTL}, stale-while-revalidate={_IMG_SWR}",
+    )
+    if resp is None:
         raise HTTPException(status_code=404, detail="Изображение не найдено")
-    data, content_type = result
-    return Response(content=data, media_type=content_type, headers=cache_headers)
+    return resp
 
 
 @router.get("/{product_id}", response_model=ProductOut)

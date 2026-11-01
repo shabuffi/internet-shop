@@ -97,12 +97,20 @@ def save_upload(original_filename: str, data: bytes) -> str:
     return name
 
 
+def media_path(name: str) -> str:
+    """Абсолютный путь к файлу медиа-каталога по имени (только basename — без traversal)."""
+    return os.path.join(settings.MEDIA_DIR, _safe_name(name))
+
+
 def delete_image(name: str) -> None:
-    """Удаляет файл картинки из медиа-каталога (молча, если файла нет)."""
+    """Удаляет файл картинки из медиа-каталога (молча, если файла нет) вместе с его копиями."""
     try:
-        os.remove(os.path.join(settings.MEDIA_DIR, _safe_name(name)))
+        os.remove(media_path(name))
     except OSError:
         pass
+    # Локальный импорт: media_variants сам импортирует этот модуль.
+    from app.services.media_variants import delete_variants
+    delete_variants(name)
 
 
 def read_image(name: str) -> tuple[bytes, str] | None:

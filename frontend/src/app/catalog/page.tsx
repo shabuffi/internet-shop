@@ -18,6 +18,7 @@ import CategorySelect from "@/components/CategorySelect";
 import SortSelect from "@/components/SortSelect";
 import { IconSearch } from "@/components/icons";
 import ProductImage from "@/components/ProductImage";
+import { productImageUrl } from "@/lib/productImage";
 
 interface Props {
   searchParams: Promise<{ category_id?: string; search?: string; page?: string; view?: string; sort?: string; photo?: string }>;
@@ -179,7 +180,7 @@ export default async function CatalogPage({ searchParams }: Props) {
               : <span className="badge badge--out"><span className="badge__dot" />Нет</span>}
           </span>
           <div className="photo photo--square">
-            <ProductImage src={p.image_url ? `/api/v1/products/${p.id}/image` : null} alt={p.name} />
+            <ProductImage src={p.image_url ? productImageUrl(p.id, "thumb") : null} alt={p.name} />
             {p.chestnyZnak && <span className="pcard__czs"><ChestnyZnakBadge variant="sticker" /></span>}
           </div>
         </Link>

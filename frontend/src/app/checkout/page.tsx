@@ -12,6 +12,7 @@ import ChestnyZnakBadge from "@/components/ChestnyZnakBadge";
 import ChestnyZnakNotice from "@/components/ChestnyZnakNotice";
 import { FieldError, useFormErrors } from "@/components/FormErrors";
 import { getMe, type UserProfile } from "@/lib/authApi";
+import { productImageUrl } from "@/lib/productImage";
 
 const DELIVERY = [
   { value: "pickup", label: "Самовывоз", hint: "забрать со склада" },
@@ -196,7 +197,7 @@ export default function CheckoutPage() {
               <div className="osummary__item" key={it.id}>
                 <div className="photo" style={{ position: "relative" }}>
                   <NoPhoto style={{ position: "absolute", inset: 0 }} />
-                  <img src={`/api/v1/products/${it.id}/image`} alt={it.name} style={{ position: "relative", zIndex: 1 }}
+                  <img src={productImageUrl(it.id, "thumb")} alt={it.name} style={{ position: "relative", zIndex: 1 }}
                     onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
                 </div>
                 <div><div className="nm" style={{ display: "inline-flex", alignItems: "center", gap: 5, flexWrap: "wrap" }}>{it.chestnyZnak && <ChestnyZnakBadge variant="icon" size={18} />}{it.name}</div><div className="qt">{it.quantity} шт{it.article ? ` · ${it.article}` : ""}</div></div>

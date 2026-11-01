@@ -10,6 +10,7 @@ import ChestnyZnakBadge from "@/components/ChestnyZnakBadge";
 import StockWarningHint from "@/components/StockWarningHint";
 import type { CartItem } from "@/context/CartContext";
 import type { Product } from "@/types/product";
+import { productImageUrl } from "@/lib/productImage";
 
 // Заказано ли больше остатка (для предупреждающей плашки). Количество — из корзины.
 // Хук useCart вызывается ОДИН раз на уровне списка; сюда прокидываем уже готовый items.
@@ -40,14 +41,14 @@ function ProductThumb({ product }: { product: Product }) {
       style={{ display: "block", width: 44, height: 44, borderRadius: 8, overflow: "hidden",
         background: "var(--paper)", border: "1px solid var(--hairline-soft)", position: "relative" }}>
       {hasImg
-        ? <img src={`/api/v1/products/${product.id}/image`} alt="" onError={() => setBroken(true)}
+        ? <img src={productImageUrl(product.id, "thumb")} alt="" onError={() => setBroken(true)}
             style={{ width: "100%", height: "100%", objectFit: "contain", display: "block" }} />
         : <NoPhoto />}
       {box && hasImg && (
         // Всплывашка ровно по размеру картинки: без подложки и полей — только само фото.
         <span style={{ position: "fixed", left: box.left, top: box.top, zIndex: 60, pointerEvents: "none",
           borderRadius: 12, overflow: "hidden", boxShadow: "0 12px 44px rgba(0,0,0,.22)", display: "block" }}>
-          <img src={`/api/v1/products/${product.id}/image`} alt={product.name} onError={() => setBox(null)}
+          <img src={productImageUrl(product.id, "thumb")} alt={product.name} onError={() => setBox(null)}
             style={{ display: "block", maxWidth: SIZE, maxHeight: SIZE, width: "auto", height: "auto" }} />
         </span>
       )}

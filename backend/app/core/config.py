@@ -27,6 +27,13 @@ class Settings(BaseSettings):
     # Каталог для картинок товаров, пришедших файлами в обмене CommerceML
     MEDIA_DIR: str = "/app/media"
 
+    # Отдавать уменьшенные копии картинок (превью/карточка, без EXIF) вместо оригиналов.
+    # Выключатель для мгновенного отката: false → отдаём оригиналы, как раньше.
+    MEDIA_VARIANTS: bool = False
+    # Отдавать файлы картинок через nginx (X-Accel-Redirect): Python не читает байты.
+    # Включать только там, где том media подключён в nginx (location /_media/).
+    MEDIA_ACCEL: bool = False
+
     # Сколько последних обменов держим в истории: строки sync_changes + копии import.xml
     # на диске (media/sync_xml). Старше — чистятся после каждого обмена.
     SYNC_HISTORY_KEEP: int = 30
