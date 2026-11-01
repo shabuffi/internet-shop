@@ -177,7 +177,7 @@ def test_product_image_default_is_card_not_original(client, db_session, variants
     media.save_image("p.png", _png((2000, 1000)))
     _product(db_session)
     r = client.get("/api/v1/products/v1/image")
-    assert Image.open(io.BytesIO(r.content)).size == (1200, 600)
+    assert Image.open(io.BytesIO(r.content)).size == (900, 450)
 
 
 def test_product_image_flag_off_serves_original(client, db_session):
@@ -279,17 +279,17 @@ def test_watermark_corner(monkeypatch):
     monkeypatch.setattr(settings, "MEDIA_WATERMARK", "corner")
     media.save_image("w.png", _white())
     im = _open(mv.get_variant("w.png", "card"))
-    assert im.size == (1200, 800)
-    assert _region_changed(im, (800, 650, 1200, 800))      # логотип справа снизу
-    assert not _region_changed(im, (0, 0, 600, 400))       # слева сверху — чисто
+    assert im.size == (900, 600)
+    assert _region_changed(im, (600, 480, 900, 600))       # логотип справа снизу
+    assert not _region_changed(im, (0, 0, 450, 300))       # слева сверху — чисто
 
 
 def test_watermark_center(monkeypatch):
     monkeypatch.setattr(settings, "MEDIA_WATERMARK", "center")
     media.save_image("w.png", _white())
     im = _open(mv.get_variant("w.png", "card"))
-    assert _region_changed(im, (500, 350, 700, 450))
-    assert not _region_changed(im, (0, 0, 150, 150))
+    assert _region_changed(im, (375, 260, 525, 340))
+    assert not _region_changed(im, (0, 0, 110, 110))
 
 
 def test_watermark_on_all_product_sizes_not_on_media(monkeypatch):
@@ -332,7 +332,7 @@ def test_watermark_missing_logo_still_no_original(monkeypatch):
     mv._logo.cache_clear()
     try:
         media.save_image("w.png", _white((2400, 1600)))
-        assert _open(mv.get_variant("w.png", "card")).size == (1200, 800)
+        assert _open(mv.get_variant("w.png", "card")).size == (900, 600)
     finally:
         mv._logo.cache_clear()
 
@@ -376,10 +376,13 @@ def test_save_copy_has_strong_center_mark_card_light_corner(monkeypatch):
     media.save_image("w.png", _white())
     card = _open(mv.get_variant("w.png", "card"))
     save = _open(mv.get_variant("w.png", "save"))
-    assert card.size == save.size == (1200, 800)            # слои совпадают по геометрии
-    assert not _region_changed(card, (500, 350, 700, 450))  # на видимой — центр чистый
+    assert card.size == (900, 600) and save.size == (1200, 800)
+    # Слои совпадают по геометрии: одинаковые пропорции → object-fit: contain кладёт их
+    # в рамку пиксель в пиксель, хоть разрешение и разное.
+    assert card.width * save.height == card.height * save.width
+    assert not _region_changed(card, (375, 260, 525, 340))  # на видимой — центр чистый
     assert _region_changed(save, (500, 350, 700, 450))      # на сохраняемой — знак по центру
-    assert _logo_darkness(save, (0, 0, 1200, 800)) > _logo_darkness(card, (0, 0, 1200, 800))
+    assert _logo_darkness(save, (0, 0, 1200, 800)) > _logo_darkness(card, (0, 0, 900, 600))
 
 
 def test_product_image_size_save_allowed(client, db_session, variants_on, monkeypatch):
