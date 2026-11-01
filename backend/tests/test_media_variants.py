@@ -710,3 +710,66 @@ def test_visible_size_setting(monkeypatch):
     # знак шире: при 30% он заходит левее, чем при 18%
     assert not _region_changed(small, (560, 450, 680, 600))
     assert _region_changed(big, (560, 450, 680, 600))
+
+
+# ─── очистка устаревших копий ────────────────────────────────────────────────
+
+def _originals_snapshot():
+    d = settings.MEDIA_DIR
+    return {n: open(os.path.join(d, n), "rb").read() for n in os.listdir(d) if os.path.isfile(os.path.join(d, n))}
+
+
+def test_cleanup_removes_copies_of_old_settings_keeps_current(monkeypatch):
+    monkeypatch.setattr(settings, "MEDIA_WATERMARK", "corner")
+    media.save_image("w.png", _white())
+    old = mv.get_variant("w.png", "card")
+    monkeypatch.setattr(settings, "MEDIA_WATERMARK_SIZE", 0.3)      # сменили размер знака
+    new = mv.get_variant("w.png", "card")
+    stats = mv.cleanup_stale()
+    assert not os.path.exists(old) and os.path.exists(new)
+    assert stats["removed"] == 1
+
+
+def test_cleanup_removes_copies_of_deleted_and_replaced_originals():
+    media.save_image("gone.png", _white())
+    media.save_image("kept.png", _white())
+    gone = mv.get_variant("gone.png", "thumb")
+    kept_old = mv.get_variant("kept.png", "thumb")
+    os.remove(media.media_path("gone.png"))                           # оригинал пропал не через delete_image
+    media.save_image("kept.png", _white((1000, 600)))                 # фото заменили под тем же именем
+    p = media.media_path("kept.png"); st = os.stat(p); os.utime(p, (st.st_atime, st.st_mtime + 5))
+    kept_new = mv.get_variant("kept.png", "thumb")
+    mv.cleanup_stale()
+    assert not os.path.exists(gone) and not os.path.exists(kept_old)
+    assert os.path.exists(kept_new)
+
+
+def test_cleanup_keeps_banner_media_copies_and_never_touches_originals(monkeypatch):
+    monkeypatch.setattr(settings, "MEDIA_WATERMARK", "corner")
+    media.save_image("banner.png", _white((3000, 1000)))
+    media.save_image("p.png", _white())
+    media.save_image("icon.svg", b"<svg xmlns='http://www.w3.org/2000/svg'/>")
+    media.save_image("images_1.json", b"{}")
+    banner = mv.get_variant("banner.png", "media")
+    mv.get_variant("p.png", "card")
+    before = _originals_snapshot()
+    monkeypatch.setattr(settings, "MEDIA_WATERMARK_SIZE", 0.4)       # все видимые копии «устарели»
+    mv.cleanup_stale()
+    assert os.path.exists(banner)                                      # баннер — актуален
+    assert _originals_snapshot() == before                             # оригиналы побайтно те же
+
+
+def test_cleanup_tmp_files_by_age():
+    media.save_image("w.png", _white())
+    mv.get_variant("w.png", "thumb")
+    vdir = os.path.join(settings.MEDIA_DIR, mv.VARIANT_DIR)
+    old_tmp, fresh_tmp = os.path.join(vdir, "a.tmp"), os.path.join(vdir, "b.tmp")
+    for f in (old_tmp, fresh_tmp):
+        open(f, "wb").write(b"x")
+    os.utime(old_tmp, (0, 0))
+    mv.cleanup_stale()
+    assert not os.path.exists(old_tmp) and os.path.exists(fresh_tmp)
+
+
+def test_cleanup_without_variant_dir_is_noop():
+    assert mv.cleanup_stale() == {"kept": 0, "removed": 0, "freed_mb": 0}

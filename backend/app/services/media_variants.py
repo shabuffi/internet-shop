@@ -3,7 +3,8 @@
 Оригиналы из обмена весят ~1 MB (до 4.4 MB, PNG до 4032px) — наружу их больше не отдаём:
 по запросу делаем копию нужного размера без EXIF (поворот применяем, метаданные и геометку
 выкидываем) и кладём в кэш на томе (``MEDIA_DIR/_v``). Копия создаётся один раз при первом
-запросе (или заранее: ``python3 -m app.services.media_variants prewarm``).
+запросе (или заранее: ``python3 -m app.services.media_variants prewarm`` — заодно удаляет
+устаревшие копии, см. :func:`cleanup_stale`; только очистка — ``… cleanup``).
 
 Что важно и почему (грабли прошлых инцидентов с фото):
 
@@ -30,6 +31,7 @@ import os
 import sys
 import tempfile
 import threading
+import time
 from functools import lru_cache
 
 from fastapi import Request
@@ -76,6 +78,8 @@ _ICON_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "assets", 
 
 # Не обрабатываем: SVG — вектор, GIF — может быть анимацией (копия её бы убила).
 _SKIP_EXT = {".svg", ".gif"}
+# Оригиналы, у которых бывают копии (для очистки кэша).
+_RASTER_EXT = {".png", ".jpg", ".jpeg", ".webp"}
 # Защита памяти: больше ~25 Мпикс (≈100 MB RGBA в памяти) не декодируем — отдаём оригинал.
 _MAX_PIXELS = 25_000_000
 _MAX_PARALLEL = 2
@@ -476,8 +480,60 @@ def prewarm(sizes: tuple[str, ...] = ("thumb", "card", "save", "thumb_save")) ->
     return stats
 
 
+_TMP_MAX_AGE = 3600   # недописанный .tmp старше часа — остаток упавшей записи
+
+
+def cleanup_stale() -> dict[str, int]:
+    """Удаляет из кэша копии, которые больше не нужны, — только внутри ``MEDIA_DIR/_v``.
+
+    Копия «нужна», если её имя совпадает с тем, что :func:`_variant_path` выдал бы сейчас для
+    существующего оригинала. Значит, удаляются: копии от прежних настроек знака (размер, место,
+    прозрачность, логотип), от прежней версии файла (фото заменили под тем же именем), копии
+    удалённых оригиналов и недописанные ``.tmp`` старше часа. Оригиналы не трогаются никогда.
+
+    Запускать с теми же настройками (env), что и у работающего backend, — иначе актуальные
+    копии будут признаны устаревшими (они просто пересоздадутся при показе, но зря).
+    """
+    vdir = os.path.realpath(_variant_dir())
+    stats = {"kept": 0, "removed": 0, "freed_mb": 0}
+    if not os.path.isdir(vdir):
+        return stats
+    expected = set()
+    for name in os.listdir(settings.MEDIA_DIR):
+        src = media_path(name)
+        if not os.path.isfile(src) or os.path.splitext(name)[1].lower() not in _RASTER_EXT:
+            continue
+        st = os.stat(src)
+        expected.update(os.path.basename(_variant_path(name, size, st)) for size in VARIANTS)
+    now, freed = time.time(), 0
+    for entry in os.scandir(vdir):
+        if not entry.is_file(follow_symlinks=False):
+            continue
+        if entry.name.endswith(".tmp"):
+            stale = now - entry.stat().st_mtime > _TMP_MAX_AGE
+        else:
+            stale = entry.name not in expected
+        if not stale:
+            stats["kept"] += 1
+            continue
+        path = os.path.realpath(entry.path)
+        if os.path.dirname(path) != vdir:          # только файлы прямо в _v — на всякий случай
+            continue
+        try:
+            freed += entry.stat().st_size
+            os.remove(path)
+            stats["removed"] += 1
+        except OSError:
+            pass
+    stats["freed_mb"] = round(freed / 1e6)
+    return stats
+
+
 if __name__ == "__main__":
-    if sys.argv[1:2] != ["prewarm"]:
-        sys.exit("usage: python3 -m app.services.media_variants prewarm")
+    cmd = sys.argv[1:2]
+    if cmd not in (["prewarm"], ["cleanup"]):
+        sys.exit("usage: python3 -m app.services.media_variants prewarm|cleanup")
     logging.basicConfig(level=logging.WARNING, format="%(message)s")
-    print(prewarm())
+    if cmd == ["prewarm"]:
+        print(prewarm())       # сначала сделать актуальные копии…
+    print(cleanup_stale())     # …потом убрать устаревшие
