@@ -41,7 +41,7 @@ class Settings(BaseSettings):
     MEDIA_WATERMARK: str = "off"
     # Чем ставить видимый знак: logo — полный логотип (решение владельца), icon — значок вкладки.
     MEDIA_WATERMARK_MARK: str = "logo"
-    MEDIA_WATERMARK_OPACITY: float = 0.6      # 0 — невидим, 1 — как есть
+    MEDIA_WATERMARK_OPACITY: float = 0.3      # 0 — невидим, 1 — как есть (рынок: 25–35%)
     # Знак на копии «для сохранения» (size=save): её получает тот, кто сохраняет большое фото
     # с карточки (невидимый слой поверх видимого фото) — поэтому крупный и заметный.
     MEDIA_WATERMARK_SAVE: str = "off"

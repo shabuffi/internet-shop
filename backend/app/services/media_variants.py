@@ -34,7 +34,7 @@ from functools import lru_cache
 
 from fastapi import Request
 from fastapi.responses import FileResponse, Response
-from PIL import Image, ImageChops, ImageFilter
+from PIL import Image, ImageChops, ImageFilter, ImageStat
 
 from app.core.config import settings
 from app.services.media_storage import media_path
@@ -69,7 +69,7 @@ WATERMARKED = {"thumb", "card", "og", "save", "thumb_save"}
 # Копии «для сохранения» — со знаком MEDIA_WATERMARK_SAVE (остальные — MEDIA_WATERMARK).
 SAVE_SIZES = {"save", "thumb_save"}
 # Версия оформления знака (обводка и т.п.): входит в имя копии — менять при смене рисования.
-_MARK_STYLE = 2
+_MARK_STYLE = 3
 _LOGO_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "assets", "watermark.png")
 # Маленький значок (иконка вкладки: шестерёнка с домиком на белом круге) — видимый знак на сайте.
 _ICON_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "assets", "watermark-icon.png")
@@ -140,27 +140,40 @@ def _logo() -> Image.Image:
 
 
 @lru_cache(maxsize=1)
+def _mono_logo() -> Image.Image:
+    """Одноцветная форма логотипа (маска L): шестерёнка + «ИНЖЕНЕР», без мелкой подписи.
+
+    Как советуют для водяных знаков на товарах: простая форма без тонких линий —
+    строка «торговый дом» с линиями в малом размере превращается в шум. Белые детали
+    логотипа (домик в шестерёнке) остаются «окнами»: маска = альфа × (1 − белизна).
+    """
+    logo = _logo()
+    rgb, alpha = logo.convert("RGB"), logo.getchannel("A")
+    whiteness = rgb.convert("L").point(lambda v: 0 if v < 200 else round((v - 200) * 255 / 55))
+    mask = ImageChops.subtract(alpha, whiteness)
+    # Подпись «торговый дом» с линиями: правее шестерёнки (x ≥ 200), ниже крупной надписи (y ≥ 100)
+    # — в координатах исходного logo.png 634×160, масштабируем, если файл другого размера.
+    sx, sy = logo.width / 634, logo.height / 160
+    mask.paste(0, (round(200 * sx), round(100 * sy), logo.width, logo.height))
+    box = mask.getbbox()
+    return mask.crop(box) if box else mask
+
+
+def _tone_for(img: Image.Image, box: tuple[int, int, int, int]) -> tuple[int, int, int]:
+    """Цвет одноцветного знака под конкретный участок фото: на светлом — тёмно-серый,
+    на тёмном — белый. Так знак читается везде и при этом не «кричит» цветами бренда."""
+    lum = ImageStat.Stat(img.convert("L").crop(box)).mean[0]
+    return (34, 34, 38) if lum > 140 else (255, 255, 255)
+
+
+@lru_cache(maxsize=1)
 def _icon() -> Image.Image:
     with Image.open(_ICON_PATH) as im:
         return im.convert("RGBA")
 
 
-def _mark(logo: Image.Image, w: int) -> tuple[Image.Image, Image.Image]:
-    """Логотип шириной ``w`` и его белая обводка (маска) — чтобы знак читался на любом фоне:
-    на светлом виден синий логотип, на тёмном/пёстром — белый контур вокруг него."""
-    h = round(logo.height * w / logo.width)
-    mark = logo.resize((w, h), Image.Resampling.LANCZOS)
-    alpha = mark.getchannel("A")
-    r = max(1, round(w / 90))                        # толщина обводки ~1% ширины логотипа
-    halo = alpha.filter(ImageFilter.MaxFilter(2 * r + 1)).filter(ImageFilter.GaussianBlur(r / 2))
-    return mark, halo
-
-
-def _paste_mark(img: Image.Image, mark: Image.Image, halo: Image.Image | None,
-                pos: tuple[int, int], opacity: float) -> None:
-    if halo is not None:
-        white = Image.new(img.mode, mark.size, (255, 255, 255, 255) if img.mode == "RGBA" else (255, 255, 255))
-        img.paste(white, pos, halo.point(lambda v: round(v * opacity * 0.85)))
+def _paste_mark(img: Image.Image, mark: Image.Image, pos: tuple[int, int], opacity: float) -> None:
+    """Вставляет цветной знак (значок-иконку) с заданной прозрачностью."""
     img.paste(mark.convert(img.mode), pos, mark.getchannel("A").point(lambda v: round(v * opacity)))
 
 
@@ -194,8 +207,8 @@ def _object_box(img: Image.Image) -> tuple[int, int, int, int] | None:
 def _apply_watermark(img: Image.Image, mode: str, opacity: float, kind: str = "logo") -> Image.Image:
     """Накладывает знак на уже уменьшенную копию.
 
-    ``kind``: ``logo`` — полный логотип с белой обводкой; ``icon`` — маленький значок
-    (иконка вкладки, уже на белом круге — обводка не нужна): ~12% ширины в углу.
+    ``kind``: ``logo`` — одноцветный логотип (см. :func:`_mono_logo`), тон под фон участка;
+    ``icon`` — маленький значок (иконка вкладки, на белом круге): ~12% ширины в углу.
 
     ``corner`` — справа снизу, ~30% ширины; ``center`` — по центру, ~60% ширины;
     ``corners`` — пять логотипов ~25% ширины: во всех четырёх углах и по центру — ни
@@ -206,7 +219,7 @@ def _apply_watermark(img: Image.Image, mode: str, opacity: float, kind: str = "l
     """
     icon = kind == "icon"
     try:
-        logo = _icon() if icon else _logo()
+        logo = _icon() if icon else _mono_logo()
     except Exception as e:  # noqa: BLE001
         log.error("media_variants: нет картинки для водяного знака %s: %s",
                   _ICON_PATH if icon else _LOGO_PATH, e)
@@ -215,15 +228,17 @@ def _apply_watermark(img: Image.Image, mode: str, opacity: float, kind: str = "l
     if icon:
         share, min_w = {"center": 0.25, "corners": 0.1}.get(mode, 0.12), 32
     else:
-        share, min_w = {"center": 0.6, "corners": 0.25, "object": 0.28}.get(mode, 0.3), 90
+        # Видимый знак — небольшой (рекомендации для товарных фото: «меньше и светлее, чем
+        # кажется нужным»); копия «для сохранения» (corners) — крупнее.
+        share, min_w = {"center": 0.45, "corners": 0.24, "object": 0.2}.get(mode, 0.18), 70
     w = min(max(min_w, round(img.width * share)), img.width - 2 * margin)
     h = round(logo.height * w / logo.width)
     if w < 20 or h > img.height - 2 * margin:
         return img
     if icon:
-        mark, halo = logo.resize((w, h), Image.Resampling.LANCZOS), None
+        mark = logo.resize((w, h), Image.Resampling.LANCZOS)
     else:
-        mark, halo = _mark(logo, w)
+        shape = logo.resize((w, h), Image.Resampling.LANCZOS)        # маска формы
     if mode == "object":
         box = _object_box(img)
         if box is None:                               # фото «в край»: отступ ~10% от краёв
@@ -235,23 +250,33 @@ def _apply_watermark(img: Image.Image, mode: str, opacity: float, kind: str = "l
             pos = (r - inset - w, b - inset - h)
         pos = (min(max(margin, pos[0]), img.width - w - margin),
                min(max(margin, pos[1]), img.height - h - margin))
-        _paste_mark(img, mark, halo, pos, opacity)
-        return img
-    if mode == "center":
-        spots = [(0.5, 0.5)]
-    elif mode == "corners":
-        # 0/1 — прижать к краю (с отступом), см. расчёт pos ниже.
-        spots = [(0, 0), (1, 0), (0, 1), (1, 1), (0.5, 0.5)]
+        spots_pos = [pos]
     else:
-        spots = [None]
-    for spot in spots:
-        if spot is None:                              # corner
-            pos = (img.width - w - margin, img.height - h - margin)
+        spots_pos = None
+    if spots_pos is None:
+        if mode == "center":
+            spots = [(0.5, 0.5)]
+        elif mode == "corners":
+            # 0/1 — прижать к краю (с отступом), см. расчёт pos ниже.
+            spots = [(0, 0), (1, 0), (0, 1), (1, 1), (0.5, 0.5)]
         else:
-            cx, cy = round(img.width * spot[0]), round(img.height * spot[1])
-            pos = (min(max(margin, cx - w // 2), img.width - w - margin),
-                   min(max(margin, cy - h // 2), img.height - h - margin))
-        _paste_mark(img, mark, halo, pos, opacity)
+            spots = [None]
+        inset = max(margin, round(min(img.size) * 0.04))   # угол: чуть дальше от края, аккуратнее
+        spots_pos = []
+        for spot in spots:
+            if spot is None:                              # corner
+                spots_pos.append((img.width - w - inset, img.height - h - inset))
+            else:
+                cx, cy = round(img.width * spot[0]), round(img.height * spot[1])
+                spots_pos.append((min(max(margin, cx - w // 2), img.width - w - margin),
+                                  min(max(margin, cy - h // 2), img.height - h - margin)))
+    for pos in spots_pos:
+        if icon:
+            _paste_mark(img, mark, pos, opacity)
+        else:
+            tone = _tone_for(img, (pos[0], pos[1], pos[0] + w, pos[1] + h))
+            fill = Image.new(img.mode, (w, h), tone + ((255,) if img.mode == "RGBA" else ()))
+            img.paste(fill, pos, shape.point(lambda v: round(v * opacity)))
     return img
 
 
