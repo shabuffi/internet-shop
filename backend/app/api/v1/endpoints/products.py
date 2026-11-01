@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.orm import Session, joinedload, selectinload
 from sqlalchemy import select, func, case
 
+from app.core.config import settings
 from app.db.session import get_db
 from app.db.models.product import Product, Category
 from app.db.models.promo import PromoCategory, MoySkladProperty, product_promo_categories
@@ -501,6 +502,11 @@ def get_product_image(request: Request, product_id: str, n: int = 0,
 
     images = row.images or ([row.image_url] if row.image_url else [])
     if not images or n < 0 or n >= len(images):
+        raise HTTPException(status_code=404, detail="Изображение не найдено")
+    # Копии «для сохранения» запрашивает невидимый слой витрины. Пока копии выключены, на его
+    # месте был бы ОРИГИНАЛ: каждая карточка тянула бы его дважды (×2 трафик), и слой отдавал
+    # бы чистое фото. 404 → слой скрывается сам, витрина работает как до копий.
+    if size in media_variants.SAVE_SIZES and not settings.MEDIA_VARIANTS:
         raise HTTPException(status_code=404, detail="Изображение не найдено")
 
     # ETag строится из имени файла + mtime/размера (см. serve_image): при замене фото — даже

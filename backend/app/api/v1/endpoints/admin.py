@@ -1307,6 +1307,10 @@ def get_media(name: str, request: Request, size: Literal["card", "save"] | None 
         if is_product_photo:
             variant = "save"
         elif is_category_image:
+            if size == "save" and not settings.MEDIA_VARIANTS:
+                # Слой «для сохранения» на плитке, пока копии выключены: 404 вместо оригинала
+                # (иначе плитка грузила бы его дважды). См. get_product_image.
+                raise HTTPException(status_code=404, detail="Файл не найден")
             variant = "card" if size == "card" else "save"
         else:
             variant = "media"

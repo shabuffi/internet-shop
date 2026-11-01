@@ -1,4 +1,5 @@
 import type { CSSProperties } from "react";
+import SaveLayer from "@/components/SaveLayer";
 
 // Единая точка отрисовки изображения категории. Не дублировать эту логику по компонентам:
 // вкладка «Категории», «Топ категорий», блок «Топ категорий» на главной и любые другие
@@ -69,7 +70,7 @@ export default function CategoryImage({
     return (
       <>
         {img}
-        <img src={mediaUrl(icon, "save")} alt="" className="cat-save" decoding="async" />
+        <SaveLayer src={mediaUrl(icon, "save")} className="cat-save" />
       </>
     );
   }

@@ -13,6 +13,7 @@ import ChestnyZnakNotice from "@/components/ChestnyZnakNotice";
 import { FieldError, useFormErrors } from "@/components/FormErrors";
 import { getMe, type UserProfile } from "@/lib/authApi";
 import { productImageUrl } from "@/lib/productImage";
+import SaveLayer from "@/components/SaveLayer";
 
 const DELIVERY = [
   { value: "pickup", label: "Самовывоз", hint: "забрать со склада" },
@@ -199,8 +200,7 @@ export default function CheckoutPage() {
                   <NoPhoto style={{ position: "absolute", inset: 0 }} />
                   <img src={productImageUrl(it.id, "thumb")} alt={it.name} style={{ position: "relative", zIndex: 1 }}
                     onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
-                  <img className="img-save" src={productImageUrl(it.id, "thumb_save")} alt={it.name}
-                    onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
+                  <SaveLayer src={productImageUrl(it.id, "thumb_save")} alt={it.name} />
                 </div>
                 <div><div className="nm" style={{ display: "inline-flex", alignItems: "center", gap: 5, flexWrap: "wrap" }}>{it.chestnyZnak && <ChestnyZnakBadge variant="icon" size={18} />}{it.name}</div><div className="qt">{it.quantity} шт{it.article ? ` · ${it.article}` : ""}</div></div>
                 <div className="pr">{formatPrice(Number(it.price) * it.quantity)}</div>

@@ -11,6 +11,7 @@ import StockWarningHint from "@/components/StockWarningHint";
 import type { CartItem } from "@/context/CartContext";
 import type { Product } from "@/types/product";
 import { productImageUrl } from "@/lib/productImage";
+import SaveLayer from "@/components/SaveLayer";
 
 // Заказано ли больше остатка (для предупреждающей плашки). Количество — из корзины.
 // Хук useCart вызывается ОДИН раз на уровне списка; сюда прокидываем уже готовый items.
@@ -46,7 +47,7 @@ function ProductThumb({ product }: { product: Product }) {
               style={{ width: "100%", height: "100%", objectFit: "contain", display: "block" }} />
             {/* Невидимый слой «для сохранения» (с логотипами) — его берёт «Сохранить картинку».
                 Всплывающее превью ниже — pointer-events: none, его сохранить нельзя. */}
-            <img className="img-save" src={productImageUrl(product.id, "thumb_save")} alt="" />
+            <SaveLayer src={productImageUrl(product.id, "thumb_save")} />
           </>
         : <NoPhoto />}
       {box && hasImg && (

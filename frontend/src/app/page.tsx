@@ -14,6 +14,7 @@ import DeliveryMap from "@/components/DeliveryMap";
 import RegionsMarquee from "@/components/RegionsMarquee";
 import Reveal from "@/components/Reveal";
 import type { Product, PromoCategory } from "@/types/product";
+import SaveLayer from "@/components/SaveLayer";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ⚙️ ПЕРЕКЛЮЧАТЕЛЬ блока «Популярные разделы» (Топ категорий) на главной.
@@ -267,7 +268,7 @@ export default async function HomePage() {
                     <img src={`/categories/${t.icon}.jpg`} alt={t.title} />
                     {/* Невидимый слой «для сохранения» — та же картинка с логотипами
                         (public/categories/save, делается backend/scripts/make_static_save_copies.py). */}
-                    <img src={`/categories/save/${t.icon}.jpg`} alt={t.title} className="cat-save" decoding="async" />
+                    <SaveLayer src={`/categories/save/${t.icon}.jpg`} alt={t.title} className="cat-save" />
                   </span>
                   <span className="cat-tile__body">
                     <span className="cat-tile__name">{t.title}</span>

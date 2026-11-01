@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import NoPhoto from "@/components/NoPhoto";
 import { productImageUrl } from "@/lib/productImage";
+import SaveLayer from "@/components/SaveLayer";
 
 // Галерея фото товара на карточке: большое фото + миниатюры (если фото несколько).
 export default function ProductGallery({ productId, images, name }: {
@@ -14,8 +15,6 @@ export default function ProductGallery({ productId, images, name }: {
   // Индексы фото, файл которых не загрузился — показываем заглушку вместо «сломанной» картинки.
   const [broken, setBroken] = useState<Set<number>>(new Set());
   const markBroken = (i: number) => setBroken((s) => (s.has(i) ? s : new Set(s).add(i)));
-  // Индексы фото, у которых не загрузилась копия «для сохранения» — слой не ставим.
-  const [saveBroken, setSaveBroken] = useState<Set<number>>(new Set());
   const mainRef = useRef<HTMLImageElement>(null);
   // SSR: картинка может «отвалиться» до гидрации (onError не сработает) — проверяем на монтировании.
   useEffect(() => {
@@ -44,10 +43,8 @@ export default function ProductGallery({ productId, images, name }: {
         {/* Невидимый слой поверх фото: та же картинка, но с крупным водяным знаком. «Сохранить
             картинку», долгое нажатие на телефоне и перетаскивание берут верхний элемент — т.е.
             сохраняется версия с логотипом, а покупатель видит фото с лёгким знаком. */}
-        {!broken.has(active) && !saveBroken.has(active) && (
-          <img key={`save-${active}`} className="photo__save" src={productImageUrl(productId, "save", active)}
-            alt={name} decoding="async"
-            onError={() => setSaveBroken((s) => (s.has(active) ? s : new Set(s).add(active)))} />
+        {!broken.has(active) && (
+          <SaveLayer key={`save-${active}`} className="photo__save" src={productImageUrl(productId, "save", active)} alt={name} />
         )}
         {many && (
           <>
@@ -74,7 +71,7 @@ export default function ProductGallery({ productId, images, name }: {
                 ? <NoPhoto />
                 : <>
                     <img src={productImageUrl(productId, "thumb", i)} alt="" onError={() => markBroken(i)} />
-                    <img className="img-save" src={productImageUrl(productId, "thumb_save", i)} alt="" />
+                    <SaveLayer src={productImageUrl(productId, "thumb_save", i)} />
                   </>}
             </button>
           ))}
