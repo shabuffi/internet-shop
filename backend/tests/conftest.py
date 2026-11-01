@@ -24,6 +24,19 @@ import app.db.models.lead      # noqa: F401
 from app.main import app
 
 
+@pytest.fixture(autouse=True)
+def _isolated_media_dir(tmp_path, monkeypatch):
+    """Каждый тест — со своим пустым MEDIA_DIR. Без этого тесты в контейнере пишут и
+    удаляют файлы в настоящем томе media (dev-«Очистить каталог» стирал все фото локально)."""
+    from app.core.config import settings
+    media = tmp_path / "media_isolated"   # не "media": так называет свою папку test_import_service
+    media.mkdir()
+    monkeypatch.setattr(settings, "MEDIA_DIR", str(media))
+    # Выключатели отдачи картинок — по умолчанию как в коде, а не из локального .env.
+    monkeypatch.setattr(settings, "MEDIA_VARIANTS", False)
+    monkeypatch.setattr(settings, "MEDIA_ACCEL", False)
+
+
 @pytest.fixture
 def db_session():
     engine = create_engine(
