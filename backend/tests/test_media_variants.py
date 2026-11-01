@@ -584,3 +584,46 @@ def test_category_save_layer_404_while_variants_off(client, db_session):
     assert client.get("/api/v1/admin/media/upload_cat.png?size=save").status_code == 404
     r = client.get("/api/v1/admin/media/upload_cat.png?size=card")
     assert r.status_code == 200 and r.content == data                              # видимое — как было
+
+
+# ─── видимый знак — маленький значок (иконка вкладки) в правом нижнем углу ────
+
+def _blueish(im, box) -> int:
+    px = im.convert("RGB").crop(box).getdata()
+    return sum(1 for r, g, b in px if b > 120 and r < 80)
+
+
+def test_visible_icon_small_bottom_right(monkeypatch):
+    monkeypatch.setattr(settings, "MEDIA_WATERMARK", "corner")
+    media.save_image("w.png", _white())
+    im = _open(mv.get_variant("w.png", "card"))               # 900x600, значок ~108px
+    assert im.size == (900, 600)
+    assert _blueish(im, (765, 465, 885, 585)) > 2000            # значок справа снизу
+    assert not _region_changed(im, (0, 0, 740, 600))             # остальное фото — чистое
+    assert not _region_changed(im, (740, 0, 900, 450))
+
+
+def test_visible_logo_mode_still_available(monkeypatch):
+    """MEDIA_WATERMARK_MARK=logo — прежний полный логотип (шире значка)."""
+    monkeypatch.setattr(settings, "MEDIA_WATERMARK", "corner")
+    monkeypatch.setattr(settings, "MEDIA_WATERMARK_MARK", "logo")
+    media.save_image("w.png", _white())
+    im = _open(mv.get_variant("w.png", "card"))
+    assert _region_changed(im, (620, 520, 740, 590))             # логотип заходит левее значка
+
+
+def test_mark_kind_in_variant_name(monkeypatch):
+    monkeypatch.setattr(settings, "MEDIA_WATERMARK", "corner")
+    media.save_image("w.png", _white())
+    icon_path = mv.get_variant("w.png", "card")
+    monkeypatch.setattr(settings, "MEDIA_WATERMARK_MARK", "logo")
+    assert mv.get_variant("w.png", "card") != icon_path
+
+
+def test_save_copy_keeps_full_logos_with_icon_visible(monkeypatch):
+    """Видимый знак — значок, а сохраняемая копия — по-прежнему полные логотипы по углам."""
+    monkeypatch.setattr(settings, "MEDIA_WATERMARK", "corner")
+    monkeypatch.setattr(settings, "MEDIA_WATERMARK_SAVE", "corners")
+    media.save_image("w.png", _white())
+    save = _open(mv.get_variant("w.png", "save"))
+    assert _region_changed(save, (20, 20, 340, 110))             # логотип слева сверху

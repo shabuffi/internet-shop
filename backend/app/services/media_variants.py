@@ -68,6 +68,8 @@ SAVE_SIZES = {"save", "thumb_save"}
 # Версия оформления знака (обводка и т.п.): входит в имя копии — менять при смене рисования.
 _MARK_STYLE = 2
 _LOGO_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "assets", "watermark.png")
+# Маленький значок (иконка вкладки: шестерёнка с домиком на белом круге) — видимый знак на сайте.
+_ICON_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "assets", "watermark-icon.png")
 
 # Не обрабатываем: SVG — вектор, GIF — может быть анимацией (копия её бы убила).
 _SKIP_EXT = {".svg", ".gif"}
@@ -92,17 +94,22 @@ def _variant_dir() -> str:
     return os.path.join(settings.MEDIA_DIR, VARIANT_DIR)
 
 
-def _watermark_mode(size: str) -> tuple[str, float] | None:
-    """Знак для этого размера: (``corner``/``center``, непрозрачность) или ``None``."""
+def _watermark_mode(size: str) -> tuple[str, float, str] | None:
+    """Знак для этого размера: (расположение, непрозрачность, ``logo``/``icon``) или ``None``.
+
+    Копии «для сохранения» — всегда полный логотип; видимые — ``MEDIA_WATERMARK_MARK``
+    (по умолчанию маленькая иконка).
+    """
     if size not in WATERMARKED:
         return None
     if size in SAVE_SIZES:
-        mode, opacity = settings.MEDIA_WATERMARK_SAVE, settings.MEDIA_WATERMARK_SAVE_OPACITY
+        mode, opacity, kind = settings.MEDIA_WATERMARK_SAVE, settings.MEDIA_WATERMARK_SAVE_OPACITY, "logo"
     else:
         mode, opacity = settings.MEDIA_WATERMARK, settings.MEDIA_WATERMARK_OPACITY
+        kind = "logo" if settings.MEDIA_WATERMARK_MARK == "logo" else "icon"
     if mode not in ("corner", "center", "corners"):
         return None
-    return mode, min(max(opacity, 0.0), 1.0)
+    return mode, min(max(opacity, 0.0), 1.0), kind
 
 
 def _variant_path(name: str, size: str, st: os.stat_result) -> str:
@@ -112,13 +119,13 @@ def _variant_path(name: str, size: str, st: os.stat_result) -> str:
     wm = _watermark_mode(size)
     if wm:
         # Смена настроек знака или самого логотипа → другое имя → копии пересоздаются.
-        tag = f".wm{_MARK_STYLE}-{wm[0]}-{round(wm[1] * 100)}-{_logo_version()}"
+        tag = f".wm{_MARK_STYLE}-{wm[2]}-{wm[0]}-{round(wm[1] * 100)}-{_asset_version(wm[2])}"
     return os.path.join(_variant_dir(), f"{stem}.{size}{tag}.{int(st.st_mtime)}-{st.st_size}{ext}")
 
 
-def _logo_version() -> int:
+def _asset_version(kind: str) -> int:
     try:
-        return os.stat(_LOGO_PATH).st_size
+        return os.stat(_ICON_PATH if kind == "icon" else _LOGO_PATH).st_size
     except OSError:
         return 0
 
@@ -126,6 +133,12 @@ def _logo_version() -> int:
 @lru_cache(maxsize=1)
 def _logo() -> Image.Image:
     with Image.open(_LOGO_PATH) as im:
+        return im.convert("RGBA")
+
+
+@lru_cache(maxsize=1)
+def _icon() -> Image.Image:
+    with Image.open(_ICON_PATH) as im:
         return im.convert("RGBA")
 
 
@@ -140,33 +153,45 @@ def _mark(logo: Image.Image, w: int) -> tuple[Image.Image, Image.Image]:
     return mark, halo
 
 
-def _paste_mark(img: Image.Image, mark: Image.Image, halo: Image.Image,
+def _paste_mark(img: Image.Image, mark: Image.Image, halo: Image.Image | None,
                 pos: tuple[int, int], opacity: float) -> None:
-    white = Image.new(img.mode, mark.size, (255, 255, 255, 255) if img.mode == "RGBA" else (255, 255, 255))
-    img.paste(white, pos, halo.point(lambda v: round(v * opacity * 0.85)))
+    if halo is not None:
+        white = Image.new(img.mode, mark.size, (255, 255, 255, 255) if img.mode == "RGBA" else (255, 255, 255))
+        img.paste(white, pos, halo.point(lambda v: round(v * opacity * 0.85)))
     img.paste(mark.convert(img.mode), pos, mark.getchannel("A").point(lambda v: round(v * opacity)))
 
 
-def _apply_watermark(img: Image.Image, mode: str, opacity: float) -> Image.Image:
-    """Накладывает логотип (с белой обводкой) на уже уменьшенную копию.
+def _apply_watermark(img: Image.Image, mode: str, opacity: float, kind: str = "logo") -> Image.Image:
+    """Накладывает знак на уже уменьшенную копию.
+
+    ``kind``: ``logo`` — полный логотип с белой обводкой; ``icon`` — маленький значок
+    (иконка вкладки, уже на белом круге — обводка не нужна): ~12% ширины в углу.
 
     ``corner`` — справа снизу, ~30% ширины; ``center`` — по центру, ~60% ширины;
     ``corners`` — пять логотипов ~25% ширины: во всех четырёх углах и по центру — ни
     обрезкой краёв, ни обрезкой центра знак не убрать. Если логотип не загрузился — копия без знака
     (в лог), но оригинал всё равно не отдаём. Слишком маленькая картинка — без знака.
     """
+    icon = kind == "icon"
     try:
-        logo = _logo()
+        logo = _icon() if icon else _logo()
     except Exception as e:  # noqa: BLE001
-        log.error("media_variants: нет логотипа для водяного знака %s: %s", _LOGO_PATH, e)
+        log.error("media_variants: нет картинки для водяного знака %s: %s",
+                  _ICON_PATH if icon else _LOGO_PATH, e)
         return img
     margin = max(4, round(min(img.size) * 0.03))
-    share = {"center": 0.6, "corners": 0.25}.get(mode, 0.3)
-    w = min(max(90, round(img.width * share)), img.width - 2 * margin)
+    if icon:
+        share, min_w = {"center": 0.25, "corners": 0.1}.get(mode, 0.12), 32
+    else:
+        share, min_w = {"center": 0.6, "corners": 0.25}.get(mode, 0.3), 90
+    w = min(max(min_w, round(img.width * share)), img.width - 2 * margin)
     h = round(logo.height * w / logo.width)
     if w < 20 or h > img.height - 2 * margin:
         return img
-    mark, halo = _mark(logo, w)
+    if icon:
+        mark, halo = logo.resize((w, h), Image.Resampling.LANCZOS), None
+    else:
+        mark, halo = _mark(logo, w)
     if mode == "center":
         spots = [(0.5, 0.5)]
     elif mode == "corners":
