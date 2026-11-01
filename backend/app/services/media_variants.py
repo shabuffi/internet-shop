@@ -16,9 +16,11 @@
 * Любая ошибка (битый файл, перегрузка) — не 500, а оригинал как раньше + запись в лог.
 * Запись атомарная (tmp + ``os.replace``): воркеров uvicorn два, они не мешают друг другу.
 * Права 644 — копии должен читать nginx (другой пользователь), см. ``MEDIA_ACCEL``.
-* Водяной знак (логотип, ``MEDIA_WATERMARK``) — на всех копиях фото товаров (thumb/card/og):
-  фото снимает сам владелец, и любая скачанная копия должна нести логотип. Настройки знака
-  входят в имя копии — смена расположения/прозрачности/логотипа даёт новые копии.
+* Водяной знак (логотип) — на всех копиях фото товаров: фото снимает сам владелец, и любая
+  скачанная копия должна нести логотип. На показываемых (thumb/card/og) — лёгкий
+  (``MEDIA_WATERMARK``), на копии ``save`` — крупный (``MEDIA_WATERMARK_SAVE``): её отдаёт
+  невидимый слой поверх большого фото на карточке, т.е. именно она уходит по «Сохранить
+  картинку». Настройки знака входят в имя копии — их смена даёт новые копии.
 """
 
 import glob
@@ -49,11 +51,12 @@ VARIANTS: dict[str, tuple[int, str]] = {
     "thumb": (500, "WEBP"),    # каталог, корзина, оформление, миниатюры галереи
     "card": (1200, "WEBP"),    # большое фото на карточке товара
     "og": (1200, "JPEG"),      # превью ссылки в соцсетях/мессенджерах
+    "save": (1200, "WEBP"),    # невидимый слой «для сохранения» поверх фото на карточке
     "media": (1920, "WEBP"),   # баннеры/бренды/иконки (/admin/media/{name})
 }
 VARIANT_DIR = "_v"
 # Размеры фото товаров — на них ставится водяной знак (media — баннеры/бренды/иконки — без).
-WATERMARKED = {"thumb", "card", "og"}
+WATERMARKED = {"thumb", "card", "og", "save"}
 _LOGO_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "assets", "watermark.png")
 
 # Не обрабатываем: SVG — вектор, GIF — может быть анимацией (копия её бы убила).
@@ -79,20 +82,27 @@ def _variant_dir() -> str:
     return os.path.join(settings.MEDIA_DIR, VARIANT_DIR)
 
 
-def _watermark_mode(size: str) -> str | None:
-    """Расположение знака для этого размера (``corner``/``center``) или ``None``."""
-    mode = settings.MEDIA_WATERMARK
-    return mode if size in WATERMARKED and mode in ("corner", "center") else None
+def _watermark_mode(size: str) -> tuple[str, float] | None:
+    """Знак для этого размера: (``corner``/``center``, непрозрачность) или ``None``."""
+    if size not in WATERMARKED:
+        return None
+    if size == "save":
+        mode, opacity = settings.MEDIA_WATERMARK_SAVE, settings.MEDIA_WATERMARK_SAVE_OPACITY
+    else:
+        mode, opacity = settings.MEDIA_WATERMARK, settings.MEDIA_WATERMARK_OPACITY
+    if mode not in ("corner", "center"):
+        return None
+    return mode, min(max(opacity, 0.0), 1.0)
 
 
 def _variant_path(name: str, size: str, st: os.stat_result) -> str:
     stem = os.path.splitext(os.path.basename(name))[0]
     ext = ".jpg" if VARIANTS[size][1] == "JPEG" else ".webp"
     tag = ""
-    mode = _watermark_mode(size)
-    if mode:
+    wm = _watermark_mode(size)
+    if wm:
         # Смена настроек знака или самого логотипа → другое имя → копии пересоздаются.
-        tag = f".wm-{mode}-{round(settings.MEDIA_WATERMARK_OPACITY * 100)}-{_logo_version()}"
+        tag = f".wm-{wm[0]}-{round(wm[1] * 100)}-{_logo_version()}"
     return os.path.join(_variant_dir(), f"{stem}.{size}{tag}.{int(st.st_mtime)}-{st.st_size}{ext}")
 
 
@@ -109,7 +119,7 @@ def _logo() -> Image.Image:
         return im.convert("RGBA")
 
 
-def _apply_watermark(img: Image.Image, mode: str) -> Image.Image:
+def _apply_watermark(img: Image.Image, mode: str, opacity: float) -> Image.Image:
     """Накладывает логотип на (уже уменьшенную) копию.
 
     ``corner`` — справа снизу, ~30% ширины; ``center`` — по центру, ~60% ширины.
@@ -127,7 +137,6 @@ def _apply_watermark(img: Image.Image, mode: str) -> Image.Image:
     if w < 20 or h > img.height - 2 * margin:
         return img                                  # картинка слишком мала для знака
     mark = logo.resize((w, h), Image.Resampling.LANCZOS)
-    opacity = min(max(settings.MEDIA_WATERMARK_OPACITY, 0.0), 1.0)
     mask = mark.getchannel("A").point(lambda v: round(v * opacity))
     if mode == "center":
         pos = ((img.width - w) // 2, (img.height - h) // 2)
@@ -137,7 +146,8 @@ def _apply_watermark(img: Image.Image, mode: str) -> Image.Image:
     return img
 
 
-def _render(src: str, dst: str, max_side: int, fmt: str, watermark: str | None = None) -> None:
+def _render(src: str, dst: str, max_side: int, fmt: str,
+            watermark: tuple[str, float] | None = None) -> None:
     """Делает копию ``src`` с длинной стороной не больше ``max_side`` и пишет её в ``dst``."""
     # Порядок важен для памяти: сначала уменьшаем (единственная полноразмерная копия в памяти —
     # сам декодированный оригинал), потом поворот и смена режима — уже на маленькой картинке.
@@ -158,7 +168,7 @@ def _render(src: str, dst: str, max_side: int, fmt: str, watermark: str | None =
     if transpose is not None:
         img = img.transpose(transpose)              # поворот по EXIF; сам EXIF дальше не пишем
     if watermark:
-        img = _apply_watermark(img, watermark)
+        img = _apply_watermark(img, *watermark)
     if fmt == "JPEG" and has_alpha:
         bg = Image.new("RGB", img.size, (255, 255, 255))
         bg.paste(img, mask=img.getchannel("A"))
@@ -270,7 +280,7 @@ def serve_image(name: str, size: str | None, request: Request, cache_control: st
     return FileResponse(target, media_type=media_type, headers=headers)
 
 
-def prewarm(sizes: tuple[str, ...] = ("thumb", "card")) -> dict[str, int]:
+def prewarm(sizes: tuple[str, ...] = ("thumb", "card", "save")) -> dict[str, int]:
     """Заранее делает копии для всех фото активных товаров (последовательно, по одной).
 
     Запускать разово после включения ``MEDIA_VARIANTS``: иначе первые посетители после

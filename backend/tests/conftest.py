@@ -36,6 +36,7 @@ def _isolated_media_dir(tmp_path, monkeypatch):
     monkeypatch.setattr(settings, "MEDIA_VARIANTS", False)
     monkeypatch.setattr(settings, "MEDIA_ACCEL", False)
     monkeypatch.setattr(settings, "MEDIA_WATERMARK", "off")
+    monkeypatch.setattr(settings, "MEDIA_WATERMARK_SAVE", "off")
 
 
 @pytest.fixture

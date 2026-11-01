@@ -659,6 +659,9 @@ button, input, textarea, select { font-family: inherit; }
    Фон белый (--paper, как у карточки), а не серый; background закрашивает поля
    (важно в корзине/чекауте, где под фото лежит NoPhoto). */
 .photo img { width: 100%; height: 100%; object-fit: contain; object-position: center; background: var(--paper); display: block; }
+/* Невидимый слой «для сохранения» поверх главного фото (см. ProductGallery): та же геометрия,
+   что у видимого img (contain по центру), под стрелками галереи (z-index 2). */
+.photo img.photo__save { position: absolute; inset: 0; z-index: 1; opacity: 0; background: transparent; }
 .photo__ph {
   position: relative; font-size: 40px; opacity: .5; color: var(--graphite);
   display: flex; align-items: center; justify-content: center;

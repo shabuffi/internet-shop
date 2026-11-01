@@ -35,9 +35,13 @@ class Settings(BaseSettings):
     MEDIA_ACCEL: bool = False
     # Водяной знак (логотип) на копиях фото товаров: off | corner (правый нижний угол) |
     # center (крупно по центру — труднее обрезать). Действует только при MEDIA_VARIANTS.
+    # Видимый знак — на том, что показывается (каталог, корзина, карточка, соцсети): лёгкий.
     MEDIA_WATERMARK: str = "off"
-    # Непрозрачность знака: 0 — невидим, 1 — как есть.
-    MEDIA_WATERMARK_OPACITY: float = 0.4
+    MEDIA_WATERMARK_OPACITY: float = 0.2      # 0 — невидим, 1 — как есть
+    # Знак на копии «для сохранения» (size=save): её получает тот, кто сохраняет большое фото
+    # с карточки (невидимый слой поверх видимого фото) — поэтому крупный и заметный.
+    MEDIA_WATERMARK_SAVE: str = "off"
+    MEDIA_WATERMARK_SAVE_OPACITY: float = 0.45
 
     # Сколько последних обменов держим в истории: строки sync_changes + копии import.xml
     # на диске (media/sync_xml). Старше — чистятся после каждого обмена.

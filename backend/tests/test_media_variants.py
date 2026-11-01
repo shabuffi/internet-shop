@@ -342,15 +342,16 @@ def test_watermark_logo_asset_exists():
     assert mv._logo().mode == "RGBA"
 
 
-def test_admin_media_product_photo_gets_watermarked_card(client, db_session, variants_on, monkeypatch):
-    """Обходной путь /admin/media/{имя фото товара} — та же копия со знаком, что на витрине."""
+def test_admin_media_product_photo_gets_save_copy(client, db_session, variants_on, monkeypatch):
+    """Обходной путь /admin/media/{имя фото товара} — копия «для сохранения» с крупным знаком."""
     monkeypatch.setattr(settings, "MEDIA_WATERMARK", "corner")
+    monkeypatch.setattr(settings, "MEDIA_WATERMARK_SAVE", "center")
     media.save_image("p.png", _white((3000, 2000)))
     _product(db_session)
     r = client.get("/api/v1/admin/media/p.png")
     im = Image.open(io.BytesIO(r.content))
     assert im.size == (1200, 800)
-    assert _region_changed(im, (800, 650, 1200, 800))
+    assert _region_changed(im, (500, 350, 700, 450))       # крупный знак по центру
 
 
 def test_admin_media_banner_not_watermarked(client, variants_on, monkeypatch):
@@ -359,3 +360,33 @@ def test_admin_media_banner_not_watermarked(client, variants_on, monkeypatch):
     im = Image.open(io.BytesIO(client.get("/api/v1/admin/media/banner.png").content))
     assert im.size == (1920, 640)
     assert not _region_changed(im, (0, 0, im.width, im.height))
+
+
+def _logo_darkness(im, box) -> int:
+    """Насколько тёмен самый тёмный пиксель в области (255 — чисто белая)."""
+    return 255 - min(im.convert("L").crop(box).getextrema())
+
+
+def test_save_copy_has_strong_center_mark_card_light_corner(monkeypatch):
+    """Видимая копия — лёгкий знак в углу; копия «для сохранения» — крупный и заметнее."""
+    monkeypatch.setattr(settings, "MEDIA_WATERMARK", "corner")
+    monkeypatch.setattr(settings, "MEDIA_WATERMARK_OPACITY", 0.2)
+    monkeypatch.setattr(settings, "MEDIA_WATERMARK_SAVE", "center")
+    monkeypatch.setattr(settings, "MEDIA_WATERMARK_SAVE_OPACITY", 0.45)
+    media.save_image("w.png", _white())
+    card = _open(mv.get_variant("w.png", "card"))
+    save = _open(mv.get_variant("w.png", "save"))
+    assert card.size == save.size == (1200, 800)            # слои совпадают по геометрии
+    assert not _region_changed(card, (500, 350, 700, 450))  # на видимой — центр чистый
+    assert _region_changed(save, (500, 350, 700, 450))      # на сохраняемой — знак по центру
+    assert _logo_darkness(save, (0, 0, 1200, 800)) > _logo_darkness(card, (0, 0, 1200, 800))
+
+
+def test_product_image_size_save_allowed(client, db_session, variants_on, monkeypatch):
+    monkeypatch.setattr(settings, "MEDIA_WATERMARK_SAVE", "center")
+    media.save_image("p.png", _white((2400, 1600)))
+    _product(db_session)
+    r = client.get("/api/v1/products/v1/image?size=save")
+    assert r.status_code == 200 and r.headers["content-type"] == "image/webp"
+    assert Image.open(io.BytesIO(r.content)).size == (1200, 800)
+

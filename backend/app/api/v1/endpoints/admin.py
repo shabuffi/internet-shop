@@ -1279,8 +1279,9 @@ def get_media(name: str, request: Request, db: Session = Depends(get_db)):
 
     Эндпоинт без авторизации, а имена файлов фото товаров видны в публичном ``/products``
     (поле ``images``) — поэтому оригиналы отсюда тоже не отдаём: при ``MEDIA_VARIANTS``
-    это копия до 1920px без EXIF, а если файл — фото товара, то та же копия ``card`` с
-    водяным знаком, что и на витрине. Только картинки — служебные файлы тома не отдаются.
+    это копия до 1920px без EXIF, а если файл — фото товара, то копия ``save`` с крупным
+    водяным знаком (как при «Сохранить картинку» на витрине). Только картинки — служебные
+    файлы тома не отдаются.
     """
     resp = None
     if media_storage.is_image_filename(name):
@@ -1293,7 +1294,7 @@ def get_media(name: str, request: Request, db: Session = Depends(get_db)):
             )).limit(1)
         ).first() is not None
         db.close()
-        size = "card" if is_product_photo else "media"
+        size = "save" if is_product_photo else "media"
         resp = media_variants.serve_image(name, size, request, "public, max-age=300")
     if resp is None:
         raise HTTPException(status_code=404, detail="Файл не найден")

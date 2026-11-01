@@ -14,6 +14,8 @@ export default function ProductGallery({ productId, images, name }: {
   // Индексы фото, файл которых не загрузился — показываем заглушку вместо «сломанной» картинки.
   const [broken, setBroken] = useState<Set<number>>(new Set());
   const markBroken = (i: number) => setBroken((s) => (s.has(i) ? s : new Set(s).add(i)));
+  // Индексы фото, у которых не загрузилась копия «для сохранения» — слой не ставим.
+  const [saveBroken, setSaveBroken] = useState<Set<number>>(new Set());
   const mainRef = useRef<HTMLImageElement>(null);
   // SSR: картинка может «отвалиться» до гидрации (onError не сработает) — проверяем на монтировании.
   useEffect(() => {
@@ -39,6 +41,14 @@ export default function ProductGallery({ productId, images, name }: {
         {broken.has(active)
           ? <NoPhoto />
           : <img ref={mainRef} src={productImageUrl(productId, "card", active)} alt={name} onError={() => markBroken(active)} />}
+        {/* Невидимый слой поверх фото: та же картинка, но с крупным водяным знаком. «Сохранить
+            картинку», долгое нажатие на телефоне и перетаскивание берут верхний элемент — т.е.
+            сохраняется версия с логотипом, а покупатель видит фото с лёгким знаком. */}
+        {!broken.has(active) && !saveBroken.has(active) && (
+          <img key={`save-${active}`} className="photo__save" src={productImageUrl(productId, "save", active)}
+            alt={name} decoding="async"
+            onError={() => setSaveBroken((s) => (s.has(active) ? s : new Set(s).add(active)))} />
+        )}
         {many && (
           <>
             <button type="button" className="gallery-arrow gallery-arrow--prev" onClick={prev} aria-label="Предыдущее фото">
