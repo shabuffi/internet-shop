@@ -34,7 +34,7 @@ from functools import lru_cache
 
 from fastapi import Request
 from fastapi.responses import FileResponse, Response
-from PIL import Image
+from PIL import Image, ImageFilter
 
 from app.core.config import settings
 from app.services.media_storage import media_path
@@ -57,6 +57,8 @@ VARIANTS: dict[str, tuple[int, str]] = {
 VARIANT_DIR = "_v"
 # Размеры фото товаров — на них ставится водяной знак (media — баннеры/бренды/иконки — без).
 WATERMARKED = {"thumb", "card", "og", "save"}
+# Версия оформления знака (обводка и т.п.): входит в имя копии — менять при смене рисования.
+_MARK_STYLE = 2
 _LOGO_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "assets", "watermark.png")
 
 # Не обрабатываем: SVG — вектор, GIF — может быть анимацией (копия её бы убила).
@@ -90,7 +92,7 @@ def _watermark_mode(size: str) -> tuple[str, float] | None:
         mode, opacity = settings.MEDIA_WATERMARK_SAVE, settings.MEDIA_WATERMARK_SAVE_OPACITY
     else:
         mode, opacity = settings.MEDIA_WATERMARK, settings.MEDIA_WATERMARK_OPACITY
-    if mode not in ("corner", "center"):
+    if mode not in ("corner", "center", "triple"):
         return None
     return mode, min(max(opacity, 0.0), 1.0)
 
@@ -102,7 +104,7 @@ def _variant_path(name: str, size: str, st: os.stat_result) -> str:
     wm = _watermark_mode(size)
     if wm:
         # Смена настроек знака или самого логотипа → другое имя → копии пересоздаются.
-        tag = f".wm-{wm[0]}-{round(wm[1] * 100)}-{_logo_version()}"
+        tag = f".wm{_MARK_STYLE}-{wm[0]}-{round(wm[1] * 100)}-{_logo_version()}"
     return os.path.join(_variant_dir(), f"{stem}.{size}{tag}.{int(st.st_mtime)}-{st.st_size}{ext}")
 
 
@@ -119,11 +121,31 @@ def _logo() -> Image.Image:
         return im.convert("RGBA")
 
 
-def _apply_watermark(img: Image.Image, mode: str, opacity: float) -> Image.Image:
-    """Накладывает логотип на (уже уменьшенную) копию.
+def _mark(logo: Image.Image, w: int) -> tuple[Image.Image, Image.Image]:
+    """Логотип шириной ``w`` и его белая обводка (маска) — чтобы знак читался на любом фоне:
+    на светлом виден синий логотип, на тёмном/пёстром — белый контур вокруг него."""
+    h = round(logo.height * w / logo.width)
+    mark = logo.resize((w, h), Image.Resampling.LANCZOS)
+    alpha = mark.getchannel("A")
+    r = max(1, round(w / 90))                        # толщина обводки ~1% ширины логотипа
+    halo = alpha.filter(ImageFilter.MaxFilter(2 * r + 1)).filter(ImageFilter.GaussianBlur(r / 2))
+    return mark, halo
 
-    ``corner`` — справа снизу, ~30% ширины; ``center`` — по центру, ~60% ширины.
-    Если логотип не загрузился — копия без знака (в лог), но оригинал всё равно не отдаём.
+
+def _paste_mark(img: Image.Image, mark: Image.Image, halo: Image.Image,
+                pos: tuple[int, int], opacity: float) -> None:
+    white = Image.new(img.mode, mark.size, (255, 255, 255, 255) if img.mode == "RGBA" else (255, 255, 255))
+    img.paste(white, pos, halo.point(lambda v: round(v * opacity * 0.85)))
+    img.paste(mark.convert(img.mode), pos, mark.getchannel("A").point(lambda v: round(v * opacity)))
+
+
+def _apply_watermark(img: Image.Image, mode: str, opacity: float) -> Image.Image:
+    """Накладывает логотип (с белой обводкой) на уже уменьшенную копию.
+
+    ``corner`` — справа снизу, ~30% ширины; ``center`` — по центру, ~60% ширины;
+    ``triple`` — три логотипа ~32% ширины по диагонали (слева сверху → центр → справа снизу):
+    обрезкой одного угла знак не убрать. Если логотип не загрузился — копия без знака
+    (в лог), но оригинал всё равно не отдаём. Слишком маленькая картинка — без знака.
     """
     try:
         logo = _logo()
@@ -131,18 +153,26 @@ def _apply_watermark(img: Image.Image, mode: str, opacity: float) -> Image.Image
         log.error("media_variants: нет логотипа для водяного знака %s: %s", _LOGO_PATH, e)
         return img
     margin = max(4, round(min(img.size) * 0.03))
-    share = 0.6 if mode == "center" else 0.3
+    share = {"center": 0.6, "triple": 0.32}.get(mode, 0.3)
     w = min(max(90, round(img.width * share)), img.width - 2 * margin)
     h = round(logo.height * w / logo.width)
     if w < 20 or h > img.height - 2 * margin:
-        return img                                  # картинка слишком мала для знака
-    mark = logo.resize((w, h), Image.Resampling.LANCZOS)
-    mask = mark.getchannel("A").point(lambda v: round(v * opacity))
+        return img
+    mark, halo = _mark(logo, w)
     if mode == "center":
-        pos = ((img.width - w) // 2, (img.height - h) // 2)
+        spots = [(0.5, 0.5)]
+    elif mode == "triple":
+        spots = [(0.2, 0.18), (0.5, 0.5), (0.8, 0.82)]
     else:
-        pos = (img.width - w - margin, img.height - h - margin)
-    img.paste(mark.convert(img.mode), pos, mask)
+        spots = [None]
+    for spot in spots:
+        if spot is None:                              # corner
+            pos = (img.width - w - margin, img.height - h - margin)
+        else:
+            cx, cy = round(img.width * spot[0]), round(img.height * spot[1])
+            pos = (min(max(margin, cx - w // 2), img.width - w - margin),
+                   min(max(margin, cy - h // 2), img.height - h - margin))
+        _paste_mark(img, mark, halo, pos, opacity)
     return img
 
 

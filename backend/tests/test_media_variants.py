@@ -390,3 +390,23 @@ def test_product_image_size_save_allowed(client, db_session, variants_on, monkey
     assert r.status_code == 200 and r.headers["content-type"] == "image/webp"
     assert Image.open(io.BytesIO(r.content)).size == (1200, 800)
 
+
+
+def test_watermark_triple_three_marks_on_diagonal(monkeypatch):
+    monkeypatch.setattr(settings, "MEDIA_WATERMARK_SAVE", "triple")
+    media.save_image("w.png", _white())
+    im = _open(mv.get_variant("w.png", "save"))
+    assert _region_changed(im, (40, 60, 400, 230))         # слева сверху
+    assert _region_changed(im, (450, 350, 750, 450))       # центр
+    assert _region_changed(im, (800, 580, 1160, 740))      # справа снизу
+    assert not _region_changed(im, (950, 0, 1200, 120))    # справа сверху — чисто
+    assert not _region_changed(im, (0, 680, 250, 800))     # слева снизу — чисто
+
+
+def test_watermark_visible_on_black_photo(monkeypatch):
+    """Инцидент «знака не видно»: синий логотип тонул на тёмном фото. Белая обводка → на
+    чёрном фоне появляются светлые пиксели."""
+    monkeypatch.setattr(settings, "MEDIA_WATERMARK_SAVE", "center")
+    media.save_image("b.png", _png((1200, 800), (0, 0, 0, 255)))
+    im = _open(mv.get_variant("b.png", "save")).convert("L")
+    assert im.crop((300, 300, 900, 500)).getextrema()[1] > 90
