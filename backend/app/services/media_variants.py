@@ -25,6 +25,7 @@
 """
 
 import glob
+import re
 import logging
 import mimetypes
 import os
@@ -32,6 +33,7 @@ import sys
 import tempfile
 import threading
 import time
+from urllib.parse import quote
 from functools import lru_cache
 
 from fastapi import Request
@@ -56,10 +58,13 @@ VARIANTS: dict[str, tuple[int, str]] = {
     # чистого фото, которое можно унести по прямому адресу.
     "card": (900, "WEBP"),     # большое фото на карточке товара
     "og": (1200, "JPEG"),      # превью ссылки в соцсетях/мессенджерах
-    "save": (1200, "WEBP"),    # невидимый слой «для сохранения» поверх фото на карточке
+    # Невидимый слой «для сохранения» поверх фото на карточке. JPEG, а не WebP: сохранённый
+    # файл должен открываться везде (старые просмотрщики Windows WebP не знают), и в нём
+    # же — подпись об авторских правах (EXIF/XMP).
+    "save": (1200, "JPEG"),
     # Невидимый слой поверх превью (каталог, «Новинки»/промо, список, корзина, миниатюры):
     # того же размера, что thumb, — иначе каждая карточка тянула бы ещё и 1200px.
-    "thumb_save": (500, "WEBP"),
+    "thumb_save": (500, "JPEG"),
     "media": (1920, "WEBP"),   # баннеры/бренды/иконки (/admin/media/{name})
     # Картинка раздела на плитке: как card, но без видимого знака (решение владельца —
     # знак только на фото товаров). При сохранении — копия save с логотипами, как у товаров.
@@ -70,14 +75,14 @@ VARIANT_DIR = "_v"
 WATERMARKED = {"thumb", "card", "og", "save", "thumb_save"}
 # Копии «для сохранения» — со знаком MEDIA_WATERMARK_SAVE (остальные — MEDIA_WATERMARK).
 SAVE_SIZES = {"save", "thumb_save"}
-# Версия оформления знака (обводка и т.п.): входит в имя копии — менять при смене рисования.
-_MARK_STYLE = 6
-_LOGO_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "assets", "watermark.png")
-# Логотип из шапки сайта (две шестерёнки, «торговый дом» строчными) — растр frontend/public/logo.svg
-# (sharp, 1400px, прозрачный фон). Из него — видимый одноцветный знак на фото сайта.
-_SITE_LOGO_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "assets", "watermark-site.png")
-# Маленький значок (иконка вкладки: шестерёнка с домиком на белом круге) — видимый знак на сайте.
-_ICON_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "assets", "watermark-icon.png")
+# Версия оформления знака: входит в имя копии — менять при смене рисования.
+_MARK_STYLE = 8
+_ASSETS = os.path.join(os.path.dirname(os.path.dirname(__file__)), "assets")
+# Логотип (шестерёнка с домиком, «ИНЖЕНЕР», «ТОРГОВЫЙ ДОМ» с линиями) — = frontend/public/logo.png.
+# Видимый знак — его серая форма, скачанные копии — он сам в цветах бренда (макет владельца).
+_LOGO_PATH = os.path.join(_ASSETS, "watermark.png")
+# Значок вкладки (шестерёнка с домиком на белом круге) — вариант видимого знака «icon».
+_ICON_PATH = os.path.join(_ASSETS, "watermark-icon.png")
 
 # Не обрабатываем: SVG — вектор, GIF — может быть анимацией (копия её бы убила).
 _SKIP_EXT = {".svg", ".gif"}
@@ -107,11 +112,14 @@ def _variant_dir() -> str:
 def _watermark_mode(size: str) -> tuple[str, float, str] | None:
     """Знак для этого размера: (расположение, непрозрачность, ``logo``/``icon``) или ``None``.
 
-    Копии «для сохранения» — всегда полный цветной логотип (``brand``); видимые —
-    ``MEDIA_WATERMARK_MARK`` (``logo`` — одноцветный, по умолчанию; ``icon`` — значок).
+    Копии «для сохранения» — логотип в цветах бренда (``brand``); видимые — ``MEDIA_WATERMARK_MARK``
+    (``logo`` — серый логотип, по умолчанию; ``icon`` — только значок).
+    Маленькие превью (``thumb``) — без видимого знака, если не включён ``MEDIA_WATERMARK_THUMB``.
     """
     if size not in WATERMARKED:
         return None
+    if size == "thumb" and not settings.MEDIA_WATERMARK_THUMB:
+        return None                     # маленькие превью каталога — без видимого знака
     if size in SAVE_SIZES:
         mode, opacity, kind = settings.MEDIA_WATERMARK_SAVE, settings.MEDIA_WATERMARK_SAVE_OPACITY, "brand"
     else:
@@ -136,56 +144,61 @@ def _variant_path(name: str, size: str, st: os.stat_result) -> str:
 
 
 def _asset_version(kind: str) -> int:
-    path = {"icon": _ICON_PATH, "logo": _SITE_LOGO_PATH}.get(kind, _LOGO_PATH)
+    """Версия картинки знака (входит в имя копии): размер файла."""
     try:
-        return os.stat(path).st_size
+        return os.stat(_ICON_PATH if kind == "icon" else _LOGO_PATH).st_size
     except OSError:
         return 0
-
-
-@lru_cache(maxsize=1)
-def _logo() -> Image.Image:
-    with Image.open(_LOGO_PATH) as im:
-        return im.convert("RGBA")
-
-
-@lru_cache(maxsize=1)
-def _mono_logo() -> Image.Image:
-    """Одноцветная форма логотипа из шапки сайта (маска L): две шестерёнки, «ИНЖЕНЕР»,
-    «торговый дом».
-
-    Как на согласованном макете: серый логотип целиком, ~28% ширины фото — в таком размере
-    подпись читается. Белые детали логотипа (домик в шестерёнке) остаются «окнами»:
-    маска = альфа × (1 − белизна).
-    """
-    with Image.open(_SITE_LOGO_PATH) as im:
-        logo = im.convert("RGBA")
-    whiteness = logo.convert("L").point(lambda v: 0 if v < 200 else round((v - 200) * 255 / 55))
-    mask = ImageChops.subtract(logo.getchannel("A"), whiteness)
-    box = mask.getbbox()
-    return mask.crop(box) if box else mask
-
-
-@lru_cache(maxsize=1)
-def _brand_white_mask() -> Image.Image:
-    """Форма полного логотипа (с подписью) для белой версии на тёмном фоне: белые детали
-    логотипа (домик) остаются «окнами» — маска = альфа × (1 − белизна)."""
-    logo = _logo()
-    whiteness = logo.convert("L").point(lambda v: 0 if v < 200 else round((v - 200) * 255 / 55))
-    return ImageChops.subtract(logo.getchannel("A"), whiteness)
-
-
-def _tone_for(img: Image.Image, box: tuple[int, int, int, int]) -> tuple[int, int, int]:
-    """Цвет одноцветного знака под конкретный участок фото: на светлом — тёмно-серый,
-    на тёмном — белый. Так знак читается везде и при этом не «кричит» цветами бренда."""
-    lum = ImageStat.Stat(img.convert("L").crop(box)).mean[0]
-    return (34, 34, 38) if lum > 140 else (255, 255, 255)
 
 
 @lru_cache(maxsize=1)
 def _icon() -> Image.Image:
     with Image.open(_ICON_PATH) as im:
         return im.convert("RGBA")
+
+
+def _shape(im: Image.Image) -> Image.Image:
+    """Маска формы: альфа × (1 − белизна) — белые детали (домик, белый круг) становятся «окнами»."""
+    whiteness = im.convert("L").point(lambda v: 0 if v < 200 else round((v - 200) * 255 / 55))
+    return ImageChops.subtract(im.getchannel("A"), whiteness)
+
+
+@lru_cache(maxsize=1)
+def _logo_images() -> tuple[Image.Image, Image.Image]:
+    """Логотип для знака: (маска формы L, цветной RGBA), обрезанные по содержимому.
+
+    Маска — для серого видимого знака и белой версии на тёмном фоне (белые детали — домик —
+    остаются «окнами»); цветной — для скачанных копий на светлых участках.
+    """
+    with Image.open(_LOGO_PATH) as im:
+        color = im.convert("RGBA")
+    shape = _shape(color)
+    box = shape.getbbox()
+    return (shape.crop(box), color.crop(box)) if box else (shape, color)
+
+
+def _tone_for(img: Image.Image, box: tuple[int, int, int, int]) -> tuple[int, int, int]:
+    """Цвет одноцветного знака под конкретный участок фото: на светлом — тёмно-серый,
+    на тёмном — белый. Прозрачные пиксели считаем белыми (так их и видно на странице)."""
+    part = img.crop(box)
+    if part.mode == "RGBA":
+        flat = Image.new("RGB", part.size, (255, 255, 255))
+        flat.paste(part, mask=part.getchannel("A"))
+        part = flat
+    lum = ImageStat.Stat(part.convert("L")).mean[0]
+    return (34, 34, 38) if lum > 140 else (255, 255, 255)
+
+
+def _soft_shadow(img: Image.Image, mask: Image.Image, pos: tuple[int, int], opacity: float) -> None:
+    """Еле заметная тень под белым знаком — чтобы он ровно читался и на пёстром/смешанном фоне
+    (а не наполовину). Не «ореол»: тёмная, размытая, ~30% от прозрачности знака."""
+    r = max(1, round(mask.height / 18))
+    pad = r * 3
+    big = Image.new("L", (mask.width + 2 * pad, mask.height + 2 * pad), 0)
+    big.paste(mask, (pad, pad))
+    shadow = big.filter(ImageFilter.GaussianBlur(r)).point(lambda v: round(v * opacity * 0.3))
+    black = Image.new(img.mode, shadow.size, (0, 0, 0, 255) if img.mode == "RGBA" else (0, 0, 0))
+    img.paste(black, (pos[0] - pad, pos[1] - pad + max(1, r // 2)), shadow)
 
 
 def _paste_mark(img: Image.Image, mark: Image.Image, pos: tuple[int, int], opacity: float) -> None:
@@ -197,8 +210,9 @@ def _object_box(img: Image.Image) -> tuple[int, int, int, int] | None:
     """Границы самого товара на фото (всё, что отличается от фона по краям) или ``None``,
     если однотонного фона нет (фото «в край»).
 
-    Прозрачный PNG — по альфе. Иначе фон = медиана четырёх углов, товар — пиксели, заметно
-    отличающиеся от него (мелкий шум/артефакты сжатия отсекаем MinFilter).
+    Прозрачный PNG — по альфе. Иначе фон = цвет, общий хотя бы для трёх углов (товар может
+    упираться в один угол), товар — пиксели, заметно отличающиеся от него (мелкий шум/артефакты
+    сжатия отсекаем MinFilter).
     """
     if "A" in img.getbands():
         alpha = img.getchannel("A")
@@ -207,9 +221,12 @@ def _object_box(img: Image.Image) -> tuple[int, int, int, int] | None:
     rgb = img.convert("RGB")
     corners = [rgb.getpixel(c) for c in ((1, 1), (img.width - 2, 1),
                                          (1, img.height - 2), (img.width - 2, img.height - 2))]
-    if max(max(abs(a - b) for a, b in zip(c, corners[0])) for c in corners) > 40:
-        return None                                    # углы разные — фона нет
-    bg = Image.new("RGB", rgb.size, tuple(sorted(ch)[1] for ch in zip(*corners)))
+    near = lambda a, b: max(abs(x - y) for x, y in zip(a, b)) <= 40
+    # Фон — цвет, общий хотя бы для трёх углов из четырёх: товар может упираться в один угол.
+    same = [c for c in corners if sum(near(c, o) for o in corners) >= 3]
+    if not same:
+        return None                                    # углы разные — однотонного фона нет
+    bg = Image.new("RGB", rgb.size, tuple(sorted(ch)[len(ch) // 2] for ch in zip(*same)))
     mask = ImageChops.difference(rgb, bg).convert("L").point(lambda v: 255 if v > 28 else 0)
     box = mask.filter(ImageFilter.MinFilter(5)).getbbox()
     if box is None:
@@ -224,14 +241,13 @@ def _apply_watermark(img: Image.Image, mode: str, opacity: float, kind: str = "l
     """Накладывает знак на уже уменьшенную копию.
 
     ``kind``:
-      * ``logo`` — одноцветная форма логотипа из шапки сайта (:func:`_mono_logo`), тон под фон —
-        видимый знак на сайте: небольшой и не «кричит» цветами бренда;
-      * ``brand`` — полный цветной логотип с «торговый дом» (копии «для сохранения»: их
-        видит только тот, кто сохранил фото, — знак должен чётко говорить, чьё фото).
-        На тёмном участке — тот же логотип белым, иначе синий на тёмном пропадает;
-      * ``icon`` — маленький значок (иконка вкладки, на белом круге).
+      * ``logo`` — серая форма логотипа (:func:`_logo_images`), тон под фон — видимый знак;
+      * ``brand`` — тот же логотип в цветах бренда (копии «для сохранения»: их видит только
+        тот, кто сохранил фото). На тёмном участке — белым, иначе синий пропадает;
+      * ``icon`` — только значок (иконка вкладки, на белом круге).
 
-    ``mode``: ``corner`` — справа снизу; ``bottom`` — снизу по центру (обрезать можно только
+    ``mode``: ``corner`` — внизу в свободном углу (справа; если там товар — слева; знак не
+    «разрезается» краем товара, см. :func:`_corner_spot`); ``bottom`` — снизу по центру (обрезать можно только
     всю нижнюю полосу); ``center`` — по центру; ``corners`` — во всех четырёх углах и по центру;
     ``object`` — в правом нижнем углу самого товара (фото «в край» — отступ ~10%).
     Нет картинки знака — копия без знака (в лог), но оригинал всё равно не отдаём.
@@ -239,10 +255,13 @@ def _apply_watermark(img: Image.Image, mode: str, opacity: float, kind: str = "l
     """
     icon, brand = kind == "icon", kind == "brand"
     try:
-        logo = _icon() if icon else _logo() if brand else _mono_logo()
+        if icon:
+            logo = _icon()
+        else:
+            shape_full, color_full = _logo_images()
+            logo = shape_full
     except Exception as e:  # noqa: BLE001
-        log.error("media_variants: нет картинки для водяного знака %s: %s",
-                  _ICON_PATH if icon else _LOGO_PATH if brand else _SITE_LOGO_PATH, e)
+        log.error("media_variants: нет картинки для водяного знака: %s", e)
         return img
     margin = max(4, round(min(img.size) * 0.03))
     if icon:
@@ -258,10 +277,13 @@ def _apply_watermark(img: Image.Image, mode: str, opacity: float, kind: str = "l
     h = round(logo.height * w / logo.width)
     if w < 20 or h > img.height - 2 * margin:
         return img
-    mark = logo.resize((w, h), Image.Resampling.LANCZOS)
-    white_mask = _brand_white_mask().resize((w, h), Image.Resampling.LANCZOS) if brand else None
-
     inset = max(margin, round(min(img.size) * 0.04))       # от края — чуть дальше, аккуратнее
+    if mode == "corner" and not icon:                       # свободный угол, без «разреза»
+        pos0, w = _corner_spot(img, w, round(logo.height * w / logo.width), inset, margin)
+        h = round(logo.height * w / logo.width)
+    mark = logo.resize((w, h), Image.Resampling.LANCZOS)
+    color = color_full.resize((w, h), Image.Resampling.LANCZOS) if brand else None
+
     if mode == "object":
         box = _object_box(img)
         if box is None:                                     # фото «в край»: отступ ~10%
@@ -276,7 +298,9 @@ def _apply_watermark(img: Image.Image, mode: str, opacity: float, kind: str = "l
     elif mode in ("center", "corners"):
         rel = [(0.5, 0.5)] if mode == "center" else [(0, 0), (1, 0), (0, 1), (1, 1), (0.5, 0.5)]
         spots = [(round(img.width * x) - w // 2, round(img.height * y) - h // 2) for x, y in rel]
-    else:                                                   # corner
+    elif not icon:                                          # corner — уже выбран выше
+        spots = [pos0]
+    else:                                                   # corner для значка
         spots = [(img.width - w - inset, img.height - h - inset)]
 
     for x, y in spots:
@@ -286,15 +310,91 @@ def _apply_watermark(img: Image.Image, mode: str, opacity: float, kind: str = "l
             continue
         tone = _tone_for(img, (pos[0], pos[1], pos[0] + w, pos[1] + h))
         if brand and tone != (255, 255, 255):               # светлый участок — цвета бренда
-            _paste_mark(img, mark, pos, opacity)
+            _paste_mark(img, color, pos, opacity)
             continue
+        if tone == (255, 255, 255):
+            _soft_shadow(img, mark, pos, opacity)
         fill = Image.new(img.mode, (w, h), tone + ((255,) if img.mode == "RGBA" else ()))
-        img.paste(fill, pos, (white_mask if brand else mark).point(lambda v: round(v * opacity)))
+        img.paste(fill, pos, mark.point(lambda v: round(v * opacity)))
     return img
 
 
+def _corner_spot(img: Image.Image, w: int, h: int, inset: int, margin: int) -> tuple[tuple[int, int], int]:
+    """Где поставить знак «в углу» и какой ширины: ``((x, y), w)``.
+
+    * Сначала правый нижний угол, если там не товар; иначе левый нижний.
+    * Если товар задевает оба угла — знак не «разрезаем» краем товара: либо уменьшаем
+      (до 60%) и ставим целиком на фон сбоку, либо кладём целиком на товар.
+    * Фото без однотонного фона — угол, где спокойнее (меньше деталей).
+    """
+    y = img.height - h - inset
+    right, left = (img.width - w - inset, y), (inset, y)
+    box = _object_box(img)
+    if box is None:
+        lum = img.convert("L")
+        busy = lambda p: ImageStat.Stat(lum.crop((p[0], p[1], p[0] + w, p[1] + h))).stddev[0]
+        return (left if busy(left) < 0.7 * busy(right) else right), w
+    pad = max(2, round(min(img.size) * 0.015))
+    l, t, r, b = box[0] - pad, box[1] - pad, box[2] + pad, box[3] + pad
+    hits = lambda p: not (p[0] + w <= l or p[0] >= r or p[1] + h <= t or p[1] >= b)
+    for p in (right, left):
+        if not hits(p):
+            return p, w
+    free_r, free_l = img.width - r - margin, l - margin      # поля фона справа/слева от товара
+    side = max(free_r, free_l)
+    if side >= 0.6 * w and b - t > h:                          # уменьшить и поставить на фон
+        w2 = min(w, side)
+        h2 = round(h * w2 / w)
+        x = img.width - w2 - margin if free_r >= free_l else margin
+        return (x, min(img.height - h2 - inset, b - h2)), w2
+    k = round(min(r - l, b - t) * 0.06)                        # целиком на товар, его правый низ
+    return (min(max(margin, r - k - w), img.width - w - margin),
+            min(max(margin, b - k - h), img.height - h - margin)), w
+
+
+_TRANSLIT = dict(zip("абвгдеёжзийклмнопрстуфхцчшщъыьэюя",
+                     ["a", "b", "v", "g", "d", "e", "e", "zh", "z", "i", "y", "k", "l", "m", "n", "o", "p",
+                      "r", "s", "t", "u", "f", "kh", "ts", "ch", "sh", "shch", "", "y", "", "e", "yu", "ya"]))
+
+
+def translit(text: str) -> str:
+    """Кириллица → латиница (для имени файла и ASCII-поля EXIF)."""
+    out = []
+    for c in text:
+        t = _TRANSLIT.get(c.lower())
+        out.append(c if t is None else (t.capitalize() if c != c.lower() else t))
+    return "".join(out)
+
+
+def download_name(title: str | None) -> str:
+    """Имя файла для «Сохранить картинку»: ``td-engineer-<название>.jpg`` (латиницей)."""
+    slug = re.sub(r"[^a-z0-9]+", "-", translit(title or "").lower()).strip("-")[:60].rstrip("-")
+    return f"td-engineer-{slug}.jpg" if slug else "td-engineer.jpg"
+
+
+def _copyright_meta() -> dict[str, bytes]:
+    """Подпись об авторских правах в сохранённом файле: EXIF (только ASCII — латиницей) и XMP
+    (UTF-8 — по-русски). Не видна, но помогает доказать авторство при жалобе на площадку."""
+    text = settings.MEDIA_COPYRIGHT
+    ascii_text = translit(text).replace("©", "(c)").replace("«", '"').replace("»", '"')
+    ascii_text = ascii_text.encode("ascii", "ignore").decode()
+    exif = Image.Exif()
+    exif[0x8298] = ascii_text                 # Copyright
+    exif[0x013B] = ascii_text                 # Artist
+    esc = text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+    xmp = ('<?xpacket begin="\ufeff" id="W5M0MpCehiHzreSzNTczkc9d"?>'
+           '<x:xmpmeta xmlns:x="adobe:ns:meta/"><rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">'
+           '<rdf:Description xmlns:dc="http://purl.org/dc/elements/1.1/" '
+           'xmlns:xmpRights="http://ns.adobe.com/xap/1.0/rights/">'
+           f'<dc:rights><rdf:Alt><rdf:li xml:lang="x-default">{esc}</rdf:li></rdf:Alt></dc:rights>'
+           f'<dc:creator><rdf:Seq><rdf:li>{esc}</rdf:li></rdf:Seq></dc:creator>'
+           '<xmpRights:Marked>True</xmpRights:Marked>'
+           '</rdf:Description></rdf:RDF></x:xmpmeta><?xpacket end="w"?>')
+    return {"exif": exif.tobytes(), "xmp": xmp.encode("utf-8")}
+
+
 def _render(src: str, dst: str, max_side: int, fmt: str,
-            watermark: tuple[str, float] | None = None) -> None:
+            watermark: tuple[str, float, str] | None = None, copyright_meta: bool = False) -> None:
     """Делает копию ``src`` с длинной стороной не больше ``max_side`` и пишет её в ``dst``."""
     # Порядок важен для памяти: сначала уменьшаем (единственная полноразмерная копия в памяти —
     # сам декодированный оригинал), потом поворот и смена режима — уже на маленькой картинке.
@@ -320,19 +420,20 @@ def _render(src: str, dst: str, max_side: int, fmt: str,
     transpose = _ORIENTATION.get(orientation)
     if transpose is not None:
         img = img.transpose(transpose)              # поворот по EXIF; сам EXIF дальше не пишем
-    if watermark:
-        img = _apply_watermark(img, *watermark)
-    if fmt == "JPEG" and has_alpha:
+    if fmt == "JPEG" and has_alpha:                 # до знака: тон знака — по итоговому белому фону
         bg = Image.new("RGB", img.size, (255, 255, 255))
         bg.paste(img, mask=img.getchannel("A"))
         img = bg
+    if watermark:
+        img = _apply_watermark(img, *watermark)
 
     os.makedirs(_variant_dir(), mode=0o755, exist_ok=True)
     fd, tmp = tempfile.mkstemp(dir=_variant_dir(), suffix=".tmp")
     try:
         with os.fdopen(fd, "wb") as f:
             if fmt == "JPEG":
-                img.save(f, "JPEG", quality=85, optimize=True, progressive=True)
+                extra = _copyright_meta() if copyright_meta else {}
+                img.save(f, "JPEG", quality=85, optimize=True, progressive=True, **extra)
             else:
                 img.save(f, "WEBP", quality=82, method=4)
         os.chmod(tmp, 0o644)
@@ -374,7 +475,7 @@ def get_variant(name: str, size: str, st: os.stat_result | None = None) -> str |
         return None
     try:
         if not os.path.isfile(dst):   # пока ждали — мог сделать соседний запрос
-            _render(src, dst, max_side, fmt, _watermark_mode(size))
+            _render(src, dst, max_side, fmt, _watermark_mode(size), copyright_meta=size in SAVE_SIZES)
         return dst
     except Exception as e:  # noqa: BLE001 — любая ошибка Pillow → оригинал, не 500
         log.warning("media_variants: не удалось сделать %s/%s: %s", name, size, e)
@@ -393,7 +494,8 @@ def delete_variants(name: str) -> None:
             pass
 
 
-def serve_image(name: str, size: str | None, request: Request, cache_control: str) -> Response | None:
+def serve_image(name: str, size: str | None, request: Request, cache_control: str,
+                filename: str | None = None) -> Response | None:
     """Ответ с картинкой: копия нужного размера (если включено) или оригинал.
 
     Файл отдаётся потоком (``FileResponse``) либо, при ``MEDIA_ACCEL``, через nginx
@@ -422,6 +524,9 @@ def serve_image(name: str, size: str | None, request: Request, cache_control: st
     else:
         etag = f'"{os.path.basename(target)}"'   # mtime/размер оригинала уже в имени копии
     headers = {"Cache-Control": cache_control, "ETag": etag}
+    if filename and target != src:
+        # «Сохранить картинку» предложит это имя (td-engineer-<товар>.jpg), а не «image».
+        headers["Content-Disposition"] = f'inline; filename="{filename}"; filename*=UTF-8\'\'{quote(filename)}'
     if request.headers.get("if-none-match") == etag:
         return Response(status_code=304, headers=headers)
 

@@ -295,9 +295,11 @@ def test_watermark_center(monkeypatch):
 def test_watermark_on_all_product_sizes_not_on_media(monkeypatch):
     monkeypatch.setattr(settings, "MEDIA_WATERMARK", "corner")
     media.save_image("w.png", _white())
-    for size in ("thumb", "card", "og"):
+    for size in ("card", "og"):
         im = _open(mv.get_variant("w.png", size))
         assert _region_changed(im, (im.width // 2, im.height // 2, im.width, im.height)), size
+    thumb = _open(mv.get_variant("w.png", "thumb"))                 # маленькие превью — без знака
+    assert not _region_changed(thumb, (0, 0, thumb.width, thumb.height))
     banner = _open(mv.get_variant("w.png", "media"))
     assert not _region_changed(banner, (0, 0, banner.width, banner.height))
 
@@ -326,22 +328,23 @@ def test_watermark_tiny_image_no_crash(monkeypatch):
 
 
 def test_watermark_missing_logo_still_no_original(monkeypatch):
-    """Нет логотипа → копия без знака (ошибка в лог), но не оригинал в полном размере."""
+    """Нет картинки логотипа → копия без знака (ошибка в лог), но не оригинал в полном размере."""
     monkeypatch.setattr(settings, "MEDIA_WATERMARK", "corner")
     monkeypatch.setattr(mv, "_LOGO_PATH", "/nonexistent/logo.png")
-    mv._logo.cache_clear()
+    mv._logo_images.cache_clear()
     try:
         media.save_image("w.png", _white((2400, 1600)))
-        assert _open(mv.get_variant("w.png", "card")).size == (900, 600)
+        im = _open(mv.get_variant("w.png", "card"))
+        assert im.size == (900, 600) and not _region_changed(im, (0, 0, 900, 600))
     finally:
-        mv._logo.cache_clear()
+        mv._logo_images.cache_clear()
 
 
-def test_watermark_logo_asset_exists():
-    assert os.path.isfile(mv._LOGO_PATH)
-    assert mv._logo().mode == "RGBA"
-    assert os.path.isfile(mv._SITE_LOGO_PATH)                     # логотип шапки — для видимого знака
-    assert mv._mono_logo().mode == "L"
+def test_watermark_assets_exist():
+    assert os.path.isfile(mv._ICON_PATH) and os.path.isfile(mv._LOGO_PATH)
+    shape, color = mv._logo_images()
+    assert shape.mode == "L" and color.mode == "RGBA" and shape.size == color.size
+    assert shape.width > 3 * shape.height                           # логотип вытянутый
 
 
 def test_admin_media_product_photo_gets_save_copy(client, db_session, variants_on, monkeypatch):
@@ -392,8 +395,9 @@ def test_product_image_size_save_allowed(client, db_session, variants_on, monkey
     media.save_image("p.png", _white((2400, 1600)))
     _product(db_session)
     r = client.get("/api/v1/products/v1/image?size=save")
-    assert r.status_code == 200 and r.headers["content-type"] == "image/webp"
+    assert r.status_code == 200 and r.headers["content-type"] == "image/jpeg"
     assert Image.open(io.BytesIO(r.content)).size == (1200, 800)
+    assert 'filename="td-engineer-t.jpg"' in r.headers["content-disposition"]   # имя товара «T»
 
 
 
@@ -476,7 +480,10 @@ def test_admin_uploaded_photo_end_to_end(client, db_session, variants_on, monkey
     assert not _region_changed(card, (0, 0, card.width, card.height))   # на сайте без знака
 
     save = Image.open(io.BytesIO(client.get("/api/v1/products/m1/image?size=save").content))
-    assert save.size == (800, 1200) and not save.getexif()
+    exif = save.getexif()
+    assert save.size == (800, 1200)
+    assert 0x8825 not in exif and 0x010F not in exif                # ни GPS, ни камеры…
+    assert "td-engineer.ru" in exif.get(0x8298, "")                 # …только наш копирайт
     assert _region_changed(save, (20, 20, 260, 90))                     # логотип в углу
 
     with open(media.media_path(name), "rb") as f:                       # оригинал цел
@@ -775,3 +782,58 @@ def test_cleanup_tmp_files_by_age():
 
 def test_cleanup_without_variant_dir_is_noop():
     assert mv.cleanup_stale() == {"kept": 0, "removed": 0, "freed_mb": 0}
+
+
+# ─── новый знак, умный угол, превью без знака, подпись в сохранённых файлах ──
+
+def test_corner_moves_left_when_product_in_bottom_right(monkeypatch):
+    monkeypatch.setattr(settings, "MEDIA_WATERMARK", "corner")
+    media.save_image("p.png", _product_on_white(box=(600, 400, 1200, 800)))   # товар справа снизу
+    im = _open(mv.get_variant("p.png", "card"))
+    plain_area = im.crop((450, 300, 900, 600))
+    assert _region_changed(im, (0, 450, 400, 600))                  # знак ушёл влево вниз
+    assert not _changed_box(plain_area, Image.new("RGB", plain_area.size, (40, 90, 160)))  # на товаре знака нет
+
+
+def test_corner_does_not_straddle_product_edge(monkeypatch):
+    """Узкий товар по центру (как пакет семян): знак не «разрезается» краем товара."""
+    monkeypatch.setattr(settings, "MEDIA_WATERMARK", "corner")
+    data = _product_on_white(box=(450, 60, 750, 760))              # в card: x 337..563
+    media.save_image("p.png", data)
+    plain = Image.open(io.BytesIO(data)).convert("RGB").resize((900, 600))
+    im = _open(mv.get_variant("p.png", "card"))
+    l, t, r, b = _changed_box(plain, im)
+    assert l >= 563 or r <= 337                                     # целиком на фоне сбоку
+
+
+def test_thumb_visible_mark_optional(monkeypatch):
+    monkeypatch.setattr(settings, "MEDIA_WATERMARK", "corner")
+    media.save_image("w.png", _white())
+    assert not _region_changed(_open(mv.get_variant("w.png", "thumb")), (0, 0, 500, 333))
+    monkeypatch.setattr(settings, "MEDIA_WATERMARK_THUMB", True)
+    assert _region_changed(_open(mv.get_variant("w.png", "thumb")), (250, 166, 500, 333))
+
+
+def test_saved_copy_has_copyright_metadata():
+    media.save_image("w.png", _white())
+    path = mv.get_variant("w.png", "save")
+    im = Image.open(path)
+    assert im.format == "JPEG"
+    assert im.getexif().get(0x8298, "").startswith("(c) TD")        # EXIF — латиницей
+    assert "ТД «Инженер»" in im.info.get("xmp", b"").decode("utf-8")  # XMP — по-русски
+
+
+def test_transparent_png_gets_dark_mark_not_invisible_white(monkeypatch):
+    """Прозрачный PNG на белой странице: знак тёмный (прозрачное считается белым)."""
+    monkeypatch.setattr(settings, "MEDIA_WATERMARK", "corner")
+    media.save_image("t.png", _png((1200, 800), (0, 0, 0, 0)))
+    im = _open(mv.get_variant("t.png", "card"))
+    flat = Image.new("RGB", im.size, (255, 255, 255))
+    flat.paste(im, mask=im.getchannel("A"))
+    assert min(flat.crop((450, 400, 900, 600)).convert("L").getdata()) < 200
+
+
+def test_download_name_translit():
+    assert mv.download_name("с4 Семена ДЫНЯ «Медовая» лакомка") == "td-engineer-s4-semena-dynya-medovaya-lakomka.jpg"
+    assert mv.download_name(None) == "td-engineer.jpg"
+

@@ -1294,16 +1294,17 @@ def get_media(name: str, request: Request, size: Literal["card", "save"] | None 
     if media_storage.is_image_filename(name):
         # Только факт привязки к товару; сессию закрываем до работы с файлом (как в
         # get_product_image — иначе соединение занято всё время отдачи, см. 6fc2f91).
-        is_product_photo = db.execute(
-            select(Product.id).where(or_(
+        product = db.execute(
+            select(Product.name).where(or_(
                 Product.image_url == name,
                 cast(Product.images, String).contains(f'"{name}"'),
             )).limit(1)
-        ).first() is not None
-        is_category_image = not is_product_photo and db.execute(
-            select(Category.id).where(Category.icon == name).limit(1)
-        ).first() is not None
+        ).first()
+        category = None if product else db.execute(
+            select(Category.name).where(Category.icon == name).limit(1)
+        ).first()
         db.close()
+        is_product_photo, is_category_image = product is not None, category is not None
         if is_product_photo:
             variant = "save"
         elif is_category_image:
@@ -1314,7 +1315,10 @@ def get_media(name: str, request: Request, size: Literal["card", "save"] | None 
             variant = "cat" if size == "card" else "save"   # на плитке — без видимого знака
         else:
             variant = "media"
-        resp = media_variants.serve_image(name, variant, request, "public, max-age=300")
+        title = product.name if product else category.name if category else None
+        resp = media_variants.serve_image(
+            name, variant, request, "public, max-age=300",
+            filename=media_variants.download_name(title) if variant == "save" else None)
     if resp is None:
         raise HTTPException(status_code=404, detail="Файл не найден")
     return resp

@@ -491,7 +491,7 @@ def get_product_image(request: Request, product_id: str, n: int = 0,
     # встают в очередь на pool.acquire() и падают по таймауту. db.close() идемпотентен —
     # повторный close() из get_db() безвреден.
     row = db.execute(
-        select(Product.images, Product.image_url).where(
+        select(Product.images, Product.image_url, Product.name).where(
             Product.id == product_id, Product.is_active == True
         )
     ).first()
@@ -514,6 +514,7 @@ def get_product_image(request: Request, product_id: str, n: int = 0,
     resp = media_variants.serve_image(
         images[n], size or "card", request,
         f"public, max-age={_IMG_TTL}, stale-while-revalidate={_IMG_SWR}",
+        filename=media_variants.download_name(row.name) if size in media_variants.SAVE_SIZES else None,
     )
     if resp is None:
         raise HTTPException(status_code=404, detail="Изображение не найдено")
