@@ -695,3 +695,18 @@ def test_visible_bottom_center(monkeypatch):
     assert _region_changed(im, (380, 520, 520, 590))                # снизу по центру
     assert not _region_changed(im, (0, 0, 900, 450))                # выше — чисто
     assert not _region_changed(im, (700, 450, 900, 600))            # правый нижний угол — чист
+
+
+def test_visible_size_setting(monkeypatch):
+    """Размер видимого знака — настройка; смена размера → новая копия."""
+    monkeypatch.setattr(settings, "MEDIA_WATERMARK", "corner")
+    media.save_image("w.png", _white())
+    small_path = mv.get_variant("w.png", "card")
+    small = _open(small_path)
+    monkeypatch.setattr(settings, "MEDIA_WATERMARK_SIZE", 0.3)
+    big_path = mv.get_variant("w.png", "card")
+    assert big_path != small_path
+    big = _open(big_path)
+    # знак шире: при 30% он заходит левее, чем при 18%
+    assert not _region_changed(small, (560, 450, 680, 600))
+    assert _region_changed(big, (560, 450, 680, 600))

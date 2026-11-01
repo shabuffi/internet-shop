@@ -123,6 +123,8 @@ def _variant_path(name: str, size: str, st: os.stat_result) -> str:
     if wm:
         # Смена настроек знака или самого логотипа → другое имя → копии пересоздаются.
         tag = f".wm{_MARK_STYLE}-{wm[2]}-{wm[0]}-{round(wm[1] * 100)}-{_asset_version(wm[2])}"
+        if size not in SAVE_SIZES and wm[0] in ("corner", "bottom"):
+            tag += f"-s{round(settings.MEDIA_WATERMARK_SIZE * 100)}"     # размер видимого знака
     return os.path.join(_variant_dir(), f"{stem}.{size}{tag}.{int(st.st_mtime)}-{st.st_size}{ext}")
 
 
@@ -243,7 +245,10 @@ def _apply_watermark(img: Image.Image, mode: str, opacity: float, kind: str = "l
     else:
         # Видимый знак — небольшой (рекомендации для товарных фото: «меньше и светлее, чем
         # кажется нужным»); копия «для сохранения» (corners) — крупнее, подпись читается.
-        share, min_w = {"center": 0.45, "corners": 0.24, "object": 0.2}.get(mode, 0.18), 70
+        share = {"center": 0.45, "corners": 0.24, "object": 0.2}.get(mode)
+        if share is None:                                   # corner / bottom — видимый знак
+            share = min(max(settings.MEDIA_WATERMARK_SIZE, 0.05), 0.6)
+        min_w = 70
     w = min(max(min_w, round(img.width * share)), img.width - 2 * margin)
     h = round(logo.height * w / logo.width)
     if w < 20 or h > img.height - 2 * margin:
