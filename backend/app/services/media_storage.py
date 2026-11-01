@@ -14,6 +14,10 @@ from app.core.config import settings
 
 # Расширения, которые считаем картинками (обмен + загрузка фото/логотипа в админке)
 IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp", ".gif", ".svg"}
+# Фото товаров и иконки категорий — только растр, который умеет media_variants: GIF (анимация)
+# и SVG (вектор) он не обрабатывает, и они уходили бы наружу как есть — без уменьшения и без
+# водяного знака; SVG с публичного адреса своего домена ещё и потенциальный XSS.
+PHOTO_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp"}
 
 
 def _safe_name(filename: str) -> str:
@@ -72,7 +76,8 @@ def save_image(filename: str, data: bytes) -> str:
     return name
 
 
-def save_upload(original_filename: str, data: bytes) -> str:
+def save_upload(original_filename: str, data: bytes,
+                allowed: set[str] = IMAGE_EXTENSIONS) -> str:
     """Сохраняет загруженную в админке картинку под уникальным именем.
 
     Имя генерируется (``upload_<uuid>.<ext>``), чтобы не пересекаться с файлами обмена.
@@ -80,6 +85,7 @@ def save_upload(original_filename: str, data: bytes) -> str:
     Args:
         original_filename: Имя исходного файла (берётся только расширение).
         data: Байты картинки.
+        allowed: Допустимые расширения (для фото товаров/категорий — :data:`PHOTO_EXTENSIONS`).
 
     Returns:
         Имя сохранённого файла.
@@ -88,7 +94,7 @@ def save_upload(original_filename: str, data: bytes) -> str:
         ValueError: если расширение не похоже на картинку.
     """
     ext = os.path.splitext(_safe_name(original_filename))[1].lower()
-    if ext not in IMAGE_EXTENSIONS:
+    if ext not in allowed:
         raise ValueError("Недопустимый тип файла")
     name = f"upload_{uuid.uuid4().hex}{ext}"
     os.makedirs(settings.MEDIA_DIR, exist_ok=True)

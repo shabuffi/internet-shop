@@ -438,6 +438,9 @@ button, input, textarea, select { font-family: inherit; }
    `.cat-tile__media img` (contain), и фиксированную высоту/мобильный кламп ниже по файлу. */
 .cat-tile .cat-tile__media--cover { padding: 0; height: auto; aspect-ratio: 1; }
 .cat-tile__media--cover::before { display: none; }
+/* Невидимый слой «для сохранения» поверх картинки категории (CategoryImage protect): та же
+   геометрия, что у видимой (cover-плитка), сверху, полностью прозрачный. */
+.cat-tile .cat-tile__media--cover img.cat-save { z-index: 2; opacity: 0; }
 .cat-tile .cat-tile__media--cover img {
   position: absolute;
   inset: 0;

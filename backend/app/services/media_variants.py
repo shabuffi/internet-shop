@@ -337,12 +337,17 @@ def prewarm(sizes: tuple[str, ...] = ("thumb", "card", "save")) -> dict[str, int
     from app.db.models.product import Product
     from app.db.session import SessionLocal
 
+    from app.db.models.product import Category
+
     db = SessionLocal()
     try:
         rows = db.execute(select(Product.images, Product.image_url).where(Product.is_active == True)).all()  # noqa: E712
+        icons = db.scalars(select(Category.icon).where(Category.icon.is_not(None))).all()
     finally:
         db.close()
     names = sorted({n for r in rows for n in (r.images or ([r.image_url] if r.image_url else []))})
+    # Картинки категорий — те же копии card (плитка) и save (с логотипами).
+    names += sorted(set(icons) - set(names))
 
     stats = {"files": len(names), "made": 0, "cached": 0, "fallback": 0, "missing": 0}
     for i, name in enumerate(names, 1):

@@ -233,7 +233,7 @@ export default async function HomePage() {
                   {/* Тот же полнокадровый квадратный блок, что у захардкоженных плиток: загруженное
                       фото категории заполняет блок (cover). Без своей иконки — нейтральная монограмма. */}
                   <span className="cat-tile__media cat-tile__media--cover">
-                    <CategoryImage icon={t.icon} name={t.name} letterSize={56} />
+                    <CategoryImage icon={t.icon} name={t.name} letterSize={56} protect />
                   </span>
                   <span className="cat-tile__body">
                     <span className="cat-tile__name">{t.name}</span>
@@ -265,6 +265,9 @@ export default async function HomePage() {
                   {/* Полнокадровое фото раздела — заполняет весь медиа-блок (cover). */}
                   <span className="cat-tile__media cat-tile__media--cover">
                     <img src={`/categories/${t.icon}.jpg`} alt={t.title} />
+                    {/* Невидимый слой «для сохранения» — та же картинка с логотипами
+                        (public/categories/save, делается backend/scripts/make_static_save_copies.py). */}
+                    <img src={`/categories/save/${t.icon}.jpg`} alt={t.title} className="cat-save" decoding="async" />
                   </span>
                   <span className="cat-tile__body">
                     <span className="cat-tile__name">{t.title}</span>

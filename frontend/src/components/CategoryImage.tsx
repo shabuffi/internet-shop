@@ -10,9 +10,10 @@ import type { CSSProperties } from "react";
 // карточки. Так карточка выглядит законченной для ЛЮБОЙ категории, а акцент остаётся на
 // названии; одна и та же фотография для всех категорий не используется.
 
-/** URL публичной отдачи иконки категории (тот же endpoint, что у логотипа/баннеров). */
-function mediaUrl(icon: string): string {
-  return `/api/v1/admin/media/${icon}`;
+/** URL публичной отдачи картинки категории (тот же endpoint, что у логотипа/баннеров).
+ *  card — видимая копия; save — копия с логотипами (её же отдаёт адрес без параметра). */
+function mediaUrl(icon: string, size: "card" | "save"): string {
+  return `/api/v1/admin/media/${icon}?size=${size}`;
 }
 
 /** Нейтральная заглушка-монограмма. Прозрачный фон — опирается на фон контейнера
@@ -43,6 +44,9 @@ function CategoryMonogram({ name, letterSize }: { name: string; letterSize: numb
  * imgStyle / imgClassName — оформление <img> в конкретном месте (в блоке главной размер
  *   задаёт CSS `.cat-tile__media img`, поэтому там ничего не передаём).
  * letterSize — размер буквы заглушки под размер контейнера.
+ * protect — поверх фото невидимый слой с копией «для сохранения» (логотипы): «Сохранить
+ *   картинку»/долгое нажатие берут его. Только там, где img растянут на контейнер с
+ *   position: relative (плитка главной, cover) — см. `.cat-tile img.cat-save` в globals.css.
  */
 export default function CategoryImage({
   icon,
@@ -50,15 +54,24 @@ export default function CategoryImage({
   imgStyle,
   imgClassName,
   letterSize = 44,
+  protect = false,
 }: {
   icon?: string | null;
   name: string;
   imgStyle?: CSSProperties;
   imgClassName?: string;
   letterSize?: number;
+  protect?: boolean;
 }) {
   if (icon) {
-    return <img src={mediaUrl(icon)} alt="" className={imgClassName} style={imgStyle} />;
+    const img = <img src={mediaUrl(icon, "card")} alt="" className={imgClassName} style={imgStyle} />;
+    if (!protect) return img;
+    return (
+      <>
+        {img}
+        <img src={mediaUrl(icon, "save")} alt="" className="cat-save" decoding="async" />
+      </>
+    );
   }
   return <CategoryMonogram name={name} letterSize={letterSize} />;
 }

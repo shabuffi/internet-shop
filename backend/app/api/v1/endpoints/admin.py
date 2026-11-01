@@ -8,6 +8,7 @@ import os
 import shutil
 import uuid
 from datetime import datetime, timedelta, timezone
+from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, UploadFile, File, Query
 from fastapi.responses import PlainTextResponse
@@ -973,9 +974,10 @@ async def upload_product_image(
         raise HTTPException(status_code=404, detail="Товар не найден")
     data = await file.read()
     try:
-        name = media_storage.save_upload(file.filename or "image.jpg", data)
+        name = media_storage.save_upload(file.filename or "image.jpg", data,
+                                         allowed=media_storage.PHOTO_EXTENSIONS)
     except ValueError:
-        raise HTTPException(status_code=400, detail="Можно загружать только изображения")
+        raise HTTPException(status_code=400, detail="Фото товара — только JPG, PNG или WebP")
 
     images = _current_images(product)
     images.append(name)
@@ -1145,6 +1147,8 @@ def attach_existing_image(
     name = os.path.basename(body.filename.replace("\\", "/"))
     if not media_storage.is_image_filename(name) or not media_storage.read_image(name):
         raise HTTPException(status_code=404, detail="Файл не найден")
+    if os.path.splitext(name)[1].lower() not in media_storage.PHOTO_EXTENSIONS:
+        raise HTTPException(status_code=400, detail="Фото товара — только JPG, PNG или WebP")
 
     images = _current_images(product)
     if name not in images:
@@ -1274,14 +1278,17 @@ async def dev_upload_image(file: UploadFile = File(...), _=Depends(_get_current_
 
 
 @router.get("/media/{name}")
-def get_media(name: str, request: Request, db: Session = Depends(get_db)):
+def get_media(name: str, request: Request, size: Literal["card", "save"] | None = None,
+              db: Session = Depends(get_db)):
     """Публичная отдача загруженного изображения (баннеры, бренды, иконки) по имени файла.
 
     Эндпоинт без авторизации, а имена файлов фото товаров видны в публичном ``/products``
     (поле ``images``) — поэтому оригиналы отсюда тоже не отдаём: при ``MEDIA_VARIANTS``
     это копия до 1920px без EXIF, а если файл — фото товара, то копия ``save`` с крупным
-    водяным знаком (как при «Сохранить картинку» на витрине). Только картинки — служебные
-    файлы тома не отдаются.
+    водяным знаком (как при «Сохранить картинку» на витрине). Картинка категории — та же
+    защита, что у фото товара: ``size=card`` — видимая копия для плитки, всё остальное
+    (в т.ч. прямой адрес без параметра) — ``save`` с логотипами. Только картинки —
+    служебные файлы тома не отдаются.
     """
     resp = None
     if media_storage.is_image_filename(name):
@@ -1293,9 +1300,17 @@ def get_media(name: str, request: Request, db: Session = Depends(get_db)):
                 cast(Product.images, String).contains(f'"{name}"'),
             )).limit(1)
         ).first() is not None
+        is_category_image = not is_product_photo and db.execute(
+            select(Category.id).where(Category.icon == name).limit(1)
+        ).first() is not None
         db.close()
-        size = "save" if is_product_photo else "media"
-        resp = media_variants.serve_image(name, size, request, "public, max-age=300")
+        if is_product_photo:
+            variant = "save"
+        elif is_category_image:
+            variant = "card" if size == "card" else "save"
+        else:
+            variant = "media"
+        resp = media_variants.serve_image(name, variant, request, "public, max-age=300")
     if resp is None:
         raise HTTPException(status_code=404, detail="Файл не найден")
     return resp
@@ -1912,9 +1927,10 @@ async def upload_category_icon(
         raise HTTPException(status_code=404, detail="Категория не найдена")
     data = await file.read()
     try:
-        name = media_storage.save_upload(file.filename or "icon.png", data)
+        name = media_storage.save_upload(file.filename or "icon.png", data,
+                                         allowed=media_storage.PHOTO_EXTENSIONS)
     except ValueError:
-        raise HTTPException(status_code=400, detail="Можно загружать только изображения")
+        raise HTTPException(status_code=400, detail="Картинка категории — только JPG, PNG или WebP")
     old = cat.icon
     cat.icon = name
     db.commit()

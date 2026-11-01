@@ -479,3 +479,74 @@ def test_admin_uploaded_photo_end_to_end(client, db_session, variants_on, monkey
 
     with open(media.media_path(name), "rb") as f:                       # оригинал цел
         assert f.read() == original
+
+
+# ─── картинки категорий и запрет GIF/SVG для фото ────────────────────────────
+
+def _admin_login(client, db_session):
+    from app.api.v1.endpoints.admin import _hash_password
+    from app.db.models.admin import AdminUser
+    db_session.add(AdminUser(username="admin", password_hash=_hash_password("password123")))
+    db_session.commit()
+    assert client.post("/api/v1/admin/login",
+                       json={"username": "admin", "password": "password123"}).status_code == 200
+
+
+def _category(db, icon, cid="c1"):
+    from app.db.models.product import Category
+    db.add(Category(id=cid, moysklad_id=f"ms-{cid}", name="Игрушки", icon=icon))
+    db.commit()
+
+
+def test_category_image_card_clean_default_watermarked(client, db_session, variants_on, monkeypatch):
+    """Картинка категории — как фото товара: size=card чистая для плитки, а прямой адрес
+    без параметра (и size=save) — копия с логотипами."""
+    monkeypatch.setattr(settings, "MEDIA_WATERMARK_SAVE", "corners")
+    media.save_image("upload_cat.png", _white((2400, 1600)))
+    _category(db_session, "upload_cat.png")
+
+    card = Image.open(io.BytesIO(client.get("/api/v1/admin/media/upload_cat.png?size=card").content))
+    assert card.size == (900, 600)
+    assert not _region_changed(card, (0, 0, 900, 600))
+
+    for url in ("/api/v1/admin/media/upload_cat.png", "/api/v1/admin/media/upload_cat.png?size=save"):
+        im = Image.open(io.BytesIO(client.get(url).content))
+        assert im.size == (1200, 800), url
+        assert _region_changed(im, (20, 20, 340, 110)), url      # логотип в углу
+
+
+def test_banner_ignores_size_param(client, variants_on, monkeypatch):
+    """Баннеры/бренды не трогаем: size=card для них не значит ничего, отдаётся media 1920."""
+    monkeypatch.setattr(settings, "MEDIA_WATERMARK_SAVE", "corners")
+    media.save_image("banner.png", _white((3000, 1000)))
+    im = Image.open(io.BytesIO(client.get("/api/v1/admin/media/banner.png?size=card").content))
+    assert im.size == (1920, 640)
+    assert not _region_changed(im, (0, 0, im.width, im.height))
+
+
+@pytest.mark.parametrize("fname", ["anim.gif", "vector.svg"])
+def test_product_photo_upload_rejects_gif_svg(client, db_session, fname):
+    _admin_login(client, db_session)
+    db_session.add(Product(id="g1", moysklad_id="ms-g1", name="T", price=Decimal("1"), stock=1))
+    db_session.commit()
+    r = client.post("/api/v1/admin/products/g1/images", files={"file": (fname, b"x", "image/gif")})
+    assert r.status_code == 400
+
+
+def test_category_icon_upload_rejects_svg_accepts_png(client, db_session):
+    _admin_login(client, db_session)
+    _category(db_session, None)
+    r = client.post("/api/v1/admin/categories/c1/icon",
+                    files={"file": ("icon.svg", b"<svg xmlns='http://www.w3.org/2000/svg'/>", "image/svg+xml")})
+    assert r.status_code == 400
+    r = client.post("/api/v1/admin/categories/c1/icon", files={"file": ("icon.png", _png((300, 300)), "image/png")})
+    assert r.status_code == 200 and r.json()["name"].endswith(".png")
+
+
+def test_attach_orphan_rejects_gif(client, db_session):
+    _admin_login(client, db_session)
+    db_session.add(Product(id="g2", moysklad_id="ms-g2", name="T", price=Decimal("1"), stock=1))
+    db_session.commit()
+    media.save_image("old.gif", b"GIF89a")
+    r = client.post("/api/v1/admin/products/g2/images/attach", json={"filename": "old.gif"})
+    assert r.status_code == 400
