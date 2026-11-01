@@ -71,7 +71,7 @@ WATERMARKED = {"thumb", "card", "og", "save", "thumb_save"}
 # Копии «для сохранения» — со знаком MEDIA_WATERMARK_SAVE (остальные — MEDIA_WATERMARK).
 SAVE_SIZES = {"save", "thumb_save"}
 # Версия оформления знака (обводка и т.п.): входит в имя копии — менять при смене рисования.
-_MARK_STYLE = 4
+_MARK_STYLE = 5
 _LOGO_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "assets", "watermark.png")
 # Маленький значок (иконка вкладки: шестерёнка с домиком на белом круге) — видимый знак на сайте.
 _ICON_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "assets", "watermark-icon.png")
@@ -147,20 +147,13 @@ def _logo() -> Image.Image:
 
 @lru_cache(maxsize=1)
 def _mono_logo() -> Image.Image:
-    """Одноцветная форма логотипа (маска L): шестерёнка + «ИНЖЕНЕР», без мелкой подписи.
+    """Одноцветная форма полного логотипа (маска L): шестерёнка, «ИНЖЕНЕР» и «торговый дом».
 
-    Как советуют для водяных знаков на товарах: простая форма без тонких линий —
-    строка «торговый дом» с линиями в малом размере превращается в шум. Белые детали
-    логотипа (домик в шестерёнке) остаются «окнами»: маска = альфа × (1 − белизна).
+    Как на согласованном макете: серый логотип целиком, ~28% ширины фото — в таком размере
+    подпись читается. Белые детали логотипа (домик в шестерёнке) остаются «окнами»:
+    маска = альфа × (1 − белизна).
     """
-    logo = _logo()
-    rgb, alpha = logo.convert("RGB"), logo.getchannel("A")
-    whiteness = rgb.convert("L").point(lambda v: 0 if v < 200 else round((v - 200) * 255 / 55))
-    mask = ImageChops.subtract(alpha, whiteness)
-    # Подпись «торговый дом» с линиями: правее шестерёнки (x ≥ 200), ниже крупной надписи (y ≥ 100)
-    # — в координатах исходного logo.png 634×160, масштабируем, если файл другого размера.
-    sx, sy = logo.width / 634, logo.height / 160
-    mask.paste(0, (round(200 * sx), round(100 * sy), logo.width, logo.height))
+    mask = _brand_white_mask()
     box = mask.getbbox()
     return mask.crop(box) if box else mask
 
