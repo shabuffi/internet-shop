@@ -35,6 +35,7 @@ def _isolated_media_dir(tmp_path, monkeypatch):
     # Выключатели отдачи картинок — по умолчанию как в коде, а не из локального .env.
     monkeypatch.setattr(settings, "MEDIA_VARIANTS", False)
     monkeypatch.setattr(settings, "MEDIA_ACCEL", False)
+    monkeypatch.setattr(settings, "MEDIA_WATERMARK", "off")
 
 
 @pytest.fixture

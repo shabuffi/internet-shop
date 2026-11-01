@@ -13,7 +13,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Response, Upload
 from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session, aliased
-from sqlalchemy import func, or_, select
+from sqlalchemy import String, cast, func, or_, select
 from sqlalchemy.exc import IntegrityError
 
 from app.core.config import settings
@@ -1274,16 +1274,27 @@ async def dev_upload_image(file: UploadFile = File(...), _=Depends(_get_current_
 
 
 @router.get("/media/{name}")
-def get_media(name: str, request: Request):
+def get_media(name: str, request: Request, db: Session = Depends(get_db)):
     """Публичная отдача загруженного изображения (баннеры, бренды, иконки) по имени файла.
 
     Эндпоинт без авторизации, а имена файлов фото товаров видны в публичном ``/products``
     (поле ``images``) — поэтому оригиналы отсюда тоже не отдаём: при ``MEDIA_VARIANTS``
-    это копия до 1920px без EXIF. Только картинки — служебные файлы тома не отдаются.
+    это копия до 1920px без EXIF, а если файл — фото товара, то та же копия ``card`` с
+    водяным знаком, что и на витрине. Только картинки — служебные файлы тома не отдаются.
     """
     resp = None
     if media_storage.is_image_filename(name):
-        resp = media_variants.serve_image(name, "media", request, "public, max-age=300")
+        # Только факт привязки к товару; сессию закрываем до работы с файлом (как в
+        # get_product_image — иначе соединение занято всё время отдачи, см. 6fc2f91).
+        is_product_photo = db.execute(
+            select(Product.id).where(or_(
+                Product.image_url == name,
+                cast(Product.images, String).contains(f'"{name}"'),
+            )).limit(1)
+        ).first() is not None
+        db.close()
+        size = "card" if is_product_photo else "media"
+        resp = media_variants.serve_image(name, size, request, "public, max-age=300")
     if resp is None:
         raise HTTPException(status_code=404, detail="Файл не найден")
     return resp

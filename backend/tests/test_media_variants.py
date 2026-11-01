@@ -263,3 +263,99 @@ def test_admin_media_svg_served_as_is(client, variants_on):
 def test_admin_media_non_image_404(client):
     media.save_image("images_1.json", b"{}")
     assert client.get("/api/v1/admin/media/images_1.json").status_code == 404
+
+
+# ─── водяной знак (логотип) ──────────────────────────────────────────────────
+
+def _white(size=(1200, 800)) -> bytes:
+    return _png(size, (255, 255, 255, 255))
+
+
+def _region_changed(im, box) -> bool:
+    return im.convert("RGB").crop(box).getextrema() != ((255, 255), (255, 255), (255, 255))
+
+
+def test_watermark_corner(monkeypatch):
+    monkeypatch.setattr(settings, "MEDIA_WATERMARK", "corner")
+    media.save_image("w.png", _white())
+    im = _open(mv.get_variant("w.png", "card"))
+    assert im.size == (1200, 800)
+    assert _region_changed(im, (800, 650, 1200, 800))      # логотип справа снизу
+    assert not _region_changed(im, (0, 0, 600, 400))       # слева сверху — чисто
+
+
+def test_watermark_center(monkeypatch):
+    monkeypatch.setattr(settings, "MEDIA_WATERMARK", "center")
+    media.save_image("w.png", _white())
+    im = _open(mv.get_variant("w.png", "card"))
+    assert _region_changed(im, (500, 350, 700, 450))
+    assert not _region_changed(im, (0, 0, 150, 150))
+
+
+def test_watermark_on_all_product_sizes_not_on_media(monkeypatch):
+    monkeypatch.setattr(settings, "MEDIA_WATERMARK", "corner")
+    media.save_image("w.png", _white())
+    for size in ("thumb", "card", "og"):
+        im = _open(mv.get_variant("w.png", size))
+        assert _region_changed(im, (im.width // 2, im.height // 2, im.width, im.height)), size
+    banner = _open(mv.get_variant("w.png", "media"))
+    assert not _region_changed(banner, (0, 0, banner.width, banner.height))
+
+
+def test_watermark_off_by_default():
+    media.save_image("w.png", _white())
+    im = _open(mv.get_variant("w.png", "card"))
+    assert not _region_changed(im, (0, 0, im.width, im.height))
+
+
+def test_watermark_settings_change_variant_name(monkeypatch):
+    """Смена расположения/прозрачности → новые копии, а не старые закэшированные."""
+    media.save_image("w.png", _white())
+    plain = mv.get_variant("w.png", "card")
+    monkeypatch.setattr(settings, "MEDIA_WATERMARK", "corner")
+    corner = mv.get_variant("w.png", "card")
+    monkeypatch.setattr(settings, "MEDIA_WATERMARK_OPACITY", 0.7)
+    stronger = mv.get_variant("w.png", "card")
+    assert len({plain, corner, stronger}) == 3
+
+
+def test_watermark_tiny_image_no_crash(monkeypatch):
+    monkeypatch.setattr(settings, "MEDIA_WATERMARK", "corner")
+    media.save_image("tiny.png", _png((40, 30)))
+    assert _open(mv.get_variant("tiny.png", "thumb")).size == (40, 30)
+
+
+def test_watermark_missing_logo_still_no_original(monkeypatch):
+    """Нет логотипа → копия без знака (ошибка в лог), но не оригинал в полном размере."""
+    monkeypatch.setattr(settings, "MEDIA_WATERMARK", "corner")
+    monkeypatch.setattr(mv, "_LOGO_PATH", "/nonexistent/logo.png")
+    mv._logo.cache_clear()
+    try:
+        media.save_image("w.png", _white((2400, 1600)))
+        assert _open(mv.get_variant("w.png", "card")).size == (1200, 800)
+    finally:
+        mv._logo.cache_clear()
+
+
+def test_watermark_logo_asset_exists():
+    assert os.path.isfile(mv._LOGO_PATH)
+    assert mv._logo().mode == "RGBA"
+
+
+def test_admin_media_product_photo_gets_watermarked_card(client, db_session, variants_on, monkeypatch):
+    """Обходной путь /admin/media/{имя фото товара} — та же копия со знаком, что на витрине."""
+    monkeypatch.setattr(settings, "MEDIA_WATERMARK", "corner")
+    media.save_image("p.png", _white((3000, 2000)))
+    _product(db_session)
+    r = client.get("/api/v1/admin/media/p.png")
+    im = Image.open(io.BytesIO(r.content))
+    assert im.size == (1200, 800)
+    assert _region_changed(im, (800, 650, 1200, 800))
+
+
+def test_admin_media_banner_not_watermarked(client, variants_on, monkeypatch):
+    monkeypatch.setattr(settings, "MEDIA_WATERMARK", "corner")
+    media.save_image("banner.png", _white((3000, 1000)))
+    im = Image.open(io.BytesIO(client.get("/api/v1/admin/media/banner.png").content))
+    assert im.size == (1920, 640)
+    assert not _region_changed(im, (0, 0, im.width, im.height))

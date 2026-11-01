@@ -16,6 +16,9 @@
 * Любая ошибка (битый файл, перегрузка) — не 500, а оригинал как раньше + запись в лог.
 * Запись атомарная (tmp + ``os.replace``): воркеров uvicorn два, они не мешают друг другу.
 * Права 644 — копии должен читать nginx (другой пользователь), см. ``MEDIA_ACCEL``.
+* Водяной знак (логотип, ``MEDIA_WATERMARK``) — на всех копиях фото товаров (thumb/card/og):
+  фото снимает сам владелец, и любая скачанная копия должна нести логотип. Настройки знака
+  входят в имя копии — смена расположения/прозрачности/логотипа даёт новые копии.
 """
 
 import glob
@@ -25,6 +28,7 @@ import os
 import sys
 import tempfile
 import threading
+from functools import lru_cache
 
 from fastapi import Request
 from fastapi.responses import FileResponse, Response
@@ -48,6 +52,9 @@ VARIANTS: dict[str, tuple[int, str]] = {
     "media": (1920, "WEBP"),   # баннеры/бренды/иконки (/admin/media/{name})
 }
 VARIANT_DIR = "_v"
+# Размеры фото товаров — на них ставится водяной знак (media — баннеры/бренды/иконки — без).
+WATERMARKED = {"thumb", "card", "og"}
+_LOGO_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "assets", "watermark.png")
 
 # Не обрабатываем: SVG — вектор, GIF — может быть анимацией (копия её бы убила).
 _SKIP_EXT = {".svg", ".gif"}
@@ -72,13 +79,65 @@ def _variant_dir() -> str:
     return os.path.join(settings.MEDIA_DIR, VARIANT_DIR)
 
 
+def _watermark_mode(size: str) -> str | None:
+    """Расположение знака для этого размера (``corner``/``center``) или ``None``."""
+    mode = settings.MEDIA_WATERMARK
+    return mode if size in WATERMARKED and mode in ("corner", "center") else None
+
+
 def _variant_path(name: str, size: str, st: os.stat_result) -> str:
     stem = os.path.splitext(os.path.basename(name))[0]
     ext = ".jpg" if VARIANTS[size][1] == "JPEG" else ".webp"
-    return os.path.join(_variant_dir(), f"{stem}.{size}.{int(st.st_mtime)}-{st.st_size}{ext}")
+    tag = ""
+    mode = _watermark_mode(size)
+    if mode:
+        # Смена настроек знака или самого логотипа → другое имя → копии пересоздаются.
+        tag = f".wm-{mode}-{round(settings.MEDIA_WATERMARK_OPACITY * 100)}-{_logo_version()}"
+    return os.path.join(_variant_dir(), f"{stem}.{size}{tag}.{int(st.st_mtime)}-{st.st_size}{ext}")
 
 
-def _render(src: str, dst: str, max_side: int, fmt: str) -> None:
+def _logo_version() -> int:
+    try:
+        return os.stat(_LOGO_PATH).st_size
+    except OSError:
+        return 0
+
+
+@lru_cache(maxsize=1)
+def _logo() -> Image.Image:
+    with Image.open(_LOGO_PATH) as im:
+        return im.convert("RGBA")
+
+
+def _apply_watermark(img: Image.Image, mode: str) -> Image.Image:
+    """Накладывает логотип на (уже уменьшенную) копию.
+
+    ``corner`` — справа снизу, ~30% ширины; ``center`` — по центру, ~60% ширины.
+    Если логотип не загрузился — копия без знака (в лог), но оригинал всё равно не отдаём.
+    """
+    try:
+        logo = _logo()
+    except Exception as e:  # noqa: BLE001
+        log.error("media_variants: нет логотипа для водяного знака %s: %s", _LOGO_PATH, e)
+        return img
+    margin = max(4, round(min(img.size) * 0.03))
+    share = 0.6 if mode == "center" else 0.3
+    w = min(max(90, round(img.width * share)), img.width - 2 * margin)
+    h = round(logo.height * w / logo.width)
+    if w < 20 or h > img.height - 2 * margin:
+        return img                                  # картинка слишком мала для знака
+    mark = logo.resize((w, h), Image.Resampling.LANCZOS)
+    opacity = min(max(settings.MEDIA_WATERMARK_OPACITY, 0.0), 1.0)
+    mask = mark.getchannel("A").point(lambda v: round(v * opacity))
+    if mode == "center":
+        pos = ((img.width - w) // 2, (img.height - h) // 2)
+    else:
+        pos = (img.width - w - margin, img.height - h - margin)
+    img.paste(mark.convert(img.mode), pos, mask)
+    return img
+
+
+def _render(src: str, dst: str, max_side: int, fmt: str, watermark: str | None = None) -> None:
     """Делает копию ``src`` с длинной стороной не больше ``max_side`` и пишет её в ``dst``."""
     # Порядок важен для памяти: сначала уменьшаем (единственная полноразмерная копия в памяти —
     # сам декодированный оригинал), потом поворот и смена режима — уже на маленькой картинке.
@@ -98,6 +157,8 @@ def _render(src: str, dst: str, max_side: int, fmt: str) -> None:
     transpose = _ORIENTATION.get(orientation)
     if transpose is not None:
         img = img.transpose(transpose)              # поворот по EXIF; сам EXIF дальше не пишем
+    if watermark:
+        img = _apply_watermark(img, watermark)
     if fmt == "JPEG" and has_alpha:
         bg = Image.new("RGB", img.size, (255, 255, 255))
         bg.paste(img, mask=img.getchannel("A"))
@@ -150,7 +211,7 @@ def get_variant(name: str, size: str, st: os.stat_result | None = None) -> str |
         return None
     try:
         if not os.path.isfile(dst):   # пока ждали — мог сделать соседний запрос
-            _render(src, dst, max_side, fmt)
+            _render(src, dst, max_side, fmt, _watermark_mode(size))
         return dst
     except Exception as e:  # noqa: BLE001 — любая ошибка Pillow → оригинал, не 500
         log.warning("media_variants: не удалось сделать %s/%s: %s", name, size, e)

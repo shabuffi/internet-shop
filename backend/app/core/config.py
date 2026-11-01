@@ -33,6 +33,11 @@ class Settings(BaseSettings):
     # Отдавать файлы картинок через nginx (X-Accel-Redirect): Python не читает байты.
     # Включать только там, где том media подключён в nginx (location /_media/).
     MEDIA_ACCEL: bool = False
+    # Водяной знак (логотип) на копиях фото товаров: off | corner (правый нижний угол) |
+    # center (крупно по центру — труднее обрезать). Действует только при MEDIA_VARIANTS.
+    MEDIA_WATERMARK: str = "off"
+    # Непрозрачность знака: 0 — невидим, 1 — как есть.
+    MEDIA_WATERMARK_OPACITY: float = 0.4
 
     # Сколько последних обменов держим в истории: строки sync_changes + копии import.xml
     # на диске (media/sync_xml). Старше — чистятся после каждого обмена.
