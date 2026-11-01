@@ -71,8 +71,11 @@ WATERMARKED = {"thumb", "card", "og", "save", "thumb_save"}
 # Копии «для сохранения» — со знаком MEDIA_WATERMARK_SAVE (остальные — MEDIA_WATERMARK).
 SAVE_SIZES = {"save", "thumb_save"}
 # Версия оформления знака (обводка и т.п.): входит в имя копии — менять при смене рисования.
-_MARK_STYLE = 5
+_MARK_STYLE = 6
 _LOGO_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "assets", "watermark.png")
+# Логотип из шапки сайта (две шестерёнки, «торговый дом» строчными) — растр frontend/public/logo.svg
+# (sharp, 1400px, прозрачный фон). Из него — видимый одноцветный знак на фото сайта.
+_SITE_LOGO_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "assets", "watermark-site.png")
 # Маленький значок (иконка вкладки: шестерёнка с домиком на белом круге) — видимый знак на сайте.
 _ICON_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "assets", "watermark-icon.png")
 
@@ -133,8 +136,9 @@ def _variant_path(name: str, size: str, st: os.stat_result) -> str:
 
 
 def _asset_version(kind: str) -> int:
+    path = {"icon": _ICON_PATH, "logo": _SITE_LOGO_PATH}.get(kind, _LOGO_PATH)
     try:
-        return os.stat(_ICON_PATH if kind == "icon" else _LOGO_PATH).st_size
+        return os.stat(path).st_size
     except OSError:
         return 0
 
@@ -147,13 +151,17 @@ def _logo() -> Image.Image:
 
 @lru_cache(maxsize=1)
 def _mono_logo() -> Image.Image:
-    """Одноцветная форма полного логотипа (маска L): шестерёнка, «ИНЖЕНЕР» и «торговый дом».
+    """Одноцветная форма логотипа из шапки сайта (маска L): две шестерёнки, «ИНЖЕНЕР»,
+    «торговый дом».
 
     Как на согласованном макете: серый логотип целиком, ~28% ширины фото — в таком размере
     подпись читается. Белые детали логотипа (домик в шестерёнке) остаются «окнами»:
     маска = альфа × (1 − белизна).
     """
-    mask = _brand_white_mask()
+    with Image.open(_SITE_LOGO_PATH) as im:
+        logo = im.convert("RGBA")
+    whiteness = logo.convert("L").point(lambda v: 0 if v < 200 else round((v - 200) * 255 / 55))
+    mask = ImageChops.subtract(logo.getchannel("A"), whiteness)
     box = mask.getbbox()
     return mask.crop(box) if box else mask
 
@@ -216,7 +224,7 @@ def _apply_watermark(img: Image.Image, mode: str, opacity: float, kind: str = "l
     """Накладывает знак на уже уменьшенную копию.
 
     ``kind``:
-      * ``logo`` — одноцветная форма логотипа (:func:`_mono_logo`), тон под фон участка —
+      * ``logo`` — одноцветная форма логотипа из шапки сайта (:func:`_mono_logo`), тон под фон —
         видимый знак на сайте: небольшой и не «кричит» цветами бренда;
       * ``brand`` — полный цветной логотип с «торговый дом» (копии «для сохранения»: их
         видит только тот, кто сохранил фото, — знак должен чётко говорить, чьё фото).
@@ -234,7 +242,7 @@ def _apply_watermark(img: Image.Image, mode: str, opacity: float, kind: str = "l
         logo = _icon() if icon else _logo() if brand else _mono_logo()
     except Exception as e:  # noqa: BLE001
         log.error("media_variants: нет картинки для водяного знака %s: %s",
-                  _ICON_PATH if icon else _LOGO_PATH, e)
+                  _ICON_PATH if icon else _LOGO_PATH if brand else _SITE_LOGO_PATH, e)
         return img
     margin = max(4, round(min(img.size) * 0.03))
     if icon:

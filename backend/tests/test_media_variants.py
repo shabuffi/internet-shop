@@ -340,6 +340,8 @@ def test_watermark_missing_logo_still_no_original(monkeypatch):
 def test_watermark_logo_asset_exists():
     assert os.path.isfile(mv._LOGO_PATH)
     assert mv._logo().mode == "RGBA"
+    assert os.path.isfile(mv._SITE_LOGO_PATH)                     # логотип шапки — для видимого знака
+    assert mv._mono_logo().mode == "L"
 
 
 def test_admin_media_product_photo_gets_save_copy(client, db_session, variants_on, monkeypatch):
