@@ -166,7 +166,11 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                   {" · "}
                   <Link href="/admin" style={{ color: "inherit", opacity: 0.55, textDecoration: "none" }}>Вход для сотрудников</Link>
                 </span>
-                <span>Produced by soffit</span>
+                <span>
+                  Produced by{" "}
+                  <a href="https://t.me/sshcont" target="_blank" rel="noopener noreferrer"
+                    className="footer__credit" title="Telegram разработчика: @sshcont">soffit</a>
+                </span>
               </div>
             </div>
           </footer>
