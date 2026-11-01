@@ -187,15 +187,21 @@ def _render(src: str, dst: str, max_side: int, fmt: str,
     # сам декодированный оригинал), потом поворот и смена режима — уже на маленькой картинке.
     # Наоборот (exif_transpose/convert на оригинале) — 2-3 полноразмерные копии на картинку.
     with Image.open(src) as im:
+        orientation = im.getexif().get(0x0112, 1)
+        if im.format == "JPEG":
+            # Фото с телефона бывают 48–50 Мпикс (фото владелец загружает и сам, через
+            # админку). JPEG декодируем сразу уменьшенным в 2–8 раз (draft) — и лимит памяти
+            # ниже проверяем уже по уменьшенному размеру. Иначе такой файл отказывал бы и
+            # уходил наружу ОРИГИНАЛОМ: в полном размере, с геометкой и без логотипа.
+            im.draft(im.mode, (max_side, max_side))
         if im.width * im.height > _MAX_PIXELS:
             raise ValueError(f"слишком большая картинка {im.width}x{im.height}")
-        orientation = im.getexif().get(0x0112, 1)
         has_alpha = im.mode in ("RGBA", "LA", "PA") or (
             im.mode == "P" and "transparency" in im.info)
         if im.mode not in ("RGB", "RGBA", "L", "LA"):
             im = im.convert("RGBA" if has_alpha else "RGB")   # P/CMYK/I;16 resize не умеет нормально
-        # Квадратная рамка — поворот на размер не влияет. Для JPEG thumbnail сам декодирует
-        # сразу уменьшенным (draft), для остальных — reduce() перед LANCZOS. Не увеличивает.
+        # Квадратная рамка — поворот на размер не влияет. JPEG уже уменьшен draft'ом выше,
+        # для остальных thumbnail делает reduce() перед LANCZOS. Не увеличивает.
         im.thumbnail((max_side, max_side), Image.Resampling.LANCZOS)
         img = im.convert("RGBA" if has_alpha else "RGB")
     transpose = _ORIENTATION.get(orientation)

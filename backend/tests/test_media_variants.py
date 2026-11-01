@@ -414,3 +414,68 @@ def test_watermark_visible_on_black_photo(monkeypatch):
     media.save_image("b.png", _png((1200, 800), (0, 0, 0, 255)))
     im = _open(mv.get_variant("b.png", "save")).convert("L")
     assert im.crop((300, 300, 900, 500)).getextrema()[1] > 90
+
+
+# ─── фото, загруженные вручную (с телефона владельца) ─────────────────────────
+
+def _phone_jpeg(size=(3000, 2000)) -> bytes:
+    """JPEG «с телефона»: поворот 6, камера и GPS-метка в EXIF."""
+    img = Image.new("RGB", size, (255, 255, 255))
+    exif = Image.Exif()
+    exif[0x0112] = 6
+    exif[0x010F] = "Apple"
+    exif[0x8825] = {1: "N", 2: (55.0, 45.0, 0.0), 3: "E", 4: (37.0, 37.0, 0.0)}   # GPSInfo
+    buf = io.BytesIO()
+    img.save(buf, "JPEG", exif=exif.tobytes(), quality=80)
+    return buf.getvalue()
+
+
+def test_huge_phone_jpeg_is_resized_not_leaked(monkeypatch):
+    """48–50 Мпикс с телефона раньше упирались в лимит памяти и уходили ОРИГИНАЛОМ.
+    Лимит здесь занижен, чтобы не гонять 48 Мпикс в тесте — механика та же."""
+    monkeypatch.setattr(mv, "_MAX_PIXELS", 2_000_000)
+    media.save_image("big.jpg", _phone_jpeg((3000, 2000)))      # 6 Мпикс > лимита, после draft 1.5
+    path = mv.get_variant("big.jpg", "card")
+    assert path is not None
+    im = _open(path)
+    assert im.size == (600, 900)                                 # уменьшено и повёрнуто
+    assert not im.getexif()                                      # ни камеры, ни GPS
+
+
+def test_huge_png_over_limit_falls_back(monkeypatch):
+    """PNG так не декодировать (нет draft) — за лимитом по-прежнему оригинал (редкость)."""
+    monkeypatch.setattr(mv, "_MAX_PIXELS", 1_000_000)
+    media.save_image("big.png", _png((2000, 1000)))
+    assert mv.get_variant("big.png", "card") is None
+
+
+def test_admin_uploaded_photo_end_to_end(client, db_session, variants_on, monkeypatch):
+    """Фото, загруженное в админке (не из МойСклад): на витрине — уменьшенная копия без
+    EXIF/GPS, «для сохранения» — с логотипами, а оригинал на диске нетронут."""
+    from app.api.v1.endpoints.admin import _hash_password
+    from app.db.models.admin import AdminUser
+    monkeypatch.setattr(settings, "MEDIA_WATERMARK_SAVE", "corners")
+    db_session.add(AdminUser(username="admin", password_hash=_hash_password("password123")))
+    db_session.add(Product(id="m1", moysklad_id="ms-m1", name="T", article="A",
+                           price=Decimal("10"), stock=1))
+    db_session.commit()
+    assert client.post("/api/v1/admin/login",
+                       json={"username": "admin", "password": "password123"}).status_code == 200
+
+    original = _phone_jpeg((3000, 2000))
+    r = client.post("/api/v1/admin/products/m1/images",
+                    files={"file": ("IMG_0001.jpg", original, "image/jpeg")})
+    assert r.status_code == 200
+    name = r.json()["images"][0]
+    assert name.startswith("upload_")
+
+    card = Image.open(io.BytesIO(client.get("/api/v1/products/m1/image?size=card").content))
+    assert card.size == (600, 900) and not card.getexif()
+    assert not _region_changed(card, (0, 0, card.width, card.height))   # на сайте без знака
+
+    save = Image.open(io.BytesIO(client.get("/api/v1/products/m1/image?size=save").content))
+    assert save.size == (800, 1200) and not save.getexif()
+    assert _region_changed(save, (20, 20, 260, 90))                     # логотип в углу
+
+    with open(media.media_path(name), "rb") as f:                       # оригинал цел
+        assert f.read() == original
