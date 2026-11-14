@@ -15,6 +15,15 @@ pydantic-settings==2.6.1
 # Background tasks
 celery==5.4.0
 redis==5.2.1
+# Транзитивные зависимости celery — пиним явно. Без пина пересборка образа 14.11.2026 взяла
+# kombu 5.7.0 (требует redis-py ≥ 6.1) → worker падал с VersionMismatch. Версии — как в
+# рабочем образе старого прода (сборка 10.09.2026).
+kombu==5.6.2
+amqp==5.3.1
+billiard==4.2.4
+vine==5.1.0
+click-repl==0.3.0
+python-dateutil==2.9.0.post0
 
 # HTTP client (уведомления в Telegram/ВК)
 httpx==0.28.1
