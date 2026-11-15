@@ -1,0 +1,11 @@
+[Unit]
+Description=Nightly encrypted DB + .env backup to owner's email (age)
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+EnvironmentFile=-/etc/default/offsite-backup
+ExecStart=/opt/internet-shop/scripts/email-backup.sh
+Nice=10
+TimeoutStartSec=30min

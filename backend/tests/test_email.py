@@ -112,3 +112,50 @@ def test_send_email_handles_error(monkeypatch):
         raise RuntimeError("smtp down")
     monkeypatch.setattr(email_mod.smtplib, "SMTP", boom)
     assert email_mod.send_email("to@x.ru", "s", "b") is False  # не падает
+
+
+def test_send_email_with_attachment(monkeypatch):
+    """Бэкап на почту: вложение уходит отдельной частью письма, байты не искажаются."""
+    import email as std_email
+    monkeypatch.setattr(email_mod, "get_smtp_config",
+                        lambda: {"host": "smtp.x", "user": "u@x", "password": "p", "port": 587, "from_email": "u@x"})
+    captured = {}
+
+    class FakeSMTP:
+        def __init__(self, host, port, timeout=0):
+            captured["timeout"] = timeout
+        def __enter__(self):
+            return self
+        def __exit__(self, *a):
+            return False
+        def starttls(self):
+            pass
+        def login(self, u, p):
+            pass
+        def sendmail(self, frm, to, msg):
+            captured["msg"] = msg
+
+    monkeypatch.setattr(email_mod.smtplib, "SMTP", FakeSMTP)
+    blob = bytes(range(256)) * 10
+    ok, err = email_mod.send_email_detail("me@x.ru", "Бэкап", "текст", attachments=[("b.tar.gz.age", blob)])
+    assert ok and err is None
+    assert captured["timeout"] >= 60                                  # большое письмо — длинный таймаут
+    parsed = std_email.message_from_string(captured["msg"])
+    parts = [p for p in parsed.walk() if p.get_filename()]
+    assert len(parts) == 1 and parts[0].get_filename() == "b.tar.gz.age"
+    assert parts[0].get_payload(decode=True) == blob
+
+
+def test_backup_mail_main(monkeypatch, capsys):
+    import io
+    import sys
+    from app.services import backup_mail
+    sent = {}
+    monkeypatch.setattr(backup_mail, "send_email_detail",
+                        lambda to, subj, body, from_name="", attachments=None:
+                        sent.update(to=to, att=attachments) or (True, None))
+    monkeypatch.setattr(sys, "stdin", io.TextIOWrapper(io.BytesIO(b"AGEDATA")))
+    assert backup_mail.main(["x", "me@x.ru", "f.age"]) == 0
+    assert sent["to"] == "me@x.ru" and sent["att"] == [("f.age", b"AGEDATA")]
+    monkeypatch.setattr(sys, "stdin", io.TextIOWrapper(io.BytesIO(b"")))
+    assert backup_mail.main(["x", "me@x.ru", "f.age"]) == 1        # пустой архив — ошибка

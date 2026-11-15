@@ -6,6 +6,8 @@
 
 import re
 import smtplib
+from email.mime.application import MIMEApplication
+from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.utils import formataddr, formatdate, make_msgid
 
@@ -64,7 +66,8 @@ def get_smtp_config() -> dict:
     return cfg
 
 
-def send_email_detail(to: str, subject: str, body: str, from_name: str = "Магазин") -> tuple[bool, str | None]:
+def send_email_detail(to: str, subject: str, body: str, from_name: str = "Магазин",
+                      attachments: list[tuple[str, bytes]] | None = None) -> tuple[bool, str | None]:
     """Отправляет письмо по SMTP (STARTTLS) и возвращает причину неудачи.
 
     Адрес «От кого» используется только если это валидный email (есть ``@``); иначе
@@ -75,6 +78,8 @@ def send_email_detail(to: str, subject: str, body: str, from_name: str = "Маг
         subject: Тема.
         body: Текст (plain).
         from_name: Отображаемое имя отправителя.
+        attachments: Вложения ``[(имя_файла, байты)]`` (бэкап на почту); без них — обычное
+            текстовое письмо, как раньше.
 
     Returns:
         Кортеж ``(успех, причина_ошибки|None)``.
@@ -86,7 +91,15 @@ def send_email_detail(to: str, subject: str, body: str, from_name: str = "Маг
     # «От кого» должен быть email и (для Яндекса и пр.) совпадать с логином — иначе берём логин
     from_addr = cfg["from_email"] if "@" in (cfg["from_email"] or "") else cfg["user"]
     try:
-        msg = MIMEText(body, "plain", "utf-8")
+        if attachments:
+            msg = MIMEMultipart()
+            msg.attach(MIMEText(body, "plain", "utf-8"))
+            for fname, data in attachments:
+                part = MIMEApplication(data, Name=fname)
+                part["Content-Disposition"] = f'attachment; filename="{fname}"'
+                msg.attach(part)
+        else:
+            msg = MIMEText(body, "plain", "utf-8")
         msg["Subject"] = subject
         msg["From"] = formataddr((from_name, from_addr))
         msg["To"] = ", ".join(recipients)
@@ -95,7 +108,8 @@ def send_email_detail(to: str, subject: str, body: str, from_name: str = "Маг
         msg["Date"] = formatdate(localtime=True)
         msg["Message-ID"] = make_msgid(domain=from_addr.rsplit("@", 1)[-1])
         port = int(cfg["port"] or 587)
-        with smtplib.SMTP(cfg["host"], port, timeout=15) as server:
+        # С вложением письмо — мегабайты: 15 с на медленном канале может не хватить.
+        with smtplib.SMTP(cfg["host"], port, timeout=120 if attachments else 15) as server:
             server.starttls()
             server.login(cfg["user"], cfg["password"])
             refused = server.sendmail(from_addr, recipients, msg.as_string())

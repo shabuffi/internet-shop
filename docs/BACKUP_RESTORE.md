@@ -67,3 +67,24 @@
 6. Сертификат HTTPS — выпустить заново (certbot), запустить всё: `$C up -d --build`.
 7. Копии фото: `$C run --rm --no-deps -T backend python3 -m app.services.media_variants prewarm` (~30–40 мин; сайт работает и без них).
 8. Перевести A-запись домена на новый IP, в МойСклад ничего менять не нужно (адрес сайта тот же).
+
+## Бэкап на почту (база + .env.prod)
+
+Каждую ночь (03:15 МСК) `scripts/email-backup.sh` шлёт письмо с архивом `td-engineer_<дата>.tar.gz.age`
+(дамп БД + `.env.prod`, ~3 МБ) на `BACKUP_EMAIL` из `/etc/default/offsite-backup`. Архив зашифрован **открытым**
+ключом владельца (`age`): на сервере лежит только «замок», расшифровать может лишь секретный ключ владельца.
+Фото в письмо не входят — для них облако (выше).
+
+**Ключ (один раз, на Mac владельца):**
+```
+brew install age
+age-keygen -o ~/td-engineer-backup-key.txt
+```
+Команда печатает `Public key: age1…` — его (только его!) вписать на сервере в `BACKUP_AGE_RECIPIENT`.
+Файл `~/td-engineer-backup-key.txt` — секретный ключ: сохранить копию в менеджер паролей. Потеряли — старые письма не открыть.
+
+**Открыть бэкап из письма:**
+```
+age -d -i ~/td-engineer-backup-key.txt td-engineer_<дата>.tar.gz.age | tar xz
+```
+Получатся `shop_<дата>.dump` (восстановление — шаг 4 выше, `pg_restore`) и `env.prod`.
