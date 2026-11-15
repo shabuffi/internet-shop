@@ -43,13 +43,21 @@ $RC delete "${REMOTE}db/" --min-age "${KEEP_DAYS}d"
 $RC copyto .env.prod "${REMOTE}config/env.prod" --backup-dir "${REMOTE}config/old/${TS}"
 
 # 3. Фото: инкрементально — едут только новые/изменённые файлы.
-MEDIA=$(docker volume inspect -f '{{.Mountpoint}}' internet-shop_media_data)
-$RC sync "$MEDIA" "${REMOTE}media" \
-  --exclude "/_v/**" --exclude "*.tmp" --exclude "._*" \
-  --backup-dir "${REMOTE}media-old/${TS}" --transfers 4 --checkers 8
-$RC delete "${REMOTE}media-old" --min-age "${KEEP_DAYS}d" 2>/dev/null || true
-$RC rmdirs "${REMOTE}media-old" --leave-root 2>/dev/null || true
+# Выключатель BACKUP_MEDIA (по умолчанию 1) — в /etc/default/offsite-backup: фото ~9 GB,
+# на бесплатный Яндекс Диск (5 GB) не влезают — до покупки места бэкапим только БД и .env.
+WHAT="БД + .env.prod"
+if [ "${BACKUP_MEDIA:-1}" = "1" ]; then
+  MEDIA=$(docker volume inspect -f '{{.Mountpoint}}' internet-shop_media_data)
+  $RC sync "$MEDIA" "${REMOTE}media" \
+    --exclude "/_v/**" --exclude "*.tmp" --exclude "._*" \
+    --backup-dir "${REMOTE}media-old/${TS}" --transfers 4 --checkers 8
+  $RC delete "${REMOTE}media-old" --min-age "${KEEP_DAYS}d" 2>/dev/null || true
+  $RC rmdirs "${REMOTE}media-old" --leave-root 2>/dev/null || true
+  WHAT="$WHAT + фото"
+else
+  log "Фото пропущены (BACKUP_MEDIA=${BACKUP_MEDIA})"
+fi
 
 # Отметка «последний успешный бэкап» — видно с сервера: cat /var/lib/offsite-backup/last_ok
-mkdir -p /var/lib/offsite-backup && date -Is > /var/lib/offsite-backup/last_ok
-log "Готово: БД + .env.prod + фото → ${REMOTE}"
+mkdir -p /var/lib/offsite-backup && echo "$(date -Is) $WHAT" > /var/lib/offsite-backup/last_ok
+log "Готово: $WHAT → ${REMOTE}"

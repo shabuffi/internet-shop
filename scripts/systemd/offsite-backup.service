@@ -5,6 +5,7 @@ Wants=network-online.target
 
 [Service]
 Type=oneshot
+EnvironmentFile=-/etc/default/offsite-backup
 ExecStart=/opt/internet-shop/scripts/offsite-backup.sh
 Nice=10
 IOSchedulingClass=idle
