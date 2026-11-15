@@ -1,0 +1,11 @@
+[Unit]
+Description=Off-site backup td-engineer.ru -> Yandex Disk (rclone crypt)
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/opt/internet-shop/scripts/offsite-backup.sh
+Nice=10
+IOSchedulingClass=idle
+TimeoutStartSec=6h
