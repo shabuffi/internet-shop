@@ -32,7 +32,7 @@ trap 'rm -rf "$TMP"' EXIT
 
 # 1. База: custom-формат (сжатый, восстанавливается pg_restore), сразу проверяем, что читается.
 DUMP="$TMP/shop_${TS}.dump"
-$COMPOSE exec -T db sh -c 'pg_dump -Fc -U "$POSTGRES_USER" "$POSTGRES_DB"' > "$DUMP"
+$COMPOSE exec -T db sh -c 'pg_dump -Fc -U "$POSTGRES_USER" "$POSTGRES_DB"' > "$DUMP" < /dev/null
 [ -s "$DUMP" ] || { log "ОШИБКА: пустой дамп БД"; exit 1; }
 $COMPOSE exec -T db pg_restore --list < "$DUMP" > /dev/null || { log "ОШИБКА: дамп не читается pg_restore"; exit 1; }
 log "БД: дамп $(du -h "$DUMP" | cut -f1)"
