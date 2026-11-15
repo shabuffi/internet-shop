@@ -231,3 +231,18 @@ def test_dev_test_notification_email_goes_to_owner(client, db_session, monkeypat
     db_session.commit()
     r = client.post("/api/v1/admin/dev/test-notification?channel=email").json()
     assert r["results"] == {"email": "sent"} and r["to"] == "o@mail.ru" and sent["to"] == "o@mail.ru"
+
+
+def test_dev_test_notification_email_custom_recipient(client, db_session, monkeypatch):
+    """Разработчик шлёт пробное письмо себе, а не владельцу."""
+    sent = {}
+    import app.integrations.email as email_mod
+    monkeypatch.setattr(email_mod, "send_email_detail",
+                        lambda to, *a, **k: (sent.setdefault("to", to), (True, None))[1])
+    _dev_login(client, monkeypatch)
+    db_session.add(ShopSettings(key="notify_email", value="o@mail.ru"))
+    db_session.commit()
+    r = client.post("/api/v1/admin/dev/test-notification?channel=email&to=me@example.com").json()
+    assert r["to"] == "me@example.com" and sent["to"] == "me@example.com"
+    bad = client.post("/api/v1/admin/dev/test-notification?channel=email&to=not-an-email")
+    assert bad.status_code == 422

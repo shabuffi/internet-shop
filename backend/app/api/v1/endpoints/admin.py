@@ -5,6 +5,7 @@ import hmac
 import json
 import jwt
 import os
+import re
 import shutil
 import uuid
 from datetime import datetime, timedelta, timezone
@@ -685,20 +686,30 @@ def test_notification(channel: str | None = None, db: Session = Depends(get_db),
 
 
 @router.post("/dev/test-notification")
-def dev_test_notification(channel: str | None = None, db: Session = Depends(get_db), _=Depends(_get_current_dev)):
+def dev_test_notification(channel: str | None = None, to: str | None = None,
+                          db: Session = Depends(get_db), _=Depends(_get_current_dev)):
     """То же, что ``/test-notification``, но со страницы «Разработчик» (её пароль, без входа админа).
 
     Нужно, чтобы сразу после замены ключа ВК / пароля SMTP проверить канал на месте.
+    ``to`` — свой адрес для пробного письма (разработчику не нужно слать тест владельцу).
     """
-    return _send_test_notification(db, channel)
+    if to is not None:
+        to = to.strip()
+        if not _EMAIL_RE.fullmatch(to):
+            raise HTTPException(status_code=422, detail="Некорректный email для пробного письма")
+    return _send_test_notification(db, channel, to or None)
 
 
-def _send_test_notification(db: Session, channel: str | None) -> dict:
+_EMAIL_RE = re.compile(r"[^@\s]+@[^@\s]+\.[^@\s]+")
+
+
+def _send_test_notification(db: Session, channel: str | None, to: str | None = None) -> dict:
     """Шлёт пробное уведомление и объясняет, почему канал не проверен.
 
     Args:
         db: Сессия БД.
         channel: ``vk`` / ``email`` или ``None`` — во все.
+        to: Куда слать пробное письмо вместо email владельца (только со страницы разработчика).
 
     Returns:
         ``{"results": {канал: "sent"|"failed"|"skipped"}, "details": {канал: причина}, "to": адрес письма}``.
@@ -725,7 +736,7 @@ def _send_test_notification(db: Session, channel: str | None) -> dict:
             details["vk"] = ("Не задан ключ сообщества." if not cfg["vk_token"]
                              else "Владелец не указал свой id ВК в Настройках.")
     # Получатель писем: «Email владельца», а если он пуст — сам SMTP-ящик (логин)
-    owner_email = _get_setting(db, "notify_email") or _get_setting(db, "smtp_user")
+    owner_email = to or _get_setting(db, "notify_email") or _get_setting(db, "smtp_user")
     if want("email"):
         if owner_email:
             ok, detail = send_email_detail(owner_email, f"Проверка уведомлений — {shop_name}", text, from_name=shop_name)

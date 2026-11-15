@@ -17,6 +17,7 @@ const EMPTY: DevForm = {
 };
 
 type Section = "vk" | "smtp";
+const TEST_TO_KEY = "dev.testEmailTo";
 type Note = { ok: boolean; text: string } | null;
 interface TestResp { results: Record<string, string>; details?: Record<string, string>; to?: string }
 
@@ -200,6 +201,15 @@ export default function DevPage() {
   const [saving, setSaving] = useState<Section | null>(null);
   const [testing, setTesting] = useState<Section | null>(null);
   const [notes, setNotes] = useState<Record<Section, Note>>({ vk: null, smtp: null });
+  // Куда слать пробное письмо: свой ящик разработчика, а не владельца. Помним в этом браузере.
+  const [testTo, setTestTo] = useState("");
+  useEffect(() => {
+    try { setTestTo(localStorage.getItem(TEST_TO_KEY) ?? ""); } catch { /* приватный режим */ }
+  }, []);
+  function changeTestTo(v: string) {
+    setTestTo(v);
+    try { localStorage.setItem(TEST_TO_KEY, v.trim()); } catch { /* приватный режим */ }
+  }
 
   async function loadSettings(): Promise<boolean> {
     try {
@@ -249,7 +259,8 @@ export default function DevPage() {
     const ch = sec === "vk" ? "vk" : "email";
     setTesting(sec); note(sec, null);
     try {
-      const r = await devFetch<TestResp>(`/dev/test-notification?channel=${ch}`, { method: "POST" });
+      const to = sec === "smtp" && testTo.trim() ? `&to=${encodeURIComponent(testTo.trim())}` : "";
+      const r = await devFetch<TestResp>(`/dev/test-notification?channel=${ch}${to}`, { method: "POST" });
       const st = r.results[ch]; const detail = r.details?.[ch];
       note(sec, st === "sent"
         ? { ok: true, text: sec === "vk" ? "Сообщение отправлено — проверьте ВК владельца." : `Письмо отправлено на ${r.to}.` }
@@ -399,7 +410,7 @@ export default function DevPage() {
           <SectionCard
             title="Почта (SMTP)"
             hint={<>Ящик, с которого сайт отправляет письма: уведомления о заказах, письма покупателям и ночной бэкап.
-              {saved.email_to && <> Проверочное письмо уйдёт на <b>{saved.email_to}</b>.</>}</>}
+</>}
             badge={smtpOk ? <StatusBadge ok text="Подключено" /> : <StatusBadge ok={false} text="Не настроено" />}
             onSave={() => saveSection("smtp")} saving={saving === "smtp"} dirty={dirtySmtp}
             onTest={() => testSection("smtp")} testing={testing === "smtp"} testLabel="Отправить тестовое письмо"
@@ -430,6 +441,15 @@ export default function DevPage() {
               <label className="form-label">Адрес «От кого» <span style={{ color: "var(--ink-tertiary)", fontWeight: 400 }}>— необязательно</span></label>
               <input className="form-input" type="email" value={form.smtp_from} onChange={set("smtp_from")}
                 placeholder="пусто = логин" autoComplete="off" />
+            </div>
+            <div style={{ ...field, paddingTop: 14, borderTop: "1px dashed var(--hairline-soft)" }}>
+              <label className="form-label">Куда отправить пробное письмо</label>
+              <input className="form-input" type="email" value={testTo} onChange={(e) => changeTestTo(e.target.value)}
+                placeholder={saved.email_to ? `пусто = владельцу (${saved.email_to})` : "ваш email"}
+                autoComplete="email" spellCheck={false} />
+              <span style={{ fontSize: 12, color: "var(--ink-tertiary)" }}>
+                Только для кнопки проверки, не сохраняется на сайте. Запоминается в этом браузере.
+              </span>
             </div>
           </SectionCard>
         </>
