@@ -287,6 +287,9 @@ def get_dev_settings(db: Session = Depends(get_db), _=Depends(_get_current_dev))
     return {
         "vk_group_token":     "***" if _get_setting(db, "vk_group_token") else "",
         "vk_env":             bool(settings.VK_GROUP_TOKEN and settings.VK_PEER_ID),
+        # Для статуса на панели: id владельца в ВК и адрес для писем задаёт владелец в Настройках
+        "vk_peer_set":        bool(_get_setting(db, "vk_peer_id") or settings.VK_PEER_ID),
+        "email_to":           _get_setting(db, "notify_email") or _get_setting(db, "smtp_user"),
         "smtp_host":          _get_setting(db, "smtp_host"),
         "smtp_port":          _get_setting(db, "smtp_port", "587"),
         "smtp_user":          _get_setting(db, "smtp_user"),
@@ -666,17 +669,39 @@ def save_info_pages(body: dict, db: Session = Depends(get_db), _=Depends(_get_cu
 
 @router.post("/test-notification")
 def test_notification(channel: str | None = None, db: Session = Depends(get_db), _=Depends(_get_current_admin)):
-    """Шлёт пробное уведомление в канал(ы) — Telegram / ВК / Email.
+    """Шлёт пробное уведомление в канал(ы) — ВК / Email (кнопки владельца в Настройках).
 
     Использует СОХРАНЁННЫЕ настройки (из БД). Помогает проверить, что бот/почта
     подключены верно.
 
     Args:
-        channel: Конкретный канал (``telegram`` / ``vk`` / ``email``) или ``None`` — во все.
+        channel: Конкретный канал (``vk`` / ``email``) или ``None`` — во все.
         db: Сессия БД.
 
     Returns:
         ``{"results": {канал: "sent"|"failed"}}`` — пусто, если запрошенный канал не настроен.
+    """
+    return _send_test_notification(db, channel)
+
+
+@router.post("/dev/test-notification")
+def dev_test_notification(channel: str | None = None, db: Session = Depends(get_db), _=Depends(_get_current_dev)):
+    """То же, что ``/test-notification``, но со страницы «Разработчик» (её пароль, без входа админа).
+
+    Нужно, чтобы сразу после замены ключа ВК / пароля SMTP проверить канал на месте.
+    """
+    return _send_test_notification(db, channel)
+
+
+def _send_test_notification(db: Session, channel: str | None) -> dict:
+    """Шлёт пробное уведомление и объясняет, почему канал не проверен.
+
+    Args:
+        db: Сессия БД.
+        channel: ``vk`` / ``email`` или ``None`` — во все.
+
+    Returns:
+        ``{"results": {канал: "sent"|"failed"|"skipped"}, "details": {канал: причина}, "to": адрес письма}``.
     """
     from app.integrations.notify import get_notify_config, send_vk
     from app.integrations.email import send_email_detail
@@ -692,17 +717,26 @@ def test_notification(channel: str | None = None, db: Session = Depends(get_db),
     results: dict[str, str] = {}
     details: dict[str, str] = {}   # причина неудачи (для UI)
 
-    if want("vk") and cfg["vk_token"] and cfg["vk_peer"]:
-        results["vk"] = "sent" if send_vk(cfg["vk_token"], cfg["vk_peer"], text) else "failed"
+    if want("vk"):
+        if cfg["vk_token"] and cfg["vk_peer"]:
+            results["vk"] = "sent" if send_vk(cfg["vk_token"], cfg["vk_peer"], text) else "failed"
+        elif channel == "vk":
+            results["vk"] = "skipped"
+            details["vk"] = ("Не задан ключ сообщества." if not cfg["vk_token"]
+                             else "Владелец не указал свой id ВК в Настройках.")
     # Получатель писем: «Email владельца», а если он пуст — сам SMTP-ящик (логин)
     owner_email = _get_setting(db, "notify_email") or _get_setting(db, "smtp_user")
-    if want("email") and owner_email:
-        ok, detail = send_email_detail(owner_email, f"Проверка уведомлений — {shop_name}", text, from_name=shop_name)
-        results["email"] = "sent" if ok else "failed"
-        if not ok and detail:
-            details["email"] = detail
+    if want("email"):
+        if owner_email:
+            ok, detail = send_email_detail(owner_email, f"Проверка уведомлений — {shop_name}", text, from_name=shop_name)
+            results["email"] = "sent" if ok else "failed"
+            if not ok and detail:
+                details["email"] = detail
+        elif channel == "email":
+            results["email"] = "skipped"
+            details["email"] = "Не задан ни email владельца, ни логин SMTP."
 
-    return {"results": results, "details": details}
+    return {"results": results, "details": details, "to": owner_email}
 
 
 # ─── Dashboard data ────────────────────────────────────────────────

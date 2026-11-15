@@ -196,3 +196,38 @@ def test_change_password_requires_auth(client):
     r = client.post("/api/v1/admin/change-password",
                     json={"current_password": "x", "new_password": "newpass456"})
     assert r.status_code == 401
+
+
+def test_dev_test_notification_requires_auth(client):
+    assert client.post("/api/v1/admin/dev/test-notification?channel=vk").status_code == 401
+
+
+def test_dev_test_notification_vk_without_peer_explains(client, db_session, monkeypatch):
+    """Ключ есть, id владельца нет — не шлём, а объясняем, чего не хватает."""
+    from app.api.v1.endpoints import admin as admin_mod
+    monkeypatch.setattr(admin_mod.settings, "VK_PEER_ID", "")
+    monkeypatch.setattr(admin_mod.settings, "VK_GROUP_TOKEN", "")
+    # get_notify_config ходит в настоящую БД (SessionLocal), а не в тестовую — подменяем
+    import app.integrations.notify as notify_mod
+    monkeypatch.setattr(notify_mod, "get_notify_config", lambda: {"vk_token": "vk1.a.X", "vk_peer": ""})
+    _dev_login(client, monkeypatch)
+    db_session.add(ShopSettings(key="vk_group_token", value="vk1.a.X"))
+    db_session.commit()
+    r = client.post("/api/v1/admin/dev/test-notification?channel=vk").json()
+    assert r["results"]["vk"] == "skipped"
+    assert "id" in r["details"]["vk"]
+    s = client.get("/api/v1/admin/dev/settings").json()
+    assert s["vk_group_token"] == "***" and s["vk_peer_set"] is False
+
+
+def test_dev_test_notification_email_goes_to_owner(client, db_session, monkeypatch):
+    """Тестовое письмо уходит на email владельца; адрес возвращается для подсказки на панели."""
+    sent = {}
+    import app.integrations.email as email_mod
+    monkeypatch.setattr(email_mod, "send_email_detail",
+                        lambda to, *a, **k: (sent.setdefault("to", to), (True, None))[1])
+    _dev_login(client, monkeypatch)
+    db_session.add(ShopSettings(key="notify_email", value="o@mail.ru"))
+    db_session.commit()
+    r = client.post("/api/v1/admin/dev/test-notification?channel=email").json()
+    assert r["results"] == {"email": "sent"} and r["to"] == "o@mail.ru" and sent["to"] == "o@mail.ru"

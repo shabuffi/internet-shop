@@ -3,23 +3,36 @@
 import { useEffect, useState } from "react";
 import { devFetch } from "@/lib/adminApi";
 import SiteSettingsCard from "@/components/SiteSettingsCard";
+import { IconEye, IconEyeOff } from "@/components/icons";
 
-// Техническая форма (обмен / ВК / SMTP). Поля приходят с /dev/settings.
+// Техническая форма (ВК / SMTP). Поля приходят с /dev/settings; секреты — маской «***».
 interface DevForm {
-  vk_group_token: string; vk_env: boolean;
+  vk_group_token: string; vk_env: boolean; vk_peer_set: boolean; email_to: string;
   smtp_host: string; smtp_port: string; smtp_user: string; smtp_password: string; smtp_from: string;
 }
 
 const EMPTY: DevForm = {
-  vk_group_token: "", vk_env: false,
+  vk_group_token: "", vk_env: false, vk_peer_set: false, email_to: "",
   smtp_host: "", smtp_port: "587", smtp_user: "", smtp_password: "", smtp_from: "",
 };
+
+type Section = "vk" | "smtp";
+type Note = { ok: boolean; text: string } | null;
+interface TestResp { results: Record<string, string>; details?: Record<string, string>; to?: string }
 
 const card: React.CSSProperties = {
   background: "var(--canvas)", borderRadius: "var(--radius-lg)", border: "1px solid var(--hairline-soft)",
   padding: "28px 32px", maxWidth: 520, margin: "0 auto",
 };
 const field: React.CSSProperties = { display: "flex", flexDirection: "column", gap: 6, marginBottom: 16 };
+const outlineBtn: React.CSSProperties = {
+  padding: "0 16px", height: 38, borderRadius: "var(--radius-md)", cursor: "pointer",
+  border: "1px solid var(--graphite)", background: "transparent", color: "var(--ink)", fontWeight: 600, fontSize: 14,
+};
+const ghostBtn: React.CSSProperties = {
+  padding: "0 12px", height: 32, borderRadius: "var(--radius-md)", cursor: "pointer", flexShrink: 0,
+  border: "1px solid var(--hairline-soft)", background: "var(--canvas)", color: "var(--ink)", fontWeight: 600, fontSize: 13,
+};
 
 type Tab = "integration" | "site" | "diag" | "danger";
 const TABS: { id: Tab; label: string }[] = [
@@ -28,6 +41,113 @@ const TABS: { id: Tab; label: string }[] = [
   { id: "diag", label: "Диагностика" },
   { id: "danger", label: "Опасная зона" },
 ];
+
+// Цветная плашка статуса канала.
+function StatusBadge({ ok, text }: { ok: boolean; text: string }) {
+  return (
+    <span style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "3px 10px", borderRadius: 999,
+      fontSize: 12, fontWeight: 600, whiteSpace: "nowrap",
+      background: ok ? "var(--stock-soft)" : "var(--cloud)",
+      color: ok ? "var(--stock)" : "var(--ink-secondary)",
+      border: `1px solid ${ok ? "var(--stock)" : "var(--hairline-soft)"}` }}>
+      <span style={{ width: 7, height: 7, borderRadius: "50%", background: ok ? "var(--stock)" : "var(--out)" }} />
+      {text}
+    </span>
+  );
+}
+
+// Сообщение под кнопками (зелёное — успех, красное — ошибка).
+function NoteLine({ note }: { note: Note }) {
+  if (!note) return null;
+  return (
+    <p role="status" style={{ marginTop: 12, fontSize: 13, lineHeight: 1.45, fontWeight: 500,
+      color: note.ok ? "var(--stock)" : "var(--error)" }}>
+      {note.ok ? "✓ " : "✕ "}{note.text}
+    </p>
+  );
+}
+
+// Поле секрета (ключ / пароль). Сохранённое значение с сервера не приходит — показываем
+// «задан» и кнопку «Заменить»; новое значение можно посмотреть глазком перед сохранением.
+function SecretField({
+  label, isSet, replacing, value, placeholder, onReplace, onCancel, onChange,
+}: {
+  label: string; isSet: boolean; replacing: boolean; value: string; placeholder: string;
+  onReplace: () => void; onCancel: () => void; onChange: (v: string) => void;
+}) {
+  const [show, setShow] = useState(false);
+  const editing = replacing || !isSet;
+  return (
+    <div style={field}>
+      <label className="form-label">{label}</label>
+      {!editing ? (
+        <div style={{ display: "flex", alignItems: "center", gap: 10, minHeight: 42, padding: "0 6px 0 14px",
+          border: "1px solid var(--hairline-soft)", borderRadius: "var(--radius-md)", background: "var(--cloud)" }}>
+          <span style={{ flex: 1, fontSize: 14, color: "var(--ink-secondary)" }}>
+            <span style={{ letterSpacing: 2 }}>••••••••</span>&nbsp; сохранён
+          </span>
+          <button type="button" onClick={onReplace} style={ghostBtn}>Заменить</button>
+        </div>
+      ) : (
+        <div style={{ position: "relative" }}>
+          <input className="form-input" type={show ? "text" : "password"} value={value}
+            onChange={(e) => onChange(e.target.value)} placeholder={placeholder}
+            autoComplete="new-password" spellCheck={false} autoFocus={replacing}
+            style={{ paddingRight: 44, width: "100%" }} />
+          <button type="button" onClick={() => setShow((v) => !v)}
+            aria-label={show ? "Скрыть" : "Показать"} title={show ? "Скрыть" : "Показать"}
+            style={{ position: "absolute", right: 6, top: "50%", transform: "translateY(-50%)", width: 34, height: 34,
+              display: "grid", placeItems: "center", border: 0, background: "transparent", cursor: "pointer",
+              color: "var(--ink-secondary)" }}>
+            {show ? <IconEyeOff width={18} height={18} /> : <IconEye width={18} height={18} />}
+          </button>
+        </div>
+      )}
+      {replacing && isSet && (
+        <button type="button" onClick={onCancel}
+          style={{ alignSelf: "flex-start", border: 0, background: "none", padding: 0, cursor: "pointer",
+            fontSize: 12, color: "var(--ink-secondary)", textDecoration: "underline" }}>
+          Отмена — оставить сохранённый
+        </button>
+      )}
+    </div>
+  );
+}
+
+// Карточка одного канала: заголовок + статус, поля, «Сохранить» и «Проверить».
+function SectionCard({
+  title, hint, badge, children, onSave, saving, dirty, onTest, testing, testLabel, note,
+}: {
+  title: string; hint: React.ReactNode; badge: React.ReactNode; children: React.ReactNode;
+  onSave: () => void; saving: boolean; dirty: boolean;
+  onTest: () => void; testing: boolean; testLabel: string; note: Note;
+}) {
+  return (
+    <section style={{ ...card, margin: "0 auto 16px" }}>
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, marginBottom: 6 }}>
+        <p style={{ fontWeight: 600, fontSize: 16 }}>{title}</p>
+        {badge}
+      </div>
+      <p style={{ fontSize: 13, color: "var(--ink-secondary)", marginBottom: 18, lineHeight: 1.45 }}>{hint}</p>
+      <form onSubmit={(e) => { e.preventDefault(); onSave(); }}>
+        {children}
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center", marginTop: 4 }}>
+          <button className="btn btn-primary" type="submit" disabled={saving || !dirty}
+            style={{ opacity: saving || !dirty ? 0.5 : 1 }}>
+            {saving ? "Сохраняем…" : "Сохранить"}
+          </button>
+          <button type="button" onClick={onTest} disabled={testing || dirty} style={{ ...outlineBtn,
+            opacity: testing || dirty ? 0.5 : 1, cursor: testing || dirty ? "not-allowed" : "pointer" }}
+            title={dirty ? "Сначала сохраните изменения" : undefined}>
+            {testing ? "Отправляем…" : testLabel}
+          </button>
+          {dirty && <span style={{ fontSize: 12, color: "var(--ink-secondary)" }}>Есть несохранённые изменения</span>}
+        </div>
+        <NoteLine note={note} />
+      </form>
+    </section>
+  );
+}
 
 // Необратимое действие с защитой от случайного нажатия: кнопка активна только после
 // того, как пользователь вручную ввёл точную фразу-подтверждение.
@@ -72,22 +192,71 @@ export default function DevPage() {
   const [authed, setAuthed] = useState(false);
   const [password, setPassword] = useState("");
   const [loginErr, setLoginErr] = useState("");
+  // saved — то, что сейчас на сервере; form — то, что в полях. Секреты в form: "" (не трогаем)
+  // или новое значение, если нажали «Заменить».
+  const [saved, setSaved] = useState<DevForm>(EMPTY);
   const [form, setForm] = useState<DevForm>(EMPTY);
-  const [saved, setSaved] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [replacing, setReplacing] = useState<Record<Section, boolean>>({ vk: false, smtp: false });
+  const [saving, setSaving] = useState<Section | null>(null);
+  const [testing, setTesting] = useState<Section | null>(null);
+  const [notes, setNotes] = useState<Record<Section, Note>>({ vk: null, smtp: null });
 
   async function loadSettings(): Promise<boolean> {
     try {
       const d = await devFetch<DevForm>("/dev/settings");
       // Берём только vk/smtp-поля: настройки сайта живут в отдельной карточке
       // (SiteSettingsCard) со своим сохранением — иначе эта форма их перезатрёт.
-      setForm({
-        vk_group_token: d.vk_group_token, vk_env: d.vk_env,
+      const next: DevForm = {
+        vk_group_token: d.vk_group_token, vk_env: d.vk_env, vk_peer_set: d.vk_peer_set, email_to: d.email_to ?? "",
         smtp_host: d.smtp_host, smtp_port: d.smtp_port, smtp_user: d.smtp_user,
         smtp_password: d.smtp_password, smtp_from: d.smtp_from,
-      });
+      };
+      setSaved(next);
+      setForm({ ...next, vk_group_token: "", smtp_password: "" });
+      setReplacing({ vk: false, smtp: false });
       setAuthed(true); return true;
     } catch { return false; }
+  }
+
+  const vkSet = saved.vk_group_token === "***";
+  const smtpPwSet = saved.smtp_password === "***";
+  const smtpOk = !!(saved.smtp_host && saved.smtp_user && smtpPwSet);
+  const dirtyVk = form.vk_group_token.trim() !== "";
+  const dirtySmtp = form.smtp_password.trim() !== "" ||
+    (["smtp_host", "smtp_port", "smtp_user", "smtp_from"] as const).some((k) => form[k].trim() !== (saved[k] ?? "").trim());
+
+  const note = (sec: Section, n: Note) => setNotes((p) => ({ ...p, [sec]: n }));
+
+  async function saveSection(sec: Section) {
+    const body: Record<string, string> = sec === "vk"
+      ? { vk_group_token: form.vk_group_token.trim() }
+      : {
+          smtp_host: form.smtp_host.trim(), smtp_port: form.smtp_port.trim() || "587",
+          smtp_user: form.smtp_user.trim(), smtp_from: form.smtp_from.trim(),
+          ...(form.smtp_password.trim() ? { smtp_password: form.smtp_password.trim() } : {}),
+        };
+    setSaving(sec); note(sec, null);
+    try {
+      await devFetch("/dev/settings", { method: "POST", body: JSON.stringify(body) });
+      await loadSettings();
+      note(sec, { ok: true, text: "Сохранено. Нажмите «Проверить», чтобы убедиться, что всё работает." });
+    } catch (err) {
+      note(sec, { ok: false, text: err instanceof Error ? err.message : "Не удалось сохранить" });
+    } finally { setSaving(null); }
+  }
+
+  async function testSection(sec: Section) {
+    const ch = sec === "vk" ? "vk" : "email";
+    setTesting(sec); note(sec, null);
+    try {
+      const r = await devFetch<TestResp>(`/dev/test-notification?channel=${ch}`, { method: "POST" });
+      const st = r.results[ch]; const detail = r.details?.[ch];
+      note(sec, st === "sent"
+        ? { ok: true, text: sec === "vk" ? "Сообщение отправлено — проверьте ВК владельца." : `Письмо отправлено на ${r.to}.` }
+        : { ok: false, text: detail || (st === "failed" ? "Не удалось отправить — проверьте данные." : "Канал не настроен.") });
+    } catch (err) {
+      note(sec, { ok: false, text: err instanceof Error ? err.message : "Ошибка" });
+    } finally { setTesting(null); }
   }
 
   useEffect(() => {
@@ -105,17 +274,9 @@ export default function DevPage() {
     }
   }
 
-  async function handleSave(e: React.FormEvent) {
-    e.preventDefault(); setSaved(false); setLoading(true);
-    try {
-      await devFetch("/dev/settings", { method: "POST", body: JSON.stringify(form) });
-      setSaved(true); setTimeout(() => setSaved(false), 3000);
-    } catch { /* ignore */ } finally { setLoading(false); }
-  }
-
   async function handleLogout() {
     await devFetch("/dev/logout", { method: "POST" }).catch(() => {});
-    setAuthed(false); setForm(EMPTY);
+    setAuthed(false); setForm(EMPTY); setSaved(EMPTY);
   }
 
   const [diag, setDiag] = useState<string>("");
@@ -210,72 +371,68 @@ export default function DevPage() {
           })}
         </div>
 
-        {/* Интеграция: ключ ВК + SMTP */}
+        {/* Интеграция: ВК и почта — отдельные карточки со своим сохранением и проверкой */}
         {tab === "integration" && (
-        <div style={card}>
-          <form onSubmit={handleSave}>
-            <p style={{ fontWeight: 600, fontSize: 16, marginBottom: 6 }}>ВКонтакте — ключ сообщества</p>
-            <p style={{ fontSize: 13, color: "var(--ink-secondary)", marginBottom: 16 }}>
-              Ключ доступа сообщества (бот). Свой id (peer_id) владелец вводит сам в Настройках.
-            </p>
+        <>
+          <SectionCard
+            title="ВКонтакте — уведомления о заказах"
+            hint={<>Ключ доступа сообщества (Управление → Работа с API) с правом <b>«сообщения сообщества»</b>.
+              Свой id в ВК владелец указывает сам в Настройках.</>}
+            badge={form.vk_env ? <StatusBadge ok text="Задан на сервере" />
+              : vkSet && saved.vk_peer_set ? <StatusBadge ok text="Подключено" />
+              : vkSet ? <StatusBadge ok={false} text="Нет id владельца" />
+              : <StatusBadge ok={false} text="Не настроено" />}
+            onSave={() => saveSection("vk")} saving={saving === "vk"} dirty={dirtyVk}
+            onTest={() => testSection("vk")} testing={testing === "vk"} testLabel="Проверить ВК" note={notes.vk}>
             {form.vk_env && (
               <p style={{ fontSize: 13, color: "var(--stock)", marginBottom: 12 }}>
-                ✓ ВК задан на сервере (.env.prod) — это поле игнорируется, можно не заполнять.
+                ✓ Ключ ВК задан на сервере (.env.prod) и важнее этого поля.
               </p>
             )}
-            <div style={field}>
-              <label className="form-label">Ключ доступа сообщества</label>
-              <input className="form-input" type="password" value={form.vk_group_token} onChange={set("vk_group_token")}
-                placeholder="vk1.a.… или оставьте ***" autoComplete="off" />
-            </div>
+            <SecretField label="Ключ доступа сообщества" isSet={vkSet} replacing={replacing.vk}
+              value={form.vk_group_token} placeholder="vk1.a.…"
+              onReplace={() => setReplacing((p) => ({ ...p, vk: true }))}
+              onCancel={() => { setReplacing((p) => ({ ...p, vk: false })); setForm((p) => ({ ...p, vk_group_token: "" })); }}
+              onChange={(v) => setForm((p) => ({ ...p, vk_group_token: v }))} />
+          </SectionCard>
 
-            <div style={{ height: 1, background: "var(--hairline-soft)", margin: "20px 0" }} />
-
-            <p style={{ fontWeight: 600, fontSize: 16, marginBottom: 6 }}>Почтовый сервер (SMTP)</p>
-            <p style={{ fontSize: 13, color: "var(--ink-secondary)", marginBottom: 16 }}>
-              Через какой ящик отправлять письма. Адрес получателя (email владельца) задаётся в Настройках.
-            </p>
-            <div style={field}>
-              <label className="form-label">SMTP-сервер (host)</label>
-              <input className="form-input" value={form.smtp_host} onChange={set("smtp_host")}
-                placeholder="smtp.yandex.ru" autoComplete="off" />
-            </div>
-            <div style={field}>
-              <label className="form-label">Порт</label>
-              <input className="form-input" value={form.smtp_port} onChange={set("smtp_port")}
-                placeholder="587" autoComplete="off" />
-            </div>
-            <div style={field}>
-              <label className="form-label">Логин (email отправителя)</label>
-              <input className="form-input" value={form.smtp_user} onChange={set("smtp_user")}
-                placeholder="shop@yandex.ru" autoComplete="off" />
-            </div>
-            <div style={field}>
-              <label className="form-label">Пароль SMTP (пароль приложения)</label>
-              <input className="form-input" type="password" value={form.smtp_password} onChange={set("smtp_password")}
-                placeholder="пароль приложения или оставьте ***" autoComplete="off" />
-            </div>
-            <div style={field}>
-              <label className="form-label">Адрес «От кого» (необязательно)</label>
-              <input className="form-input" type="email" value={form.smtp_from} onChange={set("smtp_from")}
-                placeholder="оставьте пустым (= логин)" autoComplete="off" />
-            </div>
-
-            {saved && (
-              <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", marginBottom: 12,
-                background: "var(--stock-soft)", border: "1px solid var(--stock)", borderRadius: "var(--radius-md)",
-                color: "var(--stock)", fontSize: 14, fontWeight: 600 }}>
-                <span>✓</span> Сохранено
+          <SectionCard
+            title="Почта (SMTP)"
+            hint={<>Ящик, с которого сайт отправляет письма: уведомления о заказах, письма покупателям и ночной бэкап.
+              {saved.email_to && <> Проверочное письмо уйдёт на <b>{saved.email_to}</b>.</>}</>}
+            badge={smtpOk ? <StatusBadge ok text="Подключено" /> : <StatusBadge ok={false} text="Не настроено" />}
+            onSave={() => saveSection("smtp")} saving={saving === "smtp"} dirty={dirtySmtp}
+            onTest={() => testSection("smtp")} testing={testing === "smtp"} testLabel="Отправить тестовое письмо"
+            note={notes.smtp}>
+            <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) 96px", gap: 12 }}>
+              <div style={field}>
+                <label className="form-label">Сервер</label>
+                <input className="form-input" value={form.smtp_host} onChange={set("smtp_host")}
+                  placeholder="smtp.yandex.ru" autoComplete="off" spellCheck={false} />
               </div>
-            )}
-            <button className="btn btn-primary" type="submit" disabled={loading} style={{ marginTop: 8 }}>
-              {loading ? "Сохраняем…" : "Сохранить"}
-            </button>
-            <p style={{ fontSize: 12, color: "var(--ink-secondary)", marginTop: 14 }}>
-              Проверить отправку (ВК / Email) можно у владельца в Настройках — кнопками «Отправить тест».
-            </p>
-          </form>
-        </div>
+              <div style={field}>
+                <label className="form-label">Порт</label>
+                <input className="form-input" value={form.smtp_port} onChange={set("smtp_port")}
+                  placeholder="587" inputMode="numeric" autoComplete="off" />
+              </div>
+            </div>
+            <div style={field}>
+              <label className="form-label">Логин (адрес ящика)</label>
+              <input className="form-input" value={form.smtp_user} onChange={set("smtp_user")}
+                placeholder="shop@yandex.ru" autoComplete="off" spellCheck={false} />
+            </div>
+            <SecretField label="Пароль (для Яндекса/Mail — пароль приложения)" isSet={smtpPwSet} replacing={replacing.smtp}
+              value={form.smtp_password} placeholder="новый пароль"
+              onReplace={() => setReplacing((p) => ({ ...p, smtp: true }))}
+              onCancel={() => { setReplacing((p) => ({ ...p, smtp: false })); setForm((p) => ({ ...p, smtp_password: "" })); }}
+              onChange={(v) => setForm((p) => ({ ...p, smtp_password: v }))} />
+            <div style={field}>
+              <label className="form-label">Адрес «От кого» <span style={{ color: "var(--ink-tertiary)", fontWeight: 400 }}>— необязательно</span></label>
+              <input className="form-input" type="email" value={form.smtp_from} onChange={set("smtp_from")}
+                placeholder="пусто = логин" autoComplete="off" />
+            </div>
+          </SectionCard>
+        </>
         )}
 
         {/* Настройки сайта */}
