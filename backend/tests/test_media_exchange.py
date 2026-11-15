@@ -104,3 +104,42 @@ def test_image_proxy_serves_from_media(client, db_session, monkeypatch, tmp_path
     assert resp.status_code == 200
     assert resp.content == b"PNGBYTES"
     assert resp.headers["content-type"].startswith("image/png")
+
+
+# ─── куски по file_limit (2 МБ) ──────────────────────────────────────────────
+
+def test_init_reports_2mb_file_limit(client):
+    resp = client.get("/api/v1/1c/exchange?type=catalog&mode=init")
+    assert resp.text == f"zip=no\nfile_limit={2 * 1024 * 1024}"
+
+
+def test_exchange_reassembles_chunked_image(client, monkeypatch, tmp_path):
+    """Картинка крупнее file_limit приходит кусками — склеиваем, а не оставляем хвост."""
+    monkeypatch.setattr(media.settings, "MEDIA_DIR", str(tmp_path))
+    client.get("/api/v1/1c/exchange?type=catalog&mode=init")
+    url = "/api/v1/1c/exchange?type=catalog&mode=file&filename=import_files/big-img.jpeg"
+    for part in (b"AAA", b"BBB", b"CCC"):
+        assert client.post(url, content=part).text == "success"
+    assert (tmp_path / "big-img.jpeg").read_bytes() == b"AAABBBCCC"
+
+    # новый сеанс каталога — та же картинка перезаписывается, а не дописывается к старой
+    client.get("/api/v1/1c/exchange?type=catalog&mode=init")
+    client.post(url, content=b"NEW")
+    assert (tmp_path / "big-img.jpeg").read_bytes() == b"NEW"
+
+
+def test_sale_init_keeps_catalog_chunks(client, db_session):
+    """Опрос заказов (type=sale&mode=init) посреди заливки каталога не стирает его куски."""
+    xml = (
+        '<?xml version="1.0" encoding="UTF-8"?>'
+        '<КоммерческаяИнформация><Каталог><Товары>'
+        '<Товар><Ид>chunk-sale-1</Ид><Наименование>Сейл Тест</Наименование><Артикул>CHK-S1</Артикул></Товар>'
+        '</Товары></Каталог></КоммерческаяИнформация>'
+    ).encode("utf-8")
+    half = len(xml) // 2
+    client.get("/api/v1/1c/exchange?type=catalog&mode=init")
+    client.post("/api/v1/1c/exchange?type=catalog&mode=file&filename=import.xml", content=xml[:half])
+    client.get("/api/v1/1c/exchange?type=sale&mode=init")          # МойСклад опрашивает заказы
+    client.post("/api/v1/1c/exchange?type=catalog&mode=file&filename=import.xml", content=xml[half:])
+    stored = exchange.redis_client.get(exchange._file_key("import.xml"))
+    assert stored == xml

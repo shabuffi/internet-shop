@@ -31,7 +31,7 @@ from app.db.models.product import Product
 from app.integrations.moysklad.commerceml_parser import parse_import_xml, parse_offers_xml
 from app.integrations.moysklad.commerceml_orders import build_orders_xml
 from app.services.import_service import upsert_catalog, save_sync_xml
-from app.services.media_storage import is_image_filename, save_image
+from app.services.media_storage import image_name, is_image_filename, save_image
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/1c/exchange", tags=["1C Exchange"])
@@ -40,6 +40,13 @@ router = APIRouter(prefix="/1c/exchange", tags=["1C Exchange"])
 _SESSION_KEY = "exchange:session_token"
 _FILE_KEY = "exchange:file:{name}"          # сырой XML текущей сессии
 _TTL = 3600                                  # 1 час — сессия обмена не длится дольше
+# Размер одного куска файла (ответ init). Мелкие куски — короткие POST'ы: обрыв связи
+# на пути МойСклад → сервер бьёт один кусок, а не 10-мегабайтный. Картинки крупнее лимита
+# тоже приходят кусками — их склеиваем (см. _IMAGE_SESSION_KEY).
+_FILE_LIMIT = 2 * 1024 * 1024
+# Имена картинок, уже начатых в текущем сеансе каталога: первый кусок перезаписывает файл,
+# следующие с тем же именем — дописываются.
+_IMAGE_SESSION_KEY = "exchange:session:images"
 
 # Метка последнего контакта МойСклад — для мониторинга простоя обмена (без TTL, переживает паузы)
 _LAST_SEEN_KEY = "exchange:last_seen"
@@ -429,8 +436,11 @@ async def exchange_get(
     # init = старт нового сеанса обмена → сбрасываем накопленные ранее куски файлов
     # (большой каталог приходит несколькими POST'ами с тем же именем — мы их склеиваем).
     if mode == "init":
-        redis_client.delete(_file_key("import.xml"), _file_key("offers.xml"))
-        return "zip=no\nfile_limit=10485760"  # 10 MB на один кусок; большие файлы шлются частями
+        # Сброс — только для сеанса каталога: опрос заказов (type=sale) идёт каждые ~5 мин
+        # и не должен стирать куски каталога, который в этот момент заливается.
+        if type != "sale":
+            redis_client.delete(_file_key("import.xml"), _file_key("offers.xml"), _IMAGE_SESSION_KEY)
+        return f"zip=no\nfile_limit={_FILE_LIMIT}"  # большие файлы МойСклад шлёт частями
 
     # ── Выдача заказов: МойСклад сам забирает заказы из магазина ──────────────
     # query → отдаём невыгруженные заказы XML; success → помечаем их выгруженными.
@@ -528,8 +538,13 @@ async def exchange_post(
             return "success"
         # Картинка товара (опция «Выгружать изображения») — сохраняем в медиа-хранилище
         if is_image_filename(filename):
-            saved = save_image(filename, body)
-            logger.info("Received image: %s → %s (%d bytes)", filename, saved, len(body))
+            # Картинка крупнее file_limit приходит несколькими POST'ами с тем же именем:
+            # первый кусок в сеансе перезаписывает файл, остальные дописываются.
+            first = bool(redis_client.sadd(_IMAGE_SESSION_KEY, image_name(filename)))
+            redis_client.expire(_IMAGE_SESSION_KEY, _TTL)
+            saved = save_image(filename, body, append=not first)
+            logger.info("Received image%s: %s → %s (%d bytes)",
+                        "" if first else " chunk", filename, saved, len(body))
             return "success"
         # Изменения по заказам от МойСклад (опция «Выгружать изменения по заказам»):
         # МойСклад загружает orders.xml с текущим состоянием заказов. Разбираем статус

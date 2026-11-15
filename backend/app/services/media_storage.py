@@ -59,19 +59,21 @@ def image_name(raw: str | None) -> str | None:
     return _safe_name(raw) if raw else None
 
 
-def save_image(filename: str, data: bytes) -> str:
+def save_image(filename: str, data: bytes, append: bool = False) -> str:
     """Сохраняет байты картинки в медиа-каталог.
 
     Args:
         filename: Имя файла из обмена (приводится к basename).
         data: Байты картинки.
+        append: Дописать в конец (следующий кусок картинки, порезанной по ``file_limit``),
+            а не перезаписать файл.
 
     Returns:
         Имя сохранённого файла (basename), которым он связывается с товаром.
     """
     name = _safe_name(filename)
     os.makedirs(settings.MEDIA_DIR, exist_ok=True)
-    with open(os.path.join(settings.MEDIA_DIR, name), "wb") as f:
+    with open(os.path.join(settings.MEDIA_DIR, name), "ab" if append else "wb") as f:
         f.write(data)
     return name
 
