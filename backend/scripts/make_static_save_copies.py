@@ -5,7 +5,7 @@
 главной лежит невидимый слой с копией из ``public/categories/save/`` (как у фото товаров),
 и эти копии делаются этим скриптом тем же кодом водяного знака, что и на бэкенде.
 
-Перезапускать при смене логотипа (``app/assets/watermark.png``) или картинок разделов::
+Перезапускать при смене логотипа (``app/assets/watermark-site-1gear.png``) или картинок разделов::
 
     docker compose cp frontend/public/categories backend:/tmp/cats
     docker compose exec -T backend sh -c \

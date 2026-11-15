@@ -76,11 +76,14 @@ WATERMARKED = {"thumb", "card", "og", "save", "thumb_save"}
 # Копии «для сохранения» — со знаком MEDIA_WATERMARK_SAVE (остальные — MEDIA_WATERMARK).
 SAVE_SIZES = {"save", "thumb_save"}
 # Версия оформления знака: входит в имя копии — менять при смене рисования.
-_MARK_STYLE = 8
+_MARK_STYLE = 10
 _ASSETS = os.path.join(os.path.dirname(os.path.dirname(__file__)), "assets")
-# Логотип (шестерёнка с домиком, «ИНЖЕНЕР», «ТОРГОВЫЙ ДОМ» с линиями) — = frontend/public/logo.png.
-# Видимый знак — его серая форма, скачанные копии — он сам в цветах бренда (макет владельца).
-_LOGO_PATH = os.path.join(_ASSETS, "watermark.png")
+# Знак — логотип из шапки сайта с ОДНОЙ (красной) шестерёнкой: «ИНЖЕНЕР», «торговый дом»
+# с линиями; синяя шестерёнка с домиком отрезана (решение владельца 15.11.2026). Растр
+# frontend/public/logo.svg (sharp, 150 dpi), прозрачный фон. Скачанные копии — он в цветах
+# бренда (на тёмном — белый), видимый знак на сайте (когда включат) — его серая форма.
+_LOGO_PATH = os.path.join(_ASSETS, "watermark-site-1gear.png")
+_VISIBLE_PATH = _LOGO_PATH
 # Значок вкладки (шестерёнка с домиком на белом круге) — вариант видимого знака «icon».
 _ICON_PATH = os.path.join(_ASSETS, "watermark-icon.png")
 
@@ -146,7 +149,7 @@ def _variant_path(name: str, size: str, st: os.stat_result) -> str:
 def _asset_version(kind: str) -> int:
     """Версия картинки знака (входит в имя копии): размер файла."""
     try:
-        return os.stat(_ICON_PATH if kind == "icon" else _LOGO_PATH).st_size
+        return os.stat({"icon": _ICON_PATH, "logo": _VISIBLE_PATH}.get(kind, _LOGO_PATH)).st_size
     except OSError:
         return 0
 
@@ -163,18 +166,26 @@ def _shape(im: Image.Image) -> Image.Image:
     return ImageChops.subtract(im.getchannel("A"), whiteness)
 
 
-@lru_cache(maxsize=1)
-def _logo_images() -> tuple[Image.Image, Image.Image]:
-    """Логотип для знака: (маска формы L, цветной RGBA), обрезанные по содержимому.
-
-    Маска — для серого видимого знака и белой версии на тёмном фоне (белые детали — домик —
-    остаются «окнами»); цветной — для скачанных копий на светлых участках.
-    """
-    with Image.open(_LOGO_PATH) as im:
+def _load_mark(path: str) -> tuple[Image.Image, Image.Image]:
+    """Картинка знака: (маска формы L, цветной RGBA), обрезанные по содержимому. Маска — для
+    серого знака и белой версии на тёмном фоне (белые детали — домик — остаются «окнами»)."""
+    with Image.open(path) as im:
         color = im.convert("RGBA")
     shape = _shape(color)
     box = shape.getbbox()
     return (shape.crop(box), color.crop(box)) if box else (shape, color)
+
+
+@lru_cache(maxsize=1)
+def _logo_images() -> tuple[Image.Image, Image.Image]:
+    """Логотип шапки с одной шестерёнкой — для скачанных копий (цветной; белый на тёмном)."""
+    return _load_mark(_LOGO_PATH)
+
+
+@lru_cache(maxsize=1)
+def _visible_images() -> tuple[Image.Image, Image.Image]:
+    """Логотип шапки с одной шестерёнкой — для серого видимого знака на сайте."""
+    return _load_mark(_VISIBLE_PATH)
 
 
 def _tone_for(img: Image.Image, box: tuple[int, int, int, int]) -> tuple[int, int, int]:
@@ -241,8 +252,9 @@ def _apply_watermark(img: Image.Image, mode: str, opacity: float, kind: str = "l
     """Накладывает знак на уже уменьшенную копию.
 
     ``kind``:
-      * ``logo`` — серая форма логотипа (:func:`_logo_images`), тон под фон — видимый знак;
-      * ``brand`` — тот же логотип в цветах бренда (копии «для сохранения»: их видит только
+      * ``logo`` — серая форма логотипа шапки с одной шестерёнкой (:func:`_visible_images`),
+        тон под фон — видимый знак;
+      * ``brand`` — тот же логотип с одной шестерёнкой в цветах бренда (копии «для сохранения»: их видит только
         тот, кто сохранил фото). На тёмном участке — белым, иначе синий пропадает;
       * ``icon`` — только значок (иконка вкладки, на белом круге).
 
@@ -258,7 +270,7 @@ def _apply_watermark(img: Image.Image, mode: str, opacity: float, kind: str = "l
         if icon:
             logo = _icon()
         else:
-            shape_full, color_full = _logo_images()
+            shape_full, color_full = _logo_images() if brand else _visible_images()
             logo = shape_full
     except Exception as e:  # noqa: BLE001
         log.error("media_variants: нет картинки для водяного знака: %s", e)

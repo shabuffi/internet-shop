@@ -330,21 +330,27 @@ def test_watermark_tiny_image_no_crash(monkeypatch):
 def test_watermark_missing_logo_still_no_original(monkeypatch):
     """Нет картинки логотипа → копия без знака (ошибка в лог), но не оригинал в полном размере."""
     monkeypatch.setattr(settings, "MEDIA_WATERMARK", "corner")
-    monkeypatch.setattr(mv, "_LOGO_PATH", "/nonexistent/logo.png")
-    mv._logo_images.cache_clear()
+    monkeypatch.setattr(mv, "_VISIBLE_PATH", "/nonexistent/logo.png")
+    mv._visible_images.cache_clear()
     try:
         media.save_image("w.png", _white((2400, 1600)))
         im = _open(mv.get_variant("w.png", "card"))
         assert im.size == (900, 600) and not _region_changed(im, (0, 0, 900, 600))
     finally:
-        mv._logo_images.cache_clear()
+        mv._visible_images.cache_clear()
 
 
 def test_watermark_assets_exist():
-    assert os.path.isfile(mv._ICON_PATH) and os.path.isfile(mv._LOGO_PATH)
-    shape, color = mv._logo_images()
+    for path in (mv._ICON_PATH, mv._LOGO_PATH, mv._VISIBLE_PATH):
+        assert os.path.isfile(path), path
+    shape, color = mv._logo_images()                                # скачанные копии
+    one, _ = mv._visible_images()                                   # видимый знак
     assert shape.mode == "L" and color.mode == "RGBA" and shape.size == color.size
     assert shape.width > 3 * shape.height                           # логотип вытянутый
+    assert one.size == shape.size                                   # один и тот же логотип
+    # одна (красная) шестерёнка: в левой части логотипа нет синего (синяя шестерёнка отрезана)
+    left = color.crop((0, 0, color.height, color.height)).getdata()
+    assert not any(a > 128 and b > 120 and r < 60 for r, g, b, a in left)
 
 
 def test_admin_media_product_photo_gets_save_copy(client, db_session, variants_on, monkeypatch):
