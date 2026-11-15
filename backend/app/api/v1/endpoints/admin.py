@@ -333,6 +333,7 @@ def diagnose_import(db: Session = Depends(get_db), _=Depends(_get_current_dev)):
     from app.core.redis_client import redis_client
     from app.integrations.moysklad.commerceml_parser import parse_import_xml
     from lxml import etree
+    from app.integrations.moysklad import safe_xml
 
     raw = redis_client.get("exchange:diag:import.xml")
     if not raw:
@@ -361,7 +362,7 @@ def diagnose_import(db: Session = Depends(get_db), _=Depends(_get_current_dev)):
     # Сырой XML товара, у которого есть <Картинка> (или первого)
     first_xml = None
     try:
-        root = etree.fromstring(raw)
+        root = safe_xml.fromstring(raw)
         tovars = [el for el in root.iter() if el.tag.endswith("Товар")]
         pick = next((t for t in tovars if any(c.tag.endswith("Картинка") for c in t.iter())), tovars[0] if tovars else None)
         if pick is not None:
@@ -1554,13 +1555,14 @@ def sync_log_product_xml(sync_id: int, moysklad_id: str,
                          db: Session = Depends(get_db), _=Depends(_get_current_admin)):
     """Отдаёт кусок `<Товар>` из сохранённой копии import.xml этого обмена."""
     from lxml import etree
+    from app.integrations.moysklad import safe_xml
     from app.services.import_service import read_sync_xml
 
     log = _sync_log_or_404(db, sync_id)
     raw = read_sync_xml(log)
     if not raw:
         raise HTTPException(status_code=404, detail="Копия import.xml этого обмена не сохранена")
-    root = etree.fromstring(raw)
+    root = safe_xml.fromstring(raw)
     for t in (e for e in root.iter() if e.tag.endswith("Товар")):
         ident = next((c.text for c in t.iter() if c.tag.endswith("Ид")), None)
         if ident == moysklad_id:

@@ -231,3 +231,43 @@ def test_parse_offers_ignores_unknown_product():
         "<Предложение><Ид>unknown</Ид><Количество>9</Количество></Предложение>"
     ), catalog)
     assert catalog.products[0].stock == 0   # не тронут
+
+
+# ─── XXE: внешние сущности не подставляются ──────────────────────────────────
+
+def _xxe_doc(secret_path, body):
+    return (f'<?xml version="1.0" encoding="UTF-8"?>\n'
+            f'<!DOCTYPE КоммерческаяИнформация [<!ENTITY xxe SYSTEM "file://{secret_path}">]>\n'
+            f'<КоммерческаяИнформация>{body}</КоммерческаяИнформация>').encode()
+
+
+def test_import_xml_does_not_read_local_files(tmp_path):
+    """XML с внешней сущностью не должен вытаскивать файл сервера в данные каталога."""
+    secret = tmp_path / "secret.env"
+    secret.write_text("SECRET_KEY=leaked-value")
+    xml = _xxe_doc(secret, "<Каталог><Товары><Товар><Ид>p1</Ид>"
+                           "<Наименование>Крем &xxe;</Наименование>"
+                           "<Описание>&xxe;</Описание></Товар></Товары></Каталог>")
+    catalog = parse_import_xml(xml)
+    assert "leaked-value" not in repr(catalog)
+
+
+def test_offers_xml_does_not_read_local_files(tmp_path):
+    secret = tmp_path / "secret.env"
+    secret.write_text("leaked-value")
+    catalog = parse_import_xml(_import_xml(
+        products="<Товар><Ид>p1</Ид><Наименование>Крем</Наименование></Товар>"))
+    xml = _xxe_doc(secret, "<ПакетПредложений><Предложения><Предложение><Ид>p1</Ид>"
+                           "<Количество>&xxe;</Количество></Предложение></Предложения></ПакетПредложений>")
+    try:
+        parse_offers_xml(xml, catalog)
+    except Exception:
+        pass  # отказ разобрать — тоже безопасный исход
+    assert "leaked-value" not in repr(catalog)
+
+
+def test_standard_entities_still_work():
+    """&amp;, &quot; и числовые ссылки МойСклад шлёт — они должны разбираться как раньше."""
+    catalog = parse_import_xml(_import_xml(
+        products="<Товар><Ид>p1</Ид><Наименование>Мыло &amp; &quot;Крем&quot; &#8470;1</Наименование></Товар>"))
+    assert catalog.products[0].name == 'Мыло & "Крем" №1'

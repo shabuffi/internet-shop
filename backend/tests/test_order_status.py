@@ -191,3 +191,13 @@ def test_apply_status_cancelled_marks_order(db_session):
     o = db_session.get(Order, "o-c")
     assert o.status == "cancelled"
     assert o.moysklad_status == "Отменён"
+
+
+def test_parse_does_not_read_local_files(tmp_path):
+    """orders.xml с внешней сущностью: файл сервера не попадает в статус/номер."""
+    secret = tmp_path / "secret.env"
+    secret.write_text("leaked-value")
+    xml = (f'<?xml version="1.0" encoding="UTF-8"?>\n'
+           f'<!DOCTYPE КоммерческаяИнформация [<!ENTITY xxe SYSTEM "file://{secret}">]>\n'
+           '<КоммерческаяИнформация><Документ><Номер>&xxe;</Номер></Документ></КоммерческаяИнформация>').encode()
+    assert "leaked-value" not in repr(parse_order_statuses(xml))

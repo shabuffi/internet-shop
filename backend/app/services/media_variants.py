@@ -40,6 +40,12 @@ from fastapi import Request
 from fastapi.responses import FileResponse, Response
 from PIL import Image, ImageChops, ImageFilter, ImageStat
 
+# Какие форматы вообще открываем. Фото приходят из обмена и из админки; экзотические
+# декодеры Pillow (TIFF, PSD, FPX, XBM…) — источник большинства его уязвимостей, а нужны
+# нам только эти. JPEG с телефона с «доп. кадрами» (MPO) открывается через JPEG.
+# Остальное Image.open отвергает → serve_image отдаёт файл как есть, не декодируя.
+SAFE_FORMATS = ("JPEG", "PNG", "WEBP", "GIF")
+
 from app.core.config import settings
 from app.services.media_storage import media_path
 
@@ -169,7 +175,7 @@ def _shape(im: Image.Image) -> Image.Image:
 def _load_mark(path: str) -> tuple[Image.Image, Image.Image]:
     """Картинка знака: (маска формы L, цветной RGBA), обрезанные по содержимому. Маска — для
     серого знака и белой версии на тёмном фоне (белые детали — домик — остаются «окнами»)."""
-    with Image.open(path) as im:
+    with Image.open(path, formats=SAFE_FORMATS) as im:
         color = im.convert("RGBA")
     shape = _shape(color)
     box = shape.getbbox()
@@ -411,7 +417,7 @@ def _render(src: str, dst: str, max_side: int, fmt: str,
     # Порядок важен для памяти: сначала уменьшаем (единственная полноразмерная копия в памяти —
     # сам декодированный оригинал), потом поворот и смена режима — уже на маленькой картинке.
     # Наоборот (exif_transpose/convert на оригинале) — 2-3 полноразмерные копии на картинку.
-    with Image.open(src) as im:
+    with Image.open(src, formats=SAFE_FORMATS) as im:
         orientation = im.getexif().get(0x0112, 1)
         if im.format == "JPEG":
             # Фото с телефона бывают 48–50 Мпикс (фото владелец загружает и сам, через

@@ -46,6 +46,8 @@ from io import BytesIO
 
 from lxml import etree
 
+from app.integrations.moysklad import safe_xml
+
 
 @dataclass
 class ParsedCategory:
@@ -177,6 +179,7 @@ def parse_import_xml(xml_bytes: bytes) -> ParsedCatalog:
         BytesIO(xml_bytes),
         events=("end",),
         tag=("{*}Классификатор", "{*}Каталог", "{*}Товар"),
+        **safe_xml.PARSE_OPTS,  # без внешних сущностей (XXE) — см. safe_xml
     ):
         if not tags:
             # Namespace берём с первого же подошедшего элемента: он тот же, что у корня
@@ -246,7 +249,7 @@ def parse_offers_xml(xml_bytes: bytes, catalog: ParsedCatalog) -> None:
     Returns:
         None. Результат — мутация переданного ``catalog``.
     """
-    root = etree.fromstring(xml_bytes)
+    root = safe_xml.fromstring(xml_bytes)
     ns = _detect_ns(root)
 
     product_index = {p.moysklad_id: p for p in catalog.products}

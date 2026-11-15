@@ -6,7 +6,7 @@
 МойСклад идёт без ``xmlns`` (см. commerceml_parser), поэтому теги ищем по локальному имени.
 """
 
-from lxml import etree
+from app.integrations.moysklad import safe_xml
 
 
 def _local(tag) -> str:
@@ -80,7 +80,7 @@ def parse_order_statuses(xml: bytes) -> list[dict]:
     ``items`` — позиции (см. ``_parse_items``) или ``None``, если товаров в документе нет.
     """
     try:
-        root = etree.fromstring(xml)
+        root = safe_xml.fromstring(xml)
     except Exception:
         return []
     result: list[dict] = []

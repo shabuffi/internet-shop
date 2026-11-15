@@ -29,10 +29,10 @@ python-dateutil==2.9.0.post0
 httpx==0.28.1
 
 # XML parsing (для CommerceML)
-lxml==5.3.0
+lxml==6.1.0
 
 # Уменьшенные копии картинок товаров (превью/карточка), без EXIF
-Pillow==11.3.0
+Pillow==13.0.0
 
 # Auth
 bcrypt==4.2.1

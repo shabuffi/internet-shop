@@ -843,3 +843,18 @@ def test_download_name_translit():
     assert mv.download_name("с4 Семена ДЫНЯ «Медовая» лакомка") == "td-engineer-s4-semena-dynya-medovaya-lakomka.jpg"
     assert mv.download_name(None) == "td-engineer.jpg"
 
+
+
+def test_exotic_format_not_decoded():
+    """TIFF под видом .jpg: Pillow его не открывает (декодеры TIFF/PSD/FPX — главный
+    источник уязвимостей Pillow), отдаём файл как есть."""
+    buf = io.BytesIO()
+    Image.new("RGB", (64, 64), (10, 200, 10)).save(buf, "TIFF")
+    media.save_image("fake.jpg", buf.getvalue())
+    assert mv.get_variant("fake.jpg", "thumb") is None
+
+
+def test_phone_jpeg_still_processed():
+    """Обычный JPEG по-прежнему уменьшается."""
+    media.save_image("ok.jpg", _jpeg_rotated())
+    assert mv.get_variant("ok.jpg", "thumb") is not None

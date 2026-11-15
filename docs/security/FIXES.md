@@ -79,6 +79,11 @@ Email в проекте — логин, поэтому смена сделана
 
 ---
 
+## B-6 + B-7 — 2026-11-15 (ветка, НЕ задеплоено)
+
+- **B-6** `integrations/moysklad/safe_xml.py`: `PARSE_OPTS = {resolve_entities: False, no_network: True, load_dtd: False}`; `fromstring()` через новый `XMLParser` на каждый вызов (парсер не потокобезопасен). Применено: `commerceml_parser.parse_import_xml` (`iterparse(**PARSE_OPTS)`), `parse_offers_xml`, `commerceml_order_status.parse_order_statuses`, `admin.diagnose_import`, `admin.sync_log_product_xml`. `requirements.txt`: lxml 6.1.0.
+- **B-7** `services/media_variants.py`: `SAFE_FORMATS = ("JPEG","PNG","WEBP","GIF")` в `Image.open` (`_render`, `_load_mark`). MPO в списке не нужен и ломает Pillow 13 (`KeyError: 'MPO'` — это не отдельный open-формат, MPO открывается через JPEG). Отказ декодировать → прежний путь «отдать файл как есть». `requirements.txt`: Pillow 13.0.0.
+
 ## Ротация серверных секретов — 2026-11-15 (конфигурация прода, без изменения кода)
 
 - `.env.prod`: новые `POSTGRES_PASSWORD`, `SECRET_KEY`, `DEV_PASSWORD` сгенерированы на сервере (`openssl rand`), в вывод/логи не попадали. Пароль БД сменён через `ALTER USER` по stdin (не в списке процессов). Сервисы, читающие `.env.prod`, пересозданы `up -d --no-deps --force-recreate backend worker beat` (контейнер db не трогали — пароль в env db влияет только на initdb).
